@@ -1,9 +1,6 @@
 import numpy as np
 import gemmi
 import os
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from eryx.models import *
 from eryx.pdb import AtomicModel
 from eryx.map_utils import generate_grid
