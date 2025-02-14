@@ -6,7 +6,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "numpy",
-        "torch",
+        "torch>=2.0.0",
         "pytest",
     ],
     python_requires=">=3.8",
