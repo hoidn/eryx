@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from eryx.scatter_torch import compute_form_factors, structure_factors_batch
 import eryx.scatter as scatter  # numpy version from existing code
-from eryx.models_torch import TestBridge
+from test_models_torch import TestBridge
 
 # Helper to generate test data.
 def generate_test_data():
