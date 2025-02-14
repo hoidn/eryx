@@ -31,13 +31,14 @@ def compute_form_factors(q_grid: torch.Tensor,
     assert ff_a.shape == ff_b.shape, "ff_a and ff_b must have same shape"
     assert ff_a.shape[0] == ff_c.shape[0], "Number of atoms must match across coefficients"
     
-    Q = torch.square(torch.linalg.norm(q_grid, dim=1) / (4*np.pi))
-    Q = Q.reshape(-1, 1)  # Shape: (n_points, 1)
+    Q = torch.square(torch.linalg.norm(q_grid, dim=1) / (4 * np.pi))
+    Q = Q.unsqueeze(1).unsqueeze(2)  # Now shape: (n_points, 1, 1)
     
-    fj = ff_a.unsqueeze(0) * torch.exp(-1 * ff_b.unsqueeze(0) * Q)
-    fj = torch.sum(fj, dim=2) + ff_c
+    exp_term = torch.exp(-1 * ff_b.unsqueeze(0) * Q)  # Shape: (n_points, n_atoms, 4)
+    fj = ff_a.unsqueeze(0) * exp_term                # Shape: (n_points, n_atoms, 4)
+    fj = torch.sum(fj, dim=2) + ff_c                    # Shape: (n_points, n_atoms)
     
-    return fj.reshape_as(torch.empty(Q.shape[0], ff_c.shape[0]))
+    return fj
 
 # Torch implementation of structure_factors_batch.
 def structure_factors_batch(q_grid: torch.Tensor, 
