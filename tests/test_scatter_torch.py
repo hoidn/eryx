@@ -7,23 +7,55 @@ from .test_models_torch import TestBridge
 
 # Helper to generate test data.
 def generate_test_data():
-    q_grid_np = np.linspace(0, 10, 100).reshape(100, 1)
-    ff_a_np = np.ones((100, 1))
-    ff_b_np = np.ones((100, 1)) * 2
-    ff_c_np = np.ones((100, 1)) * 3
+    """Generate test data with consistent shapes."""
+    # Example dimensions
+    n_points = 100
+    n_atoms = 5
+    n_coeffs = 4
+    
+    q_grid_np = np.random.rand(n_points, 3)  # q-vectors
+    ff_a_np = np.random.rand(n_atoms, n_coeffs)  # a coefficients
+    ff_b_np = np.random.rand(n_atoms, n_coeffs)  # b coefficients 
+    ff_c_np = np.random.rand(n_atoms)  # c coefficients
+    
+    print(f"Generated shapes: q_grid={q_grid_np.shape}, ff_a={ff_a_np.shape}, "
+          f"ff_b={ff_b_np.shape}, ff_c={ff_c_np.shape}")
+    
     return q_grid_np, ff_a_np, ff_b_np, ff_c_np
 
 def test_compute_form_factors():
     q_grid_np, ff_a_np, ff_b_np, ff_c_np = generate_test_data()
-
-    # Define lambda wrappers to match the API.
-    numpy_func = lambda data: scatter.compute_form_factors(*data)
-    torch_func = lambda data: compute_form_factors(torch.from_numpy(data[0]),
-                                                     torch.from_numpy(data[1]),
-                                                     torch.from_numpy(data[2]),
-                                                     torch.from_numpy(data[3]))
+    
+    # First verify numpy output shape
+    numpy_out = scatter.compute_form_factors(q_grid_np, ff_a_np, ff_b_np, ff_c_np)
+    print(f"NumPy output shape: {numpy_out.shape}")
+    
+    # Then verify torch output shape
+    torch_out = compute_form_factors(
+        torch.from_numpy(q_grid_np),
+        torch.from_numpy(ff_a_np),
+        torch.from_numpy(ff_b_np),
+        torch.from_numpy(ff_c_np)
+    ).numpy()
+    print(f"PyTorch output shape: {torch_out.shape}")
+    
+    # Use bridge for comparison
     bridge = TestBridge()
-    bridge.compare_outputs(numpy_func, torch_func, (q_grid_np, ff_a_np, ff_b_np, ff_c_np), rtol=1e-7)
+    bridge.compare_outputs(
+        numpy_func=lambda data: scatter.compute_form_factors(*data),
+        torch_func=lambda data: compute_form_factors(*(torch.from_numpy(d) for d in data)),
+        inputs=(q_grid_np, ff_a_np, ff_b_np, ff_c_np),
+        rtol=1e-7
+    )
+
+def test_form_factors_invalid_shapes():
+    with pytest.raises(AssertionError):
+        compute_form_factors(
+            torch.randn(10, 2),  # Invalid q_grid shape
+            torch.randn(5, 4),
+            torch.randn(5, 4),
+            torch.randn(5)
+        )
 
 def test_structure_factors_batch():
     q_grid_np, ff_a_np, ff_b_np, ff_c_np = generate_test_data()

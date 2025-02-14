@@ -3,11 +3,41 @@ import numpy as np
 from typing import Union
 
 # Torch implementation of compute_form_factors.
-def compute_form_factors(q_grid: torch.Tensor, ff_a: torch.Tensor, ff_b: torch.Tensor, ff_c: torch.Tensor) -> torch.Tensor:
-    # Example: a torch-based form factor computation. Replace with the appropriate math.
-    # (This is a placeholder that mimics an operation on q_grid.)
-    norm_q = torch.norm(q_grid, dim=1, keepdim=True)
-    return ff_a * torch.exp(-norm_q) + ff_b + ff_c
+def compute_form_factors(q_grid: torch.Tensor, 
+                        ff_a: torch.Tensor,
+                        ff_b: torch.Tensor, 
+                        ff_c: torch.Tensor) -> torch.Tensor:
+    """
+    Compute atomic form factors.
+    
+    Parameters
+    ----------
+    q_grid : torch.Tensor, shape (n_points, 3)
+        q-vectors in Angstrom
+    ff_a : torch.Tensor, shape (n_atoms, 4)
+        a coefficients of atomic form factors
+    ff_b : torch.Tensor, shape (n_atoms, 4)
+        b coefficients of atomic form factors
+    ff_c : torch.Tensor, shape (n_atoms,)
+        c coefficients of atomic form factors
+    
+    Returns
+    -------
+    fj : torch.Tensor, shape (n_points, n_atoms)
+        Atomic form factors
+    """
+    # Validate input shapes
+    assert q_grid.shape[1] == 3, "q_grid must have shape (n_points, 3)"
+    assert ff_a.shape == ff_b.shape, "ff_a and ff_b must have same shape"
+    assert ff_a.shape[0] == ff_c.shape[0], "Number of atoms must match across coefficients"
+    
+    Q = torch.square(torch.linalg.norm(q_grid, dim=1) / (4*np.pi))
+    Q = Q.reshape(-1, 1)  # Shape: (n_points, 1)
+    
+    fj = ff_a.unsqueeze(0) * torch.exp(-1 * ff_b.unsqueeze(0) * Q)
+    fj = torch.sum(fj, dim=2) + ff_c
+    
+    return fj.reshape_as(torch.empty(Q.shape[0], ff_c.shape[0]))
 
 # Torch implementation of structure_factors_batch.
 def structure_factors_batch(q_grid: torch.Tensor, 
