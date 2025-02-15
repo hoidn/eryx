@@ -24,11 +24,11 @@ class RigidBodyTranslationsTorch(ModelBase):
         lsampling: Tuple[float, float, float]
     ) -> None:
         # PORT: Replace with properly ported operations.
-        # Placeholder: using zeros – replace with pytorch equivalents of compute_molecular_transform.
+        # Placeholder: using zeros – ensure that the flattened transform has the same length as q_grid.
         self.q_grid = torch.zeros((100, 3), device=self.device)
-        self.transform = torch.zeros((10, 10, 10), device=self.device)
+        self.transform = torch.zeros((100,), device=self.device)
         self.q_mags = torch.linalg.norm(self.q_grid, dim=1)
-        self.map_shape = self.transform.shape
+        self.map_shape = (100,)
 
     def apply_disorder(
         self,
