@@ -35,8 +35,8 @@ class RigidBodyTranslationsTorch(ModelBase):
             batch_size=10000,
             n_processes=8
         )
-        self.q_grid = torch.tensor(q_grid_np, dtype=torch.float32, device=self.device)
-        self.transform = torch.tensor(transform_np, dtype=torch.float32, device=self.device)
+        self.q_grid = torch.tensor(q_grid_np, dtype=torch.float64, device=self.device)
+        self.transform = torch.tensor(transform_np, dtype=torch.float64, device=self.device)
         self.q_mags = torch.linalg.norm(self.q_grid, dim=1)
         self.map_shape = transform_np.shape
 
@@ -46,7 +46,7 @@ class RigidBodyTranslationsTorch(ModelBase):
     ) -> torch.Tensor:
         # If a float is supplied, convert to a one-element tensor.
         if isinstance(sigmas, float):
-            sigmas = torch.tensor([sigmas], device=self.device)
+            sigmas = torch.tensor([sigmas], dtype=torch.float64, device=self.device)
         # If a scalar tensor (0-D) is passed, unsqueeze it into a 1-D tensor
         if isinstance(sigmas, torch.Tensor) and sigmas.ndim == 0:
             sigmas = sigmas.unsqueeze(0)
