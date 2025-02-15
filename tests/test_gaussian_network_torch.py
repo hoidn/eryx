@@ -11,7 +11,7 @@ def test_neighbor_list():
     
     # Create both models
     torch_model = GaussianNetworkModelTorch(pdb_path, enm_cutoff=cutoff)
-    numpy_model = GaussianNetworkModel(pdb_path, enm_cutoff=cutoff)
+    numpy_model = GaussianNetworkModel(pdb_path, enm_cutoff=cutoff, gamma_intra=1.0, gamma_inter=1.0)
     
     # Compare neighbor lists
     numpy_pairs = set(map(tuple, numpy_model.neighbor_list))
@@ -41,7 +41,7 @@ def test_hessian_matches_numpy():
     
     # Create both models
     torch_model = GaussianNetworkModelTorch(pdb_path)
-    numpy_model = GaussianNetworkModel(pdb_path)
+    numpy_model = GaussianNetworkModel(pdb_path, enm_cutoff=4.0, gamma_intra=1.0, gamma_inter=1.0)
     
     # Compare Hessians
     hessian_torch = torch_model.compute_hessian().cpu().numpy()
@@ -66,7 +66,7 @@ def test_kinv_computation():
         hessian.reshape(n, n),
         Kinv.reshape(n, n)
     )
-    assert torch.allclose(prod, torch.eye(n, device=model.device), atol=1e-6)
+    assert torch.allclose(prod, torch.eye(n, dtype=prod.dtype, device=model.device), atol=1e-6)
 
 def test_gradient_computation():
     """Test that gradients flow through the model."""

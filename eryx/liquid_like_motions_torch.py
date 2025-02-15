@@ -150,12 +150,12 @@ class LiquidLikeMotionsTorch(ModelBase):
         """
         # Convert inputs to tensors if needed
         if isinstance(gammas, (float, int)):
-            gammas = torch.tensor([gammas], device=self.device)
+            gammas = torch.tensor([gammas], device=self.device, dtype=torch.float64)
         if isinstance(sigmas, (float, int)):
-            sigmas = torch.tensor([sigmas], device=self.device)
+            sigmas = torch.tensor([sigmas], device=self.device, dtype=torch.float64)
             
         # Generate kernel and convolve with transform
-        Id = torch.zeros((len(gammas), self.q_grid.shape[0]), device=self.device)
+        Id = torch.zeros((len(gammas), self.q_grid.shape[0]), device=self.device, dtype=torch.float64)
         kernels = 8.0 * torch.pi * (gammas.unsqueeze(1)**3) / torch.square(
             1 + torch.square(gammas.unsqueeze(1) * self.q_mags)
         )

@@ -98,6 +98,7 @@ class GaussianNetworkModelTorch(ModelBase):
             
             # Add phase factor if kvec provided
             if kvec is not None:
+                kvec = kvec.to(self.xyz.dtype)
                 phase = torch.dot(kvec, diffs[idx])
                 phase_factor = torch.exp(1j * phase)
                 block = block * phase_factor
