@@ -91,4 +91,4 @@ class DeviceManager:
 class GradientCheckpointing:
     @staticmethod
     def checkpoint(module: torch.nn.Module, *inputs: torch.Tensor) -> torch.Tensor:
-        return torch.utils.checkpoint.checkpoint(module, *inputs)
+        return torch.utils.checkpoint.checkpoint_sequential([module], 1, *inputs)

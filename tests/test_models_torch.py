@@ -69,7 +69,9 @@ def test_device_management():
 
 # NEW: Test for gradient checkpointing
 def test_gradient_checkpointing():
-    module = torch.nn.Linear(10, 5)
+    module = torch.nn.Sequential(
+        torch.nn.Linear(10, 5)
+    )
     input_tensor = torch.randn(1, 10, requires_grad=True)
     output = GradientCheckpointing.checkpoint(module, input_tensor)
     output.sum().backward()
