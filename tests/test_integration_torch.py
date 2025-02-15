@@ -43,11 +43,11 @@ def test_liquid_like_motions_integration():
     sigma = 0.5
     # Instantiate numpy version
     numpy_model = LiquidLikeMotions(PDB_PATH, HSAMPLING, KSAMPLING, LSAMPLING, expand_p1=True)
-    numpy_output = numpy_model.apply_disorder(sigma)
+    numpy_output = numpy_model.apply_disorder(sigma, 1.0)
     
     # Instantiate torch version
     torch_model = LiquidLikeMotionsTorch(PDB_PATH, HSAMPLING, KSAMPLING, LSAMPLING, expand_p1=True, device='cpu')
-    torch_output = torch_model.apply_disorder(sigma)
+    torch_output = torch_model.apply_disorder(sigma, 1.0)
     
     assert torch.allclose(torch_output.cpu(), torch.from_numpy(numpy_output), rtol=1e-7, equal_nan=True)
 
