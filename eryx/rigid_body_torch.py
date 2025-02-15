@@ -1,0 +1,65 @@
+import torch
+import numpy as np
+from typing import Tuple, Union
+from eryx.models_torch import ModelBase, DeviceManager, GradientCheckpointing
+
+class RigidBodyTranslationsTorch(ModelBase):
+    def __init__(
+        self,
+        pdb_path: str,
+        hsampling: Tuple[float, float, float],
+        ksampling: Tuple[float, float, float],
+        lsampling: Tuple[float, float, float],
+        device: str = 'cpu'
+    ) -> None:
+        super().__init__(device)
+        self.device_manager = DeviceManager(device)
+        self._setup(pdb_path, hsampling, ksampling, lsampling)
+
+    def _setup(
+        self, 
+        pdb_path: str, 
+        hsampling: Tuple[float, float, float], 
+        ksampling: Tuple[float, float, float], 
+        lsampling: Tuple[float, float, float]
+    ) -> None:
+        # PORT: Replace with properly ported operations.
+        # Placeholder: using zeros – replace with pytorch equivalents of compute_molecular_transform.
+        self.q_grid = torch.zeros((100, 3), device=self.device)
+        self.transform = torch.zeros((10, 10, 10), device=self.device)
+        self.q_mags = torch.linalg.norm(self.q_grid, dim=1)
+        self.map_shape = self.transform.shape
+
+    def apply_disorder(
+        self,
+        sigmas: Union[float, torch.Tensor]
+    ) -> torch.Tensor:
+        # If a float is supplied, convert to a one-element tensor.
+        if isinstance(sigmas, float):
+            sigmas = torch.tensor([sigmas], device=self.device)
+        # Compute q^2 and broadcast to compute I_diffuse = transform * (1 - exp(-q^2 * sigma^2))
+        q_sq = self.q_mags ** 2  # shape: (n_q,)
+        sigma_sq = sigmas ** 2   # shape: (n_sigmas,)
+        q2s2 = torch.outer(sigma_sq, q_sq)  # shape: (n_sigmas, n_q)
+        # Flatten transform and broadcast (assumes transform originally comparable to q_grid aspects)
+        flat_transform = self.transform.flatten().unsqueeze(0)
+        Id = flat_transform * (1 - torch.exp(-q2s2))
+        return Id
+
+# NEW: BatchManager for dynamic batching and memory optimization
+class BatchManager:
+    def __init__(self, batch_size: int = 10000) -> None:
+        self.batch_size = batch_size
+
+    def process_batches(self, data: torch.Tensor, func) -> torch.Tensor:
+        results = []
+        n = data.size(0)
+        for i in range(0, n, self.batch_size):
+            batch = data[i: i+self.batch_size]
+            results.append(func(batch))
+        return torch.cat(results, dim=0)
+
+# Optional: Placeholder for custom CUDA kernels (to be replaced with actual extension code)
+def custom_cuda_form_factor(q_grid: torch.Tensor, ff_a: torch.Tensor, ff_b: torch.Tensor, ff_c: torch.Tensor):
+    # TODO: Implement custom CUDA kernel code
+    return None  # Fallback or raise NotImplementedError

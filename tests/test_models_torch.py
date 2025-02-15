@@ -4,7 +4,10 @@ import torch
 from typing import Any, Callable
 
 # Import the new torch modules and functions.
-from eryx.models_torch import TensorWrapper, ModelBase, sym_ops_to_tensor, grid_to_tensor, CrystallographicTensors
+from eryx.models_torch import (
+    TensorWrapper, ModelBase, sym_ops_to_tensor, grid_to_tensor, 
+    CrystallographicTensors, NumericalValidator, DeviceManager, GradientCheckpointing
+)
 
 # TestBridge to compare numpy and torch results.
 class TestBridge:
@@ -49,3 +52,30 @@ def test_crystallographic_tensors():
     tensor = torch.tensor([1.0, 2.0, 3.0])
     result = CrystallographicTensors.some_operation(tensor)
     np.testing.assert_allclose(tensor.numpy(), result.cpu().numpy())
+
+# NEW: Test for numerical validation
+def test_numerical_validation():
+    validator = NumericalValidator(rtol=1e-7, atol=1e-9)
+    torch_out = torch.tensor([1.0, 2.0, 3.0])
+    numpy_out = np.array([1.0, 2.0, 3.0])
+    assert validator.compare(torch_out, numpy_out)
+
+# NEW: Test for device management
+def test_device_management():
+    manager = DeviceManager('cpu')
+    new_device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    manager.to(new_device)
+    assert manager.device == new_device
+
+# NEW: Test for gradient checkpointing
+def test_gradient_checkpointing():
+    module = torch.nn.Linear(10, 5)
+    input_tensor = torch.randn(1, 10, requires_grad=True)
+    output = GradientCheckpointing.checkpoint(module, input_tensor)
+    output.sum().backward()
+    assert input_tensor.grad is not None
+
+# NEW: Test error handling for invalid inputs
+def test_error_handling():
+    with pytest.raises(TypeError):
+         grid_to_tensor("invalid input")
