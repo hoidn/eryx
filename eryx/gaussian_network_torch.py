@@ -61,33 +61,36 @@ class GaussianNetworkModelTorch(ModelBase):
         Parameters
         ----------
         kvec : torch.Tensor, optional, shape (3,)
-            k-vector for phase factor computation
+            k-vector for phase factor computation. If provided, will include
+            phase factors in the Hessian computation.
             
         Returns
         -------
         hessian : torch.Tensor
-            Hessian matrix of spring network
+            Hessian matrix of spring network. If kvec is provided, returns
+            a complex tensor, otherwise returns a real tensor.
         """
         # Get pairs of atoms that are neighbors
         pairs = torch.nonzero(self.neighbor_mask)
         
         # Compute normalized displacement vectors
         diffs = self.xyz[pairs[:, 0]] - self.xyz[pairs[:, 1]]
-        distances = torch.norm(diffs, dim=1, keepdim=True)
+        distances = torch.linalg.norm(diffs, dim=1, keepdim=True)
         directions = diffs / distances
         
         # Compute spring constants (gamma)
-        gamma = torch.full_like(distances, self.gamma_inter)
+        gamma = torch.full_like(distances, self.gamma_inter, device=self.device)
         same_molecule = pairs[:, 0] // self.n_atoms_per_asu == pairs[:, 1] // self.n_atoms_per_asu
         gamma[same_molecule] = self.gamma_intra
         
         # Build Hessian blocks
         n_atoms = len(self.xyz)
-        hessian = torch.zeros((n_atoms, 3, n_atoms, 3), device=self.device)
+        dtype = torch.complex128 if kvec is not None else torch.float64
+        hessian = torch.zeros((n_atoms, 3, n_atoms, 3), dtype=dtype, device=self.device)
         
         for idx, (i, j) in enumerate(pairs):
             # Outer product of direction vectors
-            block = directions[idx].unsqueeze(1) @ directions[idx].unsqueeze(0)
+            block = torch.matmul(directions[idx].unsqueeze(1), directions[idx].unsqueeze(0))
             block *= gamma[idx]
             
             # Add phase factor if kvec provided
@@ -100,7 +103,14 @@ class GaussianNetworkModelTorch(ModelBase):
             hessian[i, :, i, :] += block
             hessian[j, :, j, :] += block
             hessian[i, :, j, :] -= block
-            hessian[j, :, i, :] -= block.conj()
+            hessian[j, :, i, :] -= block.conj() if kvec is not None else block
+            
+        # Add small regularization term for numerical stability
+        eye = torch.eye(3, dtype=dtype, device=self.device)
+        eye_full = torch.zeros((n_atoms, 3, n_atoms, 3), dtype=dtype, device=self.device)
+        for i in range(n_atoms):
+            eye_full[i, :, i, :] = eye
+        hessian += 1e-12 * eye_full
             
         return hessian
 
