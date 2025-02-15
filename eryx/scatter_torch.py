@@ -28,7 +28,7 @@ def compute_form_factors(q_grid: torch.Tensor,
     """
     # Validate input shapes
     if q_grid.shape[1] != 3:
-        raise ValueError(f"q_grid must have shape (n_points, 3), got shape {q_grid.shape}")
+        raise AssertionError(f"q_grid must have shape (n_points, 3), got shape {q_grid.shape}")
     assert ff_a.shape == ff_b.shape, "ff_a and ff_b must have same shape"
     assert ff_a.shape[0] == ff_c.shape[0], "Number of atoms must match across coefficients"
     

@@ -131,7 +131,7 @@ class LiquidLikeMotionsTorch(ModelBase):
     def apply_disorder(
         self,
         sigmas: Union[float, torch.Tensor],
-        gammas: Union[float, torch.Tensor]
+        gammas: Union[float, torch.Tensor] = 1.0
     ) -> torch.Tensor:
         """
         Compute the diffuse map(s) from the crystal transform.

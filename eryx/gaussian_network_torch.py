@@ -35,6 +35,9 @@ class GaussianNetworkModelTorch(ModelBase):
         
         # Convert coordinates to tensor
         self.xyz = torch.from_numpy(model.xyz).to(self.device)
+        if self.xyz.ndim > 2:
+            # Flatten extra dimensions so that self.xyz is of shape (n_atoms, 3)
+            self.xyz = self.xyz.reshape(-1, 3)
         
         # Build neighbor list using numpy initially
         self._build_neighbor_list()
@@ -49,7 +52,8 @@ class GaussianNetworkModelTorch(ModelBase):
         self.neighbor_mask = distances <= self.enm_cutoff
         
         # Zero out self-interactions
-        self.neighbor_mask.fill_diagonal_(False)
+        idx = torch.arange(self.neighbor_mask.size(0), device=self.neighbor_mask.device)
+        self.neighbor_mask[idx, idx] = False
 
     def compute_hessian(
         self,

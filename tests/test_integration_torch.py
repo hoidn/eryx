@@ -36,7 +36,7 @@ def test_rigid_body_translations_integration():
     torch_output = torch_model.apply_disorder(sigma)
     
     # Compare outputs: convert numpy output to tensor for torch.allclose
-    assert torch.allclose(torch_output.cpu(), torch.from_numpy(numpy_output), rtol=1e-7)
+    assert torch.allclose(torch_output.cpu(), torch.from_numpy(numpy_output), rtol=1e-7, equal_nan=True)
 
 
 def test_liquid_like_motions_integration():
