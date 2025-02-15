@@ -23,12 +23,22 @@ class RigidBodyTranslationsTorch(ModelBase):
         ksampling: Tuple[float, float, float], 
         lsampling: Tuple[float, float, float]
     ) -> None:
-        # PORT: Replace with properly ported operations.
-        # Placeholder: using zeros – ensure that the flattened transform has the same length as q_grid.
-        self.q_grid = torch.zeros((100, 3), device=self.device)
-        self.transform = torch.zeros((100,), device=self.device)
+        from eryx.base import compute_molecular_transform
+        # Call the numpy version to compute the molecular transform.
+        q_grid_np, transform_np = compute_molecular_transform(
+            pdb_path, 
+            hsampling, 
+            ksampling, 
+            lsampling,
+            expand_friedel=True,  # use default options
+            res_limit=0,
+            batch_size=10000,
+            n_processes=8
+        )
+        self.q_grid = torch.tensor(q_grid_np, dtype=torch.float32, device=self.device)
+        self.transform = torch.tensor(transform_np, dtype=torch.float32, device=self.device)
         self.q_mags = torch.linalg.norm(self.q_grid, dim=1)
-        self.map_shape = (100,)
+        self.map_shape = transform_np.shape
 
     def apply_disorder(
         self,
