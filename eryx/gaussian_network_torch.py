@@ -54,6 +54,9 @@ class GaussianNetworkModelTorch(ModelBase):
         # Zero out self-interactions
         idx = torch.arange(self.neighbor_mask.size(0), device=self.neighbor_mask.device)
         self.neighbor_mask[idx, idx] = False
+        
+        # Create neighbor list for numpy compatibility
+        self.neighbor_list = torch.nonzero(self.neighbor_mask, as_tuple=False).tolist()
 
     def compute_hessian(
         self,
@@ -98,16 +101,14 @@ class GaussianNetworkModelTorch(ModelBase):
             
             # Add phase factor if kvec provided
             if kvec is not None:
-                kvec = kvec.to(self.xyz.dtype)
-                phase = torch.dot(kvec, diffs[idx])
-                phase_factor = torch.exp(1j * phase)
+                # Compute the phase factor without changing shape:
+                phase_factor = torch.exp(1j * torch.dot(kvec.to(self.xyz.dtype), diffs[idx]))
                 block = block * phase_factor
-            
-            # Add blocks to Hessian
+            # Then add into the hessian so that:
             hessian[i, :, i, :] += block
             hessian[j, :, j, :] += block
             hessian[i, :, j, :] -= block
-            hessian[j, :, i, :] -= block.conj() if kvec is not None else block
+            hessian[j, :, i, :] -= (block.conj() if kvec is not None else block)
             
         # Add small regularization term for numerical stability
         eye = torch.eye(3, dtype=dtype, device=self.device)
@@ -153,7 +154,7 @@ class GaussianNetworkModelTorch(ModelBase):
         eye = torch.eye(hessian.shape[0], dtype=hessian.dtype, device=self.device)
         if hessian.dtype == torch.complex128:
             eye = eye.to(torch.complex128)
-        hessian = hessian + 1e-12 * eye
+        hessian = hessian + 1e-8 * eye
         
         # Compute inverse
         Kinv = torch.linalg.pinv(hessian)

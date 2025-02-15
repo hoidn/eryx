@@ -164,9 +164,10 @@ class LiquidLikeMotionsTorch(ModelBase):
             # Use conv3d for small maps (more efficient for small tensors)
             if int(torch.prod(torch.tensor(self.map_shape)).item()) < 1e7:
                 kernel_reshaped = kernels[num].reshape(self.map_shape)
+                kernel_norm = kernel_reshaped / kernel_reshaped.sum()
                 Id[num] = torch.nn.functional.conv3d(
                     self.transform.unsqueeze(0).unsqueeze(0),
-                    kernel_reshaped.unsqueeze(0).unsqueeze(0),
+                    kernel_norm.unsqueeze(0).unsqueeze(0),
                     padding='same'
                 ).squeeze().flatten()
             else:
