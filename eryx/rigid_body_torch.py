@@ -37,9 +37,12 @@ class RigidBodyTranslationsTorch(ModelBase):
         # If a float is supplied, convert to a one-element tensor.
         if isinstance(sigmas, float):
             sigmas = torch.tensor([sigmas], device=self.device)
+        # If a scalar tensor (0-D) is passed, unsqueeze it into a 1-D tensor
+        if isinstance(sigmas, torch.Tensor) and sigmas.ndim == 0:
+            sigmas = sigmas.unsqueeze(0)
         # Compute q^2 and broadcast to compute I_diffuse = transform * (1 - exp(-q^2 * sigma^2))
         q_sq = self.q_mags ** 2  # shape: (n_q,)
-        sigma_sq = sigmas ** 2   # shape: (n_sigmas,)
+        sigma_sq = sigmas ** 2   # now guaranteed to be 1-D: shape: (n_sigmas,)
         q2s2 = torch.outer(sigma_sq, q_sq)  # shape: (n_sigmas, n_q)
         # Flatten transform and broadcast (assumes transform originally comparable to q_grid aspects)
         flat_transform = self.transform.flatten().unsqueeze(0)

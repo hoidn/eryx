@@ -1,4 +1,5 @@
 import torch
+from torch.utils.checkpoint import checkpoint
 import numpy as np
 from typing import Union, Any, Callable, Tuple
 
@@ -91,4 +92,4 @@ class DeviceManager:
 class GradientCheckpointing:
     @staticmethod
     def checkpoint(module: torch.nn.Module, *inputs: torch.Tensor) -> torch.Tensor:
-        return torch.utils.checkpoint.checkpoint_sequential([module], 1, *inputs)
+        return checkpoint(module, *inputs)

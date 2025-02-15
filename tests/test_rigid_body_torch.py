@@ -4,7 +4,7 @@ import pytest
 from eryx.rigid_body_torch import RigidBodyTranslationsTorch, BatchManager
 
 def test_rigid_body_translations_matches_numpy():
-    pdb_path = "pdbs/5zck.pdb"  # adjust path as needed for tests
+    pdb_path = "tests/pdbs/5zck.pdb"  # adjust path as needed for tests
     hsampling = (-4, 4, 1)
     ksampling = (-17, 17, 1)
     lsampling = (-29, 29, 1)
