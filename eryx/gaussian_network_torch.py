@@ -34,7 +34,7 @@ class GaussianNetworkModelTorch(ModelBase):
         self.n_atoms_per_asu = self.model.xyz.shape[0]
         
         # Convert coordinates to tensor
-        self.xyz = torch.from_numpy(model.xyz).to(self.device)
+        self.xyz = torch.from_numpy(self.model.xyz).to(self.device)
         if self.xyz.ndim > 2:
             # Flatten extra dimensions so that self.xyz is of shape (n_atoms, 3)
             self.xyz = self.xyz.reshape(-1, 3)
