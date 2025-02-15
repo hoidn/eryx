@@ -12,7 +12,7 @@ class GaussianNetworkModelTorch(ModelBase):
     
     def __init__(
         self,
-        pdb_path: str,
+        pdb_path: str, 
         enm_cutoff: float = 4.0,
         gamma_intra: float = 1.0,
         gamma_inter: float = 1.0,
@@ -149,7 +149,7 @@ class GaussianNetworkModelTorch(ModelBase):
             hessian = hessian.reshape(shape[0]*3, -1)
             
         # Add small diagonal term for numerical stability
-        eye = torch.eye(hessian.shape[0], device=self.device)
+        eye = torch.eye(hessian.shape[0], dtype=hessian.dtype, device=self.device)
         if hessian.dtype == torch.complex128:
             eye = eye.to(torch.complex128)
         hessian = hessian + 1e-12 * eye

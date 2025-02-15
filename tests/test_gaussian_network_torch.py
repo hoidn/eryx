@@ -26,7 +26,9 @@ def test_hessian_symmetry():
     
     # Test without k-vector
     hessian = model.compute_hessian()
-    assert torch.allclose(hessian, hessian.transpose(-1, -2))
+    hessian_mat = hessian.reshape(hessian.shape[0]*hessian.shape[1],
+                                  hessian.shape[2]*hessian.shape[3])
+    assert torch.allclose(hessian_mat, hessian_mat.T.conj())
     
     # Test with k-vector
     kvec = torch.randn(3)
