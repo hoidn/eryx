@@ -60,15 +60,14 @@ class GaussianNetworkModelTorch(ModelBase):
         
         Parameters
         ----------
-        kvec : torch.Tensor, optional, shape (3,)
-            k-vector for phase factor computation. If provided, will include
-            phase factors in the Hessian computation.
-            
+        kvec : Optional[torch.Tensor]
+            A 1D tensor of shape (3,) representing the k-vector for phase factors.
+            If provided, the Hessian will include complex phase factors.
+        
         Returns
         -------
-        hessian : torch.Tensor
-            Hessian matrix of spring network. If kvec is provided, returns
-            a complex tensor, otherwise returns a real tensor.
+        torch.Tensor
+            A tensor of shape (n_atoms, 3, n_atoms, 3); if kvec is given, dtype is complex.
         """
         # Get pairs of atoms that are neighbors
         pairs = torch.nonzero(self.neighbor_mask)

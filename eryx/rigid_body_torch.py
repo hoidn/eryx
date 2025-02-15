@@ -35,6 +35,9 @@ class RigidBodyTranslationsTorch(ModelBase):
             batch_size=10000,
             n_processes=8
         )
+        # Ensure proper data type and device for molecular transform tensors
+        if not isinstance(q_grid_np, np.ndarray) or not isinstance(transform_np, np.ndarray):
+            raise TypeError("Expected numpy arrays from compute_molecular_transform")
         self.q_grid = torch.tensor(q_grid_np, dtype=torch.float64, device=self.device)
         self.transform = torch.tensor(transform_np, dtype=torch.float64, device=self.device)
         self.q_mags = torch.linalg.norm(self.q_grid, dim=1)
@@ -55,6 +58,7 @@ class RigidBodyTranslationsTorch(ModelBase):
         sigma_sq = sigmas ** 2   # now guaranteed to be 1-D: shape: (n_sigmas,)
         q2s2 = torch.outer(sigma_sq, q_sq)  # shape: (n_sigmas, n_q)
         # Flatten transform and broadcast (assumes transform originally comparable to q_grid aspects)
+        # flat_transform shape: (1, n_q); q2s2: (n_sigmas, n_q)
         flat_transform = self.transform.flatten().unsqueeze(0)
         Id = flat_transform * (1 - torch.exp(-q2s2))
         return Id

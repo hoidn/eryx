@@ -9,7 +9,7 @@ from eryx.models_torch import (
     CrystallographicTensors, NumericalValidator, DeviceManager, GradientCheckpointing
 )
 
-# TestBridge to compare numpy and torch results.
+# TestBridge: Utility class to validate torch implementations against numpy reference
 class TestBridge:
     def compare_outputs(
         self, 

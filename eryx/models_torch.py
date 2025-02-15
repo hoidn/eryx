@@ -25,8 +25,10 @@ class ModelBase:
         self.device = device
 
     def to(self, device: str) -> None:
+        """Transfer model to specified device."""
         self.device = device
-        # In derived classes, call .to(device) on all tensors.
+        # Reminder: Derived classes must transfer their tensors using .to(device)
+        # This includes: self.q_grid, self.transform, etc.
 
 # Utility functions for converting crystallographic inputs.
 def sym_ops_to_tensor(sym_ops: np.ndarray, device: str = 'cpu') -> torch.Tensor:
