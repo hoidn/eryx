@@ -30,8 +30,8 @@ class GaussianNetworkModelTorch(ModelBase):
         from .pdb import AtomicModel  # Import here to avoid circular imports
         
         # Use numpy AtomicModel to load initial data
-        model = AtomicModel(pdb_path)
-        self.n_atoms_per_asu = model.xyz.shape[0]
+        self.model = AtomicModel(pdb_path)
+        self.n_atoms_per_asu = self.model.xyz.shape[0]
         
         # Convert coordinates to tensor
         self.xyz = torch.from_numpy(model.xyz).to(self.device)
@@ -96,13 +96,14 @@ class GaussianNetworkModelTorch(ModelBase):
         
         for idx, (i, j) in enumerate(pairs):
             # Outer product of direction vectors
-            block = torch.matmul(directions[idx].unsqueeze(1), directions[idx].unsqueeze(0))
+            block = torch.outer(directions[idx], directions[idx])
             block *= gamma[idx]
             
             # Add phase factor if kvec provided
             if kvec is not None:
                 # Compute the phase factor without changing shape:
                 phase_factor = torch.exp(1j * torch.dot(kvec.to(self.xyz.dtype), diffs[idx]))
+                # phase_factor is a scalar; ensure block remains 3x3:
                 block = block * phase_factor
             # Then add into the hessian so that:
             hessian[i, :, i, :] += block
@@ -117,7 +118,14 @@ class GaussianNetworkModelTorch(ModelBase):
             eye_full[i, :, i, :] = eye
         hessian += 1e-12 * eye_full
             
-        return hessian
+        # --- New projection step to match numpy output ---
+        # Project the all-atom Hessian onto rigid-body degrees of freedom
+        A = torch.from_numpy(self.model.Amat).to(self.device).to(torch.float64)
+        # Project using Einstein summation to match numpy shape
+        H_proj = torch.einsum('iajk,ma,nb->imnjb', hessian, A, A)
+        # Add cell dimension to match numpy shape
+        hessian_torch = H_proj.unsqueeze(2)
+        return hessian_torch
 
     def compute_Kinv(
         self,
@@ -154,7 +162,7 @@ class GaussianNetworkModelTorch(ModelBase):
         eye = torch.eye(hessian.shape[0], dtype=hessian.dtype, device=self.device)
         if hessian.dtype == torch.complex128:
             eye = eye.to(torch.complex128)
-        hessian = hessian + 1e-8 * eye
+        hessian = hessian + 1e-12 * eye
         
         # Compute inverse
         Kinv = torch.linalg.pinv(hessian)

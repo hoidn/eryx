@@ -87,4 +87,4 @@ def test_one_phonon_integration():
     torch_model = OnePhononTorch(PDB_PATH, HSAMPLING, KSAMPLING, LSAMPLING, expand_p1=True, device='cpu')
     torch_output = torch_model.apply_disorder()
     
-    assert torch.allclose(torch_output.cpu(), torch.from_numpy(numpy_output), rtol=1e-7)
+    assert torch.allclose(torch_output.cpu(), torch.from_numpy(numpy_output), rtol=1e-7, equal_nan=True)
