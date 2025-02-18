@@ -1,4 +1,5 @@
 import pytest
+import logging
 import torch
 import numpy as np
 from eryx.gaussian_network_torch import GaussianNetworkModelTorch
