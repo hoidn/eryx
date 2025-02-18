@@ -198,4 +198,10 @@ class OnePhononTorch(ModelRunner):
         mult_tensor = torch.tensor(mult, device=self.device, dtype=torch.float32)
         I_full = I_full / (mult_tensor.max() / mult_tensor)
         I_full = I_full.to(self.device)
+        # Now resize the computed map to the original sampling
+        sampling_original = [(int(self.hkl_grid[:, i].min()),
+                              int(self.hkl_grid[:, i].max()),
+                              self.hsampling[i]) for i in range(3)]
+        I_full_np = resize_map(I_full.cpu().numpy(), sampling_original, sampling_ravel)
+        I_full = torch.tensor(I_full_np, device=self.device, dtype=torch.float32)
         return I_full.flatten()
