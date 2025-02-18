@@ -44,6 +44,7 @@ def generate_grid(A_inv, hsampling, ksampling, lsampling, return_hkl=False):
         return q_grid, map_shape
 
 def get_symmetry_equivalents(hkl_grid, sym_ops):
+    hkl_grid = np.atleast_2d(hkl_grid)  # ENSURE hkl_grid is two-dimensional.
     """
     Get symmetry equivalent Miller indices of input hkl_grid.
     The symmetry-equivalents are stacked horizontally, so that
@@ -235,7 +236,11 @@ def compute_multiplicity(model, hsampling, ksampling, lsampling):
     """
     sym_ops_exp = expand_sym_ops(model.sym_ops)
     hkl_grid, map_shape = generate_grid(model.A_inv, hsampling, ksampling, lsampling, return_hkl=True)
-    hkl_sym = get_symmetry_equivalents(hkl_grid, sym_ops_exp)
+    # Filter to keep only symmetry operators whose dot–product output would have the same number of columns as hkl_grid.
+    valid_sym_ops = { key: op for key, op in sym_ops_exp.items() if op.shape[1] == hkl_grid.shape[1] }
+    if not valid_sym_ops:
+        raise ValueError("No symmetry operators match the grid dimensions.")
+    hkl_sym = get_symmetry_equivalents(hkl_grid, valid_sym_ops)
     ravel, map_shape_ravel = get_ravel_indices(hkl_sym, (hsampling[2], ksampling[2], lsampling[2]))
     multiplicity = (np.diff(np.sort(ravel.T,axis=1),axis=1)!=0).sum(axis=1)+1
     return hkl_grid, multiplicity.reshape(map_shape)
