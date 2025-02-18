@@ -95,8 +95,7 @@ class OnePhononTorch(ModelRunner):
                             sym_ops[1][key] = np.hstack([D, T])
                         else:
                             sym_ops[1][key] = np.hstack([np.diag(op), np.zeros((3,1))])
-            # Force key 0 (no translation) to be the full 3x4 identity operator.
-            sym_ops[1][0] = np.hstack([np.eye(3), np.zeros((3,1))])
+            # [Do not force key 0 here since it is already set correctly.]
         elif isinstance(sym_ops[1], np.ndarray):
             if sym_ops[1].ndim != 2 or sym_ops[1].shape != (3, 3):
                 sym_ops = (sym_ops[0], np.diagflat(sym_ops[1]))
