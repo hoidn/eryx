@@ -5,7 +5,7 @@ from eryx.models import ModelRunner
 from eryx.gaussian_network_torch import GaussianNetworkModelTorch
 from eryx.pdb import AtomicModel
 from eryx.logging_utils import log_method_call
-from eryx.map_utils import generate_grid, get_resolution_mask, get_dq_map, expand_sym_ops, get_symmetry_equivalents, get_ravel_indices, compute_multiplicity
+from eryx.map_utils import generate_grid, get_resolution_mask, get_dq_map, expand_sym_ops, get_symmetry_equivalents, get_ravel_indices, compute_multiplicity, get_centered_sampling
 from eryx.scatter import structure_factors
 
 class OnePhononTorch(ModelRunner):
