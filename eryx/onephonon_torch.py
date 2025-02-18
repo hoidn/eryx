@@ -164,7 +164,6 @@ class OnePhononTorch(ModelRunner):
         sym_ops_rot = self.gnm_torch.atomic_model.sym_ops[0]
         hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops_rot)
         ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, self.map_shape)
-        # (Optional debug logs, e.g.: print("I_full shape:", I_full.shape, "transform shape:", transform.shape))
         if transform.numel() == 0:
             return I_full.to(self.device)
         I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
