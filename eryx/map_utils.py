@@ -64,8 +64,15 @@ def get_symmetry_equivalents(hkl_grid, sym_ops):
     """
     hkl_grid_sym = np.empty(3)
     for i,rot in sym_ops.items():
+        print(f"DEBUG: Processing symmetry op key {i}, op shape: {rot.shape}")
+        print(f"DEBUG: rot.T shape for key {i}: {rot.T.shape}")
         hkl_grid_rot = np.matmul(hkl_grid, rot)
+        print(f"DEBUG: hkl_grid_rot shape for key {i}: {hkl_grid_rot.shape}")
+        print(f"DEBUG: hkl_grid_sym shape before vstack for key {i}: {hkl_grid_sym.shape}")
+        if hkl_grid_rot.shape[1] != hkl_grid_sym.shape[0]:
+            print(f"ERROR: Dimension mismatch for key {i}: hkl_grid_sym has {hkl_grid_sym.shape[0]} columns, but hkl_grid_rot has {hkl_grid_rot.shape[1]} columns.")
         hkl_grid_sym = np.vstack((hkl_grid_sym, hkl_grid_rot))
+        print(f"DEBUG: hkl_grid_sym shape after vstack for key {i}: {hkl_grid_sym.shape}")
     hkl_grid_sym = hkl_grid_sym[1:]
     return hkl_grid_sym.reshape(len(sym_ops), hkl_grid.shape[0], 3)
     
