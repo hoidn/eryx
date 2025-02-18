@@ -145,7 +145,24 @@ class OnePhononTorch(ModelRunner):
 
             indices = torch.nonzero(valid, as_tuple=True)[0]  # 1D tensor of indices
             q_sel = q_grid_torch[indices].cpu().numpy()
+            # Debug prints to check the shapes of ff_a, ff_b, and ff_c
+            print("DEBUG: ff_a shape before squeeze:", atomic_model.ff_a.shape)
+            print("DEBUG: ff_b shape before squeeze:", atomic_model.ff_b.shape)
+            print("DEBUG: ff_c shape before squeeze:", atomic_model.ff_c.shape)
+
+            # Apply squeeze to remove any extra dimensions
+            ff_a = atomic_model.ff_a.squeeze()
+            ff_b = atomic_model.ff_b.squeeze()
+            ff_c = atomic_model.ff_c.squeeze()
+
+            print("DEBUG: ff_a shape after squeeze:", ff_a.shape)
+            print("DEBUG: ff_b shape after squeeze:", ff_b.shape)
+            print("DEBUG: ff_c shape after squeeze:", ff_c.shape)
+
             results_np = structure_factors(q_sel,
+                                           ff_a,
+                                           ff_b,
+                                           ff_c,
                                            xyz,
                                            atomic_model.ff_a,
                                            atomic_model.ff_b,
