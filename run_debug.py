@@ -15,7 +15,8 @@ def setup_logging():
         format="%(asctime)s %(levelname)s: %(message)s",
         filename="debug_output.log",
         filemode="w"
-    )
+    n_processes=1
+)
     # Also output to console
     console = logging.StreamHandler()
     console.setLevel(logging.DEBUG)
