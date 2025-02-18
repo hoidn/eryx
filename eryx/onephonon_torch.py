@@ -58,11 +58,16 @@ class OnePhononTorch(ModelRunner):
         # Process the first symmetry set:
         # Ensure that sym_ops[0] contains full (3,3) matrices.
         if isinstance(sym_ops[0], dict):
-            # Force entry for key 0 to be the full identity matrix.
-            sym_ops[0][0] = np.eye(3)
+            new_sym0 = {}
             for key, op in sym_ops[0].items():
-                if key != 0 and ((op.ndim != 2) or (op.shape != (3, 3))):
-                    sym_ops[0][key] = np.diag(op)
+                if key == 0:
+                    new_sym0[key] = np.eye(3)
+                else:
+                    if op.ndim == 1 and op.shape[0] == 3:
+                        new_sym0[key] = np.diag(op)
+                    else:
+                        new_sym0[key] = op
+            sym_ops[0] = new_sym0
         elif isinstance(sym_ops[0], np.ndarray):
             if sym_ops[0].ndim != 2 or sym_ops[0].shape != (3, 3):
                 sym_ops = (np.diagflat(sym_ops[0]), sym_ops[1])
@@ -148,7 +153,7 @@ class OnePhononTorch(ModelRunner):
         # Allocate a 1D accumulator (flattened over the full map)
         I_full = torch.zeros(np.prod(map_shape_ravel), device=self.device, dtype=torch.float32)
         # Convert the ravel indices array to a tensor:
-        indices = torch.tensor(ravel_np, device=self.device, dtype=torch.long)  # shape: (num_indices,)
+        indices = torch.tensor(ravel_np, device=self.device, dtype=torch.long).flatten()  # shape: (num_indices,)
         # Use index_add_: add the entire transform vector at every index in “indices”.
         I_full.index_add_(0, indices, transform)
         # Reshape back to the expected diffraction map shape.
