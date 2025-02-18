@@ -32,18 +32,19 @@ def compute_form_factors(q_grid, ff_a, ff_b, ff_c):
     print("[DEBUG] ff_a_original shape:", ff_a.shape)  # e.g., (4, 28, 4)
     print("[DEBUG] ff_b_original shape:", ff_b.shape)  # e.g., (4, 28, 4)
     print("[DEBUG] Q shape:", Q.shape)                 # e.g., (18585,)
-    temp_a = ff_a[:, :, np.newaxis]
-    temp_b = ff_b[:, :, None]
-    print("[DEBUG] temp_a shape (ff_a[:,:,np.newaxis]):", temp_a.shape)  # Expecting (4, 28, 1, 4)
-    print("[DEBUG] temp_b shape (ff_b[:,:,None]):", temp_b.shape)      # Expecting (4, 28, 1, 4)
-    temp_Q = Q[:, np.newaxis].T
+    # Expand dimensions so that Q broadcasts correctly over the last two axes
+    # New shapes:
+    #   temp_a: (n_elem, n_atoms, 1, n_gaussians)
+    #   temp_b: (n_elem, n_atoms, 1, n_gaussians)
+    #   temp_Q: (1, 1, n_q_points, 1)
+    temp_a = ff_a[:, :, np.newaxis, :]
+    temp_b = ff_b[:, :, np.newaxis, :]
+    temp_Q = Q.reshape(1, 1, -1, 1)
     print("[DEBUG] temp_Q shape (Q[:,np.newaxis].T):", temp_Q.shape)     # Expecting (1, 18585)
     print(f"[DEBUG] compute_form_factors: Q.shape = {Q.shape}")
-    exp_term = np.exp(-1 * temp_b * temp_Q)
-    print("[DEBUG] exp_term shape:", exp_term.shape)
+    exp_term = np.exp(-temp_b * temp_Q)
     fj = temp_a * exp_term
-    print(f"[DEBUG] compute_form_factors: intermediate fj.shape = {fj.shape}")
-    fj = np.sum(fj, axis=1) + ff_c[:,np.newaxis]
+    fj = np.sum(fj, axis=-1) + ff_c[:, :, np.newaxis]
     mean_fj = np.mean(fj)
     logging.debug(f"[TestReference] Mean of form factors: {mean_fj:.8f}")
     return fj.reshape(ff_a.shape[0]*ff_a.shape[1], -1).T
