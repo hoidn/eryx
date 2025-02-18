@@ -42,9 +42,9 @@ class OnePhononTorch(ModelRunner):
             self.n_processes = 1  # Avoid CUDA re-init issues in forked subprocesses.
 
         # Use torch routines to set up the grid and q_grid
+        atomic_model = AtomicModel(pdb_path, expand_p1=expand_p1, frame=-1)
         print("DEBUG: Initial ff_a shape:", atomic_model.ff_a.shape)
         print("DEBUG: Initial xyz shape:", atomic_model.xyz.shape)
-        atomic_model = AtomicModel(pdb_path, expand_p1=expand_p1, frame=-1)
         self.hkl_grid, self.map_shape = generate_grid(atomic_model.A_inv,
                                                       self.hsampling,
                                                       self.ksampling,
