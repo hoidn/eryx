@@ -243,7 +243,7 @@ class OnePhononTorch(ModelRunner):
         mult_tensor = torch.tensor(mult, device=self.device, dtype=torch.float32)
         print("DEBUG: multiplicity array shape:", mult_tensor.shape)
         print("DEBUG: multiplicity array values:", mult_tensor)
-        I_full = I_full / (mult_tensor.max() / mult_tensor)
+        I_full = I_full / mult_tensor
         I_full = I_full.to(self.device)
         # Now resize the computed map to the original sampling
         sampling_original = [(int(self.hkl_grid[:, i].min()),
