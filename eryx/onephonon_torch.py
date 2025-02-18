@@ -75,35 +75,32 @@ class OnePhononTorch(ModelRunner):
         return Id
     def _compute_crystal_transform_torch(self, q_grid_torch: torch.Tensor) -> torch.Tensor:
         """
-        Compute the crystal transform in torch in an equivalent way to the NP version.
+        Compute the crystal transform in torch by leveraging the existing NP structure factors.
         """
-    """
-    Compute the crystal transform in torch by leveraging the existing NP structure factors.
-    """
-    # Get NP data from the atomic model
-    atomic_model = self.gnm_torch.atomic_model
-    cell = atomic_model.cell
-    hkl = self.hkl_grid  # already a NP array
-    # Compute NP masks and dq map
-    mask_np, _ = get_resolution_mask(cell, hkl, self.res_limit)
-    dq_map_np = np.around(get_dq_map(cell.A_inv, hkl), 5)
-    valid = (dq_map_np == 0) & mask_np
-    # Recompute the full NP q_grid (as in base.py)
-    q_grid_np = 2 * np.pi * np.inner(cell.A_inv.T, hkl).T
-    # Allocate intensity array
-    I_np = np.zeros(q_grid_np.shape[0], dtype=np.float32)
-    if np.any(valid):
-        # Use the NP structure_factors function to compute complex structure factors
-        I_np[valid] = np.square(np.abs(structure_factors(q_grid_np[valid],
-                                                          atomic_model.xyz,
-                                                          atomic_model.ff_a,
-                                                          atomic_model.ff_b,
-                                                          atomic_model.ff_c,
-                                                          U=None,
-                                                          batch_size=self.batch_size,
-                                                          n_processes=self.n_processes)))
-    # Return the intensity as a torch tensor on self.device
-    return torch.tensor(I_np, device=self.device, dtype=torch.float32)
+        # Get NP data from the atomic model
+        atomic_model = self.gnm_torch.atomic_model
+        cell = atomic_model.cell
+        hkl = self.hkl_grid  # already a NP array
+        # Compute NP masks and dq map
+        mask_np, _ = get_resolution_mask(cell, hkl, self.res_limit)
+        dq_map_np = np.around(get_dq_map(cell.A_inv, hkl), 5)
+        valid = (dq_map_np == 0) & mask_np
+        # Recompute the full NP q_grid (as in base.py)
+        q_grid_np = 2 * np.pi * np.inner(cell.A_inv.T, hkl).T
+        # Allocate intensity array
+        I_np = np.zeros(q_grid_np.shape[0], dtype=np.float32)
+        if np.any(valid):
+            # Use the NP structure_factors function to compute complex structure factors
+            I_np[valid] = np.square(np.abs(structure_factors(q_grid_np[valid],
+                                                              atomic_model.xyz,
+                                                              atomic_model.ff_a,
+                                                              atomic_model.ff_b,
+                                                              atomic_model.ff_c,
+                                                              U=None,
+                                                              batch_size=self.batch_size,
+                                                              n_processes=self.n_processes)))
+        # Return the intensity as a torch tensor on self.device
+        return torch.tensor(I_np, device=self.device, dtype=torch.float32)
 
     def _incoherent_sum_torch(self, transform: torch.Tensor) -> torch.Tensor:
         """
