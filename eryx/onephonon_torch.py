@@ -144,10 +144,11 @@ class OnePhononTorch(ModelRunner):
         # -- DEBUG_HYP3: Compare NP and Torch q_grids. 
         atomic_model = self.gnm_torch.atomic_model
         hkl = self.hkl_grid  # NP hkl
-        print("DEBUG_HYP3: hkl_grid shape from Torch branch:", hkl.shape)
+        print("DEBUG_HYP_TORCH: hkl_grid shape from Torch branch:", hkl.shape)
         q_grid_np = 2 * np.pi * np.inner(atomic_model.A_inv.T, hkl).T
         diff_q = np.abs(q_grid_np - q_grid_torch.cpu().numpy())
-        print("DEBUG_HYP3: max difference between NP and Torch q_grid:", diff_q.max())
+        print("DEBUG_HYP_TORCH: np_q_grid.shape =", q_grid_np.shape)
+        print("DEBUG_HYP_TORCH: max difference between np and torch q_grid =", diff_q.max())
         hkl = self.hkl_grid  # already a NP array
         # Use atomic_model.cell only for the mask; use atomic_model.A_inv for dq and q_grid
         mask_np, _ = get_resolution_mask(atomic_model.cell, hkl, self.res_limit)
@@ -258,11 +259,14 @@ class OnePhononTorch(ModelRunner):
         # Restore the full symmetry operations.
         self.gnm_torch.atomic_model.sym_ops = original_sym_ops
         mult_tensor = torch.tensor(mult, device=self.device, dtype=torch.float32)
-        print("DEBUG_HYP1: multiplicity tensor shape:", mult_tensor.shape)
+        print("DEBUG_HYP_TORCH: multiplicity tensor shape:", mult_tensor.shape)
+        print("DEBUG_HYP_TORCH: multiplicity tensor stats: min =", mult_tensor.min().item(), 
+              "max =", mult_tensor.max().item(), 
+              "unique =", torch.unique(mult_tensor))
         print("DEBUG_HYP1: multiplicity tensor (min, max, unique):",
               mult_tensor.min().item(), mult_tensor.max().item(), torch.unique(mult_tensor))
         scaling_factor = mult_tensor.max() / mult_tensor
-        print("DEBUG_HYP1: computed scaling factor (first 10 elems):", scaling_factor.flatten()[:10])
+        print("DEBUG_HYP_TORCH: computed scaling factor (first 10 elems):", scaling_factor.flatten()[:10])
         print("DEBUG_HYP1: I_full BEFORE scaling (first 10 elems):", I_full.flatten()[:10])
         # Option to disable multiplicity scaling (for debugging)
         if not getattr(self, "disable_scaling", False):
@@ -270,7 +274,7 @@ class OnePhononTorch(ModelRunner):
             logging.debug(f"Applied multiplicity scaling, scaling factor stats: max={scaling_factor.max()}, min={scaling_factor.min()}")
         else:
             logging.debug("Multiplicity scaling disabled for debugging")
-        print("DEBUG_HYP1: I_full AFTER scaling (first 10 elems):", I_full.flatten()[:10])
+        print("DEBUG_HYP_TORCH: I_full AFTER scaling (first 10 elems):", I_full.flatten()[:10])
         if isinstance(original_sym_ops, (tuple, list)):
             self.gnm_torch.atomic_model.sym_ops = original_sym_ops[0]
         else:
@@ -313,8 +317,8 @@ class OnePhononTorch(ModelRunner):
         
         I_full_np = resize_map(I_full.cpu().numpy(), sampling_original, sampling_ravel)
         print("DEBUG: I_full_np shape after resize_map =", I_full_np.shape)
-        print("DEBUG_HYP2: I_full_np shape after resize_map:", I_full_np.shape)
-        print("DEBUG_HYP2: I_full_np (first 10 elems) after resize_map:", I_full_np.flatten()[:10])
+        print("DEBUG_HYP_TORCH: I_full_np shape after resize_map:", I_full_np.shape)
+        print("DEBUG_HYP_TORCH: I_full_np (first 10 elems) after resize_map:", I_full_np.flatten()[:10])
         # (Optional test:) Uncomment the next line to disable any additional scaling:
         # I_full_np = I_full_np  # No extra scaling here
         
