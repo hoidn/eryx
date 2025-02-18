@@ -99,8 +99,9 @@ def test_inversion_stability_torch(gnm_model_torch, device):
     for i in range(gnm_model_torch.n_asu):
         for j in range(gnm_model_torch.n_atoms_per_asu):
             block = identity_approx[i, j, :, :]
-            expected = torch.zeros((gnm_model_torch.n_asu, gnm_model_torch.n_atoms_per_asu), device=device)
-            expected[i, j] = 1.0
+            expected = torch.zeros((gnm_model_torch.n_asu, gnm_model_torch.n_atoms_per_asu),
+                                   dtype=block.dtype, device=device)
+            expected[i, j] = 1.0 + 0j
             assert torch.allclose(block, expected, rtol=1e-7)
 
 
@@ -108,7 +109,7 @@ def test_device_placement(gnm_model_torch, device):
     """
     Check that key model tensors remain on the appropriate device.
     """
-    assert gnm_model_torch.gamma.device == device
+    assert gnm_model_torch.gamma.device.type == device.type
     hessian = gnm_model_torch.compute_hessian()
     assert hessian.device == device
 

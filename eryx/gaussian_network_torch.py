@@ -120,7 +120,7 @@ class GaussianNetworkModelTorch:
             r_cell = torch.tensor(r_cell_np, device=self.device, dtype=torch.float32)
             phase = torch.dot(kvec, r_cell)
             eikr = torch.cos(phase) + 1j * torch.sin(phase)
-            Kmat += hessian[:, :, j_cell, :, :] * eikr
+            Kmat -= hessian[:, :, j_cell, :, :] * eikr
         # logging.debug(f"Kmat shape: {Kmat.shape}")
         return Kmat
 
