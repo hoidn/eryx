@@ -37,6 +37,8 @@ class OnePhononTorch(ModelRunner):
         self.batch_size = batch_size
         self.n_processes = n_processes
         self.device = device
+        if self.device.type == "cuda" and self.device.index is None:
+            self.device = torch.device("cuda:0")
 
         # Use numpy routines to set up the grid and q_grid
         atomic_model = AtomicModel(pdb_path, expand_p1)
@@ -100,6 +102,7 @@ class OnePhononTorch(ModelRunner):
                                        (-self.hsampling[1], self.hsampling[1], self.hsampling[2]),
                                        (-self.ksampling[1], self.ksampling[1], self.ksampling[2]),
                                        (-self.lsampling[1], self.lsampling[1], self.lsampling[2]))
-        I_full = I_full / (mult.max() / mult)
+        mult_flat = mult.flatten()
+        I_full = I_full / (mult_flat.max() / mult_flat)
         I_torch = torch.tensor(I_full, device=self.device, dtype=torch.float32)
         return I_torch.flatten()

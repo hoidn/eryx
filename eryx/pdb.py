@@ -178,7 +178,7 @@ class AtomicModel:
             sym_ops = {}
             transformations = {}
             for i, op in enumerate(sg.operations()):
-                r = np.array(op.rot, dtype=float) / op.DEN
+                r = np.array(op.rot, dtype=float).reshape(3,3) / op.DEN
                 t = np.array(op.tran, dtype=float) / op.DEN
                 sym_ops[i] = r  # only rotation part
                 transformations[i] = np.hstack((r, t.reshape(3,1)))
