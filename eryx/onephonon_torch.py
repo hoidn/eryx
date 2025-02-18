@@ -145,19 +145,14 @@ class OnePhononTorch(ModelRunner):
 
             indices = torch.nonzero(valid, as_tuple=True)[0]  # 1D tensor of indices
             q_sel = q_grid_torch[indices].cpu().numpy()
-            # Debug prints to check the shapes of ff_a, ff_b, and ff_c
-            print("DEBUG: ff_a shape before squeeze:", atomic_model.ff_a.shape)
-            print("DEBUG: ff_b shape before squeeze:", atomic_model.ff_b.shape)
-            print("DEBUG: ff_c shape before squeeze:", atomic_model.ff_c.shape)
-
-            # Apply squeeze to remove any extra dimensions
-            ff_a = atomic_model.ff_a.squeeze()
-            ff_b = atomic_model.ff_b.squeeze()
-            ff_c = atomic_model.ff_c.squeeze()
-
-            print("DEBUG: ff_a shape after squeeze:", ff_a.shape)
-            print("DEBUG: ff_b shape after squeeze:", ff_b.shape)
-            print("DEBUG: ff_c shape after squeeze:", ff_c.shape)
+            # Force selection of the first asymmetric unit so that shapes become (n_atoms,4) and (n_atoms,)
+            print("DEBUG: ff_a shape before indexing:", atomic_model.ff_a.shape)
+            ff_a = atomic_model.ff_a[0]
+            ff_b = atomic_model.ff_b[0]
+            ff_c = atomic_model.ff_c[0]
+            print("DEBUG: ff_a shape after indexing:", ff_a.shape)
+            print("DEBUG: ff_b shape after indexing:", ff_b.shape)
+            print("DEBUG: ff_c shape after indexing:", ff_c.shape)
 
             results_np = structure_factors(q_sel,
                                            xyz,
