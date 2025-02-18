@@ -183,6 +183,7 @@ class OnePhononTorch(ModelRunner):
         print("DEBUG: In _incoherent_sum_torch, q_grid values:", self.q_grid)
         print("DEBUG: In _incoherent_sum_torch, input hkl_grid shape:", self.hkl_grid.shape)
         print("DEBUG: In _incoherent_sum_torch, input hkl_grid values:", self.hkl_grid)
+        atomic_model = self.gnm_torch.atomic_model
         print("DEBUG: atomic_model.sym_ops[0]:", atomic_model.sym_ops[0])
         print("DEBUG: atomic_model.sym_ops[1]:", atomic_model.sym_ops[1])
         
