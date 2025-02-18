@@ -38,6 +38,12 @@ def run_np():
         gamma_inter=1.0
     )
     Id_np = onephonon_np.apply_disorder(use_data_adp=True)
+    logging.debug(f"NP: hkl_grid shape = {onephonon_np.hkl_grid.shape}")
+    logging.debug("NP: hkl_grid coordinate ranges:")
+    logging.debug(f"  Dimension 0: min = {onephonon_np.hkl_grid[:,0].min()}, max = {onephonon_np.hkl_grid[:,0].max()}")
+    logging.debug(f"  Dimension 1: min = {onephonon_np.hkl_grid[:,1].min()}, max = {onephonon_np.hkl_grid[:,1].max()}")
+    logging.debug(f"  Dimension 2: min = {onephonon_np.hkl_grid[:,2].min()}, max = {onephonon_np.hkl_grid[:,2].max()}")
+    logging.debug(f"NP: q_grid range: min = {onephonon_np.q_grid.min()}, max = {onephonon_np.q_grid.max()}")
     logging.info("NP branch diffuse intensity stats: min=%s, max=%s", np.nanmin(Id_np), np.nanmax(Id_np))
     # Save for later comparison
     np.save("np_diffuse_intensity.npy", Id_np)
@@ -56,6 +62,14 @@ def run_torch():
         gamma_inter=1.0,
         device=device
     )
+    # onephonon_torch.hkl_grid is the NP hkl_grid used internally.
+    logging.debug(f"Torch: hkl_grid shape = {onephonon_torch.hkl_grid.shape}")
+    logging.debug("Torch: hkl_grid coordinate ranges:")
+    logging.debug(f"  Dimension 0: min = {onephonon_torch.hkl_grid[:,0].min()}, max = {onephonon_torch.hkl_grid[:,0].max()}")
+    logging.debug(f"  Dimension 1: min = {onephonon_torch.hkl_grid[:,1].min()}, max = {onephonon_torch.hkl_grid[:,1].max()}")
+    logging.debug(f"  Dimension 2: min = {onephonon_torch.hkl_grid[:,2].min()}, max = {onephonon_torch.hkl_grid[:,2].max()}")
+    logging.debug(f"Torch: q_grid shape (torch) = {onephonon_torch.q_grid.shape}")
+    logging.debug(f"Torch: q_grid range: min = {onephonon_torch.q_grid.cpu().min().item()}, max = {onephonon_torch.q_grid.cpu().max().item()}")
     Id_torch = onephonon_torch.apply_disorder()
     logging.info("Torch branch diffuse intensity stats: min=%s, max=%s", Id_torch.min().item(), Id_torch.max().item())
     # Save for later comparison
