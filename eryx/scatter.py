@@ -1,6 +1,15 @@
 import numpy as np
 import logging
 import multiprocess as mp
+
+def setup_logging_worker():
+    import logging
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)s: %(message)s",
+        filename="debug_output.log",
+        filemode="a"  # append so messages from workers add into the same log
+    )
 from functools import partial
 
 def compute_form_factors(q_grid, ff_a, ff_b, ff_c):
@@ -116,7 +125,7 @@ def structure_factors(q_grid, xyz, ff_a, ff_b, ff_c, U=None,
                                                                         project_on_components=project_on_components, sum_over_atoms=sum_over_atoms)
     else:
         q_sel = [q_grid[splits[batch]: splits[batch+1]] for batch in range(n_batches)]
-        pool = mp.Pool(processes=n_processes)
+        pool = mp.Pool(processes=n_processes, initializer=setup_logging_worker)
         sf_partial = partial(structure_factors_batch, xyz=xyz, ff_a=ff_a, ff_b=ff_b, ff_c=ff_c, U=U,
                              compute_qF=compute_qF,
                              project_on_components=project_on_components, sum_over_atoms=sum_over_atoms)
