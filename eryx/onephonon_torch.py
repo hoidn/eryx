@@ -52,16 +52,28 @@ class OnePhononTorch(ModelRunner):
 
         # Initialize the torch-based GNM
         self.gnm_torch = GaussianNetworkModelTorch(pdb_path, gnm_cutoff, gamma_intra, gamma_inter, device=device)
-        # Ensure full symmetry matrices in atomic_model: if any sym_op for key 0 is 1D with shape (3,), convert it to a diagonal 3×3 matrix.
-        sym_ops0 = self.gnm_torch.atomic_model.sym_ops[0]
-        for key, op in sym_ops0.items():
-            if op.ndim == 1 and op.shape[0] == 3:
-                sym_ops0[key] = np.diag(op)
-        # (If needed, similarly update sym_ops[1], for example:)
-        sym_ops1 = self.gnm_torch.atomic_model.sym_ops[1]
-        for key, op in sym_ops1.items():
-            if op.ndim == 1 and op.shape[0] == 3:
-                sym_ops1[key] = np.diag(op)
+        # Ensure full symmetry matrices in atomic_model.
+        sym_ops = self.gnm_torch.atomic_model.sym_ops
+        # Process the first symmetry set:
+        if isinstance(sym_ops[0], dict):
+            for key, op in sym_ops[0].items():
+                if op.ndim == 1 and op.shape[0] == 3:
+                    sym_ops[0][key] = np.diag(op)
+        elif isinstance(sym_ops[0], np.ndarray):
+            if sym_ops[0].ndim == 1 and sym_ops[0].shape[0] == 3:
+                # Replace the 1D array with its diagonal
+                sym_ops = (np.diag(sym_ops[0]), sym_ops[1])
+                self.gnm_torch.atomic_model.sym_ops = sym_ops
+
+        # Similarly process the second symmetry set (if needed):
+        if isinstance(sym_ops[1], dict):
+            for key, op in sym_ops[1].items():
+                if op.ndim == 1 and op.shape[0] == 3:
+                    sym_ops[1][key] = np.diag(op)
+        elif isinstance(sym_ops[1], np.ndarray):
+            if sym_ops[1].ndim == 1 and sym_ops[1].shape[0] == 3:
+                sym_ops = (sym_ops[0], np.diag(sym_ops[1]))
+                self.gnm_torch.atomic_model.sym_ops = sym_ops
 
     @log_method_call
     def apply_disorder(self) -> torch.Tensor:
