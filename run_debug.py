@@ -16,7 +16,6 @@ def setup_logging():
         filename="debug_output.log",
         filemode="w"
     )
-)
     # Also output to console
     console = logging.StreamHandler()
     console.setLevel(logging.DEBUG)
