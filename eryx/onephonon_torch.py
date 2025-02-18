@@ -168,11 +168,12 @@ class OnePhononTorch(ModelRunner):
             I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
             return I_full.to(self.device)
         I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
-        # Convert the ravel indices array to a tensor:
-        indices = torch.tensor(ravel_np, device=self.device, dtype=torch.long).flatten()  # shape: (num_indices,)
-        # Use index_add_: add the entire transform vector at every index in “indices”.
-        factor = len(ravel_np) // self.q_grid.shape[0]
-        transform_rep = transform.repeat_interleave(factor)
+        # Convert the ravel indices array to a tensor on CPU:
+        indices = torch.tensor(ravel_np, device='cpu', dtype=torch.long).flatten()
+        # Move input transform to CPU and repeat as needed:
+        transform_cpu = transform.to('cpu')
+        factor = len(ravel_np) // int(self.q_grid.shape[0])
+        transform_rep = transform_cpu.repeat_interleave(factor)
         I_full.index_add_(0, indices, transform_rep)
         I_full = I_full.to(self.device)
         I_full = I_full.view(*map_shape_ravel)
