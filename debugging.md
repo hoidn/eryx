@@ -1,5 +1,10 @@
 # Debugging Strategy: Grid Consistency and Diffuse Intensity Comparison
 
+<key test and logging output>
+python run_debug.py > debug_output.log
+pytest --log-cli-level=DEBUG -sv tests/test_onephonon_torch.py > test_onephonon_torch_output.log > test_onephonon_torch_output.log
+</key test and logging output>
+
 This document outlines the steps we follow to isolate and understand the discrepancy between the NP branch and the Torch branch diffuse intensity computations.
 
 1. **Grid and Sampling Parameters Verification**  
@@ -48,7 +53,3 @@ This document outlines the steps we follow to isolate and understand the discrep
    - Use the detailed debug prints to pinpoint whether the discrepancy stems from grid generation, symmetry expansion, or the post-processing (i.e., resizing) step.
 
 By following the above steps and closely inspecting the logged output, we can identify whether the root cause is due to a sampling parameter misinterpretation, an inconsistency in symmetry operations, or an issue in the scaling and raveling functions.
-
----
-
-Save these instructions in **debugging.md** and use them as a reference while reviewing the output from run_debug.py and the Torch tests.
