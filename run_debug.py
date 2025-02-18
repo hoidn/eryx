@@ -5,10 +5,17 @@ from eryx.models import OnePhonon   # NP version
 from eryx.onephonon_torch import OnePhononTorch
 
 def setup_logging():
-    logging.basicConfig(level=logging.DEBUG,
-                        format="%(asctime)s %(levelname)s: %(message)s",
-                        filename="debug_output.log",
-                        filemode="w")
+    import logging
+    # Remove any existing handlers.
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+    
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format="%(asctime)s %(levelname)s: %(message)s",
+        filename="debug_output.log",
+        filemode="w"
+    )
     # Also output to console
     console = logging.StreamHandler()
     console.setLevel(logging.DEBUG)
@@ -55,6 +62,7 @@ def run_torch():
     np.save("torch_diffuse_intensity.npy", Id_torch.detach().cpu().numpy())
 
 if __name__ == "__main__":
+    setup_logging()
     setup_logging()
     run_np()
     run_torch()
