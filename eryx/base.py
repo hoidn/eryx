@@ -111,6 +111,8 @@ def compute_crystal_transform(pdb_path, hsampling, ksampling, lsampling, U=None,
                                         lsampling, 
                                         return_hkl=True)
     q_grid = 2*np.pi*np.inner(model.A_inv.T, hkl_grid).T
+    print("AGGRESSIVE_DEBUG_HYP_NP: q_grid shape =", q_grid.shape)
+    print("AGGRESSIVE_DEBUG_HYP_NP: hkl_grid shape =", hkl_grid.shape)
     mask, res_map = get_resolution_mask(model.cell, hkl_grid, res_limit)
     dq_map = np.around(get_dq_map(model.A_inv, hkl_grid), 5)
     dq_map[~mask] = -1
@@ -262,8 +264,9 @@ def incoherent_sum_real(model, hkl_grid, sampling, U=None, mask=None, batch_size
     # get symmetry information for expanded map
     sym_ops = expand_sym_ops(model.sym_ops)
     hkl_sym = get_symmetry_equivalents(hkl_grid, sym_ops)
-    print("NP DEBUG (real): hkl_sym shape after symmetry expansion:", np.array(hkl_sym).shape)
-    print("NP DEBUG (real): hkl_sym (first 2 groups):", np.array(hkl_sym)[:2])
+    print("AGGRESSIVE_DEBUG_HYP_NP: hkl_sym shape after symmetry expansion:", np.array(hkl_sym).shape)
+    print("AGGRESSIVE_DEBUG_HYP_NP: first few ravel_np groups:", ravel[:2])
+    print("AGGRESSIVE_DEBUG_HYP_NP: map_shape_ravel:", map_shape_ravel)
 
     ravel, map_shape_ravel = get_ravel_indices(hkl_sym, sampling)
     print("NP DEBUG (real): ravel indices (first few groups):", ravel[:2])
@@ -289,6 +292,8 @@ def incoherent_sum_real(model, hkl_grid, sampling, U=None, mask=None, batch_size
     
     sampling_original = [(int(hkl_grid[:,i].min()),int(hkl_grid[:,i].max()),sampling[i]) for i in range(3)]
     print("AGGRESSIVE_DEBUG_HYP_NP: BEFORE resize_map: I shape =", I.shape, "min =", np.nanmin(I), "max =", np.nanmax(I), "mean =", np.nanmean(I))
+    I = resize_map(I, sampling_original, sampling_ravel)
+    print("AGGRESSIVE_DEBUG_HYP_NP: AFTER resize_map: I_resized shape =", I.shape, "min =", np.nanmin(I), "max =", np.nanmax(I), "mean =", np.nanmean(I))
     I = resize_map(I, sampling_original, sampling_ravel)
     print("AGGRESSIVE_DEBUG_HYP_NP: AFTER resize_map: I_resized shape =", I.shape, "min =", np.nanmin(I), "max =", np.nanmax(I), "mean =", np.nanmean(I))
     
