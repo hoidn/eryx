@@ -165,6 +165,7 @@ class OnePhononTorch(ModelRunner):
         hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops_rot)
         ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, self.map_shape)
         if transform.numel() == 0:
+            I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
             return I_full.to(self.device)
         I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
         # Convert the ravel indices array to a tensor:
