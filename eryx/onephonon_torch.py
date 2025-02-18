@@ -289,7 +289,14 @@ class OnePhononTorch(ModelRunner):
         sampling_original = [(int(self.hkl_grid[:, i].min()),
                               int(self.hkl_grid[:, i].max()),
                               self.hsampling[i]) for i in range(3)]
+        print("DEBUG: self.hkl_grid.shape =", self.hkl_grid.shape)
+        print("DEBUG: self.map_shape =", self.map_shape)
+        print("DEBUG: sampling_original =", sampling_original)
+        print("DEBUG: sampling_ravel =", sampling_ravel)
+        print("DEBUG: np.prod(map_shape_ravel) =", np.prod(map_shape_ravel))
+        
         I_full_np = resize_map(I_full.cpu().numpy(), sampling_original, sampling_ravel)
+        print("DEBUG: I_full_np shape after resize_map =", I_full_np.shape)
         print("DEBUG_HYP2: I_full_np shape after resize_map:", I_full_np.shape)
         print("DEBUG_HYP2: I_full_np (first 10 elems) after resize_map:", I_full_np.flatten()[:10])
         # (Optional test:) Uncomment the next line to disable any additional scaling:
