@@ -193,7 +193,7 @@ class OnePhononTorch(ModelRunner):
                                        sampling_ravel[0], 
                                        sampling_ravel[1], 
                                        sampling_ravel[2])
-        mult_flat = torch.tensor(mult.flatten(), device=self.device, dtype=torch.float32)
-        I_full = I_full / (mult_flat.max() / mult_flat)
+        mult_tensor = torch.tensor(mult, device=self.device, dtype=torch.float32)
+        I_full = I_full / (mult_tensor.max() / mult_tensor)
         I_full = I_full.to(self.device)
         return I_full.flatten()
