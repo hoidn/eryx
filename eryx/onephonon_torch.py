@@ -55,8 +55,8 @@ class OnePhononTorch(ModelRunner):
         logging.debug(f"q_grid values (torch): {self.q_grid}")
 
         # Initialize the torch-based GNM
-        print("DEBUG: Before compute_multiplicity, ff_a shape:", atomic_model.ff_a.shape)
-        print("DEBUG: Before compute_multiplicity, xyz shape:", atomic_model.xyz.shape)
+        print("DEBUG: Before compute_multiplicity, ff_a shape:", atomic_model.ff_a[0].shape)
+        print("DEBUG: Before compute_multiplicity, xyz shape:", atomic_model.xyz[0].shape)
         self.gnm_torch = GaussianNetworkModelTorch(pdb_path, gnm_cutoff, gamma_intra, gamma_inter, device=device)
         # Ensure full symmetry matrices in atomic_model.
         sym_ops = self.gnm_torch.atomic_model.sym_ops
@@ -183,6 +183,8 @@ class OnePhononTorch(ModelRunner):
         print("DEBUG: In _incoherent_sum_torch, q_grid values:", self.q_grid)
         print("DEBUG: In _incoherent_sum_torch, input hkl_grid shape:", self.hkl_grid.shape)
         print("DEBUG: In _incoherent_sum_torch, input hkl_grid values:", self.hkl_grid)
+        print("DEBUG: atomic_model.sym_ops[0]:", atomic_model.sym_ops[0])
+        print("DEBUG: atomic_model.sym_ops[1]:", atomic_model.sym_ops[1])
         
         hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops_rot)
         hs_shape = np.array(hkl_sym).shape
@@ -231,6 +233,8 @@ class OnePhononTorch(ModelRunner):
                                        sampling_ravel[1], 
                                        sampling_ravel[2])
         mult_tensor = torch.tensor(mult, device=self.device, dtype=torch.float32)
+        print("DEBUG: multiplicity array shape:", mult_tensor.shape)
+        print("DEBUG: multiplicity array values:", mult_tensor)
         I_full = I_full / (mult_tensor.max() / mult_tensor)
         I_full = I_full.to(self.device)
         # Now resize the computed map to the original sampling
@@ -238,5 +242,7 @@ class OnePhononTorch(ModelRunner):
                               int(self.hkl_grid[:, i].max()),
                               self.hsampling[i]) for i in range(3)]
         I_full_np = resize_map(I_full.cpu().numpy(), sampling_original, sampling_ravel)
+        print("DEBUG: I_full_np shape after resize_map:", I_full_np.shape)
+        print("DEBUG: I_full_np values after resize_map:", I_full_np)
         I_full = torch.tensor(I_full_np, device=self.device, dtype=torch.float32)
         return I_full.flatten()
