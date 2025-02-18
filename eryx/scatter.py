@@ -23,31 +23,12 @@ def compute_form_factors(q_grid, ff_a, ff_b, ff_c):
     fj : numpy.ndarray, shape (n_points, n_atoms)
         atomic form factors 
     """
-    print(f"[DEBUG] compute_form_factors: q_grid.shape = {q_grid.shape}")
-    print(f"[DEBUG] compute_form_factors: ff_a.shape = {ff_a.shape}")
-    print(f"[DEBUG] compute_form_factors: ff_b.shape = {ff_b.shape}")
-    print(f"[DEBUG] compute_form_factors: ff_c.shape = {ff_c.shape}")
-    
     Q = np.square(np.linalg.norm(q_grid, axis=1) / (4*np.pi))
-    print("[DEBUG] ff_a_original shape:", ff_a.shape)  # e.g., (4, 28, 4)
-    print("[DEBUG] ff_b_original shape:", ff_b.shape)  # e.g., (4, 28, 4)
-    print("[DEBUG] Q shape:", Q.shape)                 # e.g., (18585,)
-    # Expand dimensions so that Q broadcasts correctly over the last two axes
-    # New shapes:
-    #   temp_a: (n_elem, n_atoms, 1, n_gaussians)
-    #   temp_b: (n_elem, n_atoms, 1, n_gaussians)
-    #   temp_Q: (1, 1, n_q_points, 1)
-    temp_a = ff_a[:, :, np.newaxis, :]
-    temp_b = ff_b[:, :, np.newaxis, :]
-    temp_Q = Q.reshape(1, 1, -1, 1)
-    print("[DEBUG] temp_Q shape (Q[:,np.newaxis].T):", temp_Q.shape)     # Expecting (1, 18585)
-    print(f"[DEBUG] compute_form_factors: Q.shape = {Q.shape}")
-    exp_term = np.exp(-temp_b * temp_Q)
-    fj = temp_a * exp_term
-    fj = np.sum(fj, axis=-1) + ff_c[:, :, np.newaxis]
+    fj = ff_a[:,:,np.newaxis] * np.exp(-1 * ff_b[:,:,None] * Q[:,np.newaxis].T)
+    fj = np.sum(fj, axis=1) + ff_c[:,np.newaxis]
     mean_fj = np.mean(fj)
     logging.debug(f"[TestReference] Mean of form factors: {mean_fj:.8f}")
-    return fj.reshape(ff_a.shape[0]*ff_a.shape[1], -1).T
+    return fj.T
 
 def structure_factors_batch(q_grid, xyz, ff_a, ff_b, ff_c, U=None,
                             compute_qF=False, project_on_components=None,
