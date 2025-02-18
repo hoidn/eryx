@@ -73,6 +73,8 @@ class OnePhononTorch(ModelRunner):
         mask = torch.tensor(mask_np, device=self.device, dtype=torch.bool)
         dq_mask = torch.tensor(np.equal(dq_map_np, 0), device=self.device)
         xyz = torch.tensor(self.gnm_torch.atomic_model.xyz, device=self.device, dtype=torch.float32)
+        if xyz.ndim > 2:
+            xyz = xyz.reshape(-1, xyz.shape[-1])
         phi = torch.matmul(q_grid_torch, xyz.T)
         A_real = torch.cos(phi)
         A_imag = torch.sin(phi)
