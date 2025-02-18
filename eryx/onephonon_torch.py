@@ -182,10 +182,21 @@ class OnePhononTorch(ModelRunner):
         logging.debug(f"[OnePhononTorch._incoherent_sum_torch] map_shape_ravel: {map_shape_ravel}, np.prod(map_shape_ravel): {np.prod(map_shape_ravel)}")
         I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
         transform_cpu = transform.to('cpu')
-        # Instead of concatenation, loop over each symmetry group from ravel_np.
-        for group in ravel_np:
-            idx_tensor = torch.tensor(group, device='cpu', dtype=torch.long)
-            I_full.index_add_(0, idx_tensor, transform_cpu)
+        # Mimic the NP routine: use the first symmetry group as primary.
+        primary_indices = torch.tensor(ravel_np[0], device='cpu', dtype=torch.long)
+        I_full[primary_indices] = transform_cpu  # assign primary values
+
+        # For each subsequent group, copy the intensities from the primary positions
+        for group in ravel_np[1:]:
+            # Find the intersection between the primary ravel and this group.
+            group_np = np.array(group)
+            primary_np = np.array(ravel_np[0])
+            # Compute indices in the primary array that match the current group.
+            intersect, comm1, comm2 = np.intersect1d(primary_np, group_np, return_indices=True)
+            if intersect.size:
+                # Copy the corresponding values from the primary result.
+                idx_tensor = torch.tensor(group_np[comm2], device='cpu', dtype=torch.long)
+                I_full[idx_tensor] = I_full[torch.tensor(primary_np[comm1], device='cpu', dtype=torch.long)]
         # This conversion is non-differentiable and breaks the gradient flow intentionally.
         I_full = I_full.to(self.device).detach()
         I_full = I_full.view(*map_shape_ravel)
