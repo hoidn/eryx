@@ -92,18 +92,18 @@ class GaussianNetworkModelTorch:
                                 )
                                 raise
                             hessian_diag[i_asu, i_at] += val_to_assign * float(len(neigh_indices))
-                            logging.debug(
-                                f"[DEBUG compute_hessian] ASU={i_asu}, atom index={i_at}: processed {len(neigh_indices)} neighbors, "
-                                f"current diag accumulator = {hessian_diag[i_asu, i_at].item()}"
-                            )
+                            # logging.debug(
+                            #     f"[DEBUG compute_hessian] ASU={i_asu}, atom index={i_at}: processed {len(neigh_indices)} neighbors, "
+                            #     f"current diag accumulator = {hessian_diag[i_asu, i_at].item()}"
+                            # )
         # Set the diagonal (reference cell)
         for i_asu in range(self.n_asu):
             for i_at in range(self.n_atoms_per_asu):
                 hessian[i_asu, i_at, self.id_cell_ref, i_asu, i_at] = -hessian_diag[i_asu, i_at] - self.gamma[self.id_cell_ref, i_asu, i_asu].to(torch.complex128)
-            logging.debug(
-                f"[DEBUG compute_hessian] Before diagonal assignment for ASU={i_asu}, atom index={i_at}: "
-                f"hessian_diag = {hessian_diag[i_asu, i_at].item()}, gamma (ref cell) = {self.gamma[self.id_cell_ref, i_asu, i_asu].item()}"
-            )
+            # logging.debug(
+            #     f"[DEBUG compute_hessian] Before diagonal assignment for ASU={i_asu}, atom index={i_at}: "
+            #     f"hessian_diag = {hessian_diag[i_asu, i_at].item()}, gamma (ref cell) = {self.gamma[self.id_cell_ref, i_asu, i_asu].item()}"
+            # )
         # logging.debug(hessian[0, :, :, 0, :])
         # logging.debug(f"Hessian shape: {hessian.shape}")
         return hessian
