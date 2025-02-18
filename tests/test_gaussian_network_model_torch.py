@@ -105,7 +105,7 @@ def test_inversion_stability_torch(gnm_model_torch, device):
             expected[i, j] = 1.0 + 0j
             diff = torch.abs(block - expected)
             maxdiff = diff.max().item()
-            logging.debug(f"[DEBUG test_inversion_stability] For i_asu={i}, atom index={j}, max diff={maxdiff:.8e}, block=\n{block}, expected=\n{expected}")
+            logging.info(f"[INFO test_inversion_stability] For i_asu={i}, atom index={j}, max diff={maxdiff:.8e}")
             assert torch.allclose(block, expected, rtol=1e-7)
 
 
