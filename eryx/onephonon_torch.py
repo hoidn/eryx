@@ -82,24 +82,6 @@ class OnePhononTorch(ModelRunner):
             sym_ops[0] = new_sym0
         self.gnm_torch.atomic_model.sym_ops = sym_ops
 
-        # Process the second symmetry set to ensure full (3,3) matrices.
-        if isinstance(sym_ops[1], dict):
-            for key, op in sym_ops[1].items():
-                if op.ndim < 2:  # if given as a flat vector
-                    if key == 0:
-                        sym_ops[1][key] = np.hstack([np.eye(3), np.zeros((3,1))])
-                    else:
-                        if op.shape[0] == 4:
-                            D = np.diag(op[:3])
-                            T = op[3:].reshape(3, 1)
-                            sym_ops[1][key] = np.hstack([D, T])
-                        else:
-                            sym_ops[1][key] = np.hstack([np.diag(op), np.zeros((3,1))])
-            # [Do not force key 0 here since it is already set correctly.]
-        elif isinstance(sym_ops[1], np.ndarray):
-            if sym_ops[1].ndim != 2 or sym_ops[1].shape != (3, 3):
-                sym_ops = (sym_ops[0], np.diagflat(sym_ops[1]))
-                self.gnm_torch.atomic_model.sym_ops = sym_ops
 
     @log_method_call
     def apply_disorder(self) -> torch.Tensor:
@@ -152,8 +134,8 @@ class OnePhononTorch(ModelRunner):
         Compute the diffuse intensity by incoherently summing the contributions
         from each asymmetric unit in a manner equivalent to NP’s incoherent_sum_real().
         """
-        sym_ops = self.gnm_torch.atomic_model.sym_ops
-        hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops)
+        sym_ops_rot = self.gnm_torch.atomic_model.sym_ops[0]
+        hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops_rot)
         ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, self.map_shape)
         # Allocate a 1D accumulator (flattened over the full map)
         I_full = torch.zeros(np.prod(map_shape_ravel), device='cpu', dtype=torch.float32)
