@@ -242,7 +242,25 @@ class OnePhononTorch(ModelRunner):
         self.gnm_torch.atomic_model.sym_ops = original_sym_ops
         mult_tensor = torch.tensor(mult, device=self.device, dtype=torch.float32)
         print("DEBUG: multiplicity array shape:", mult_tensor.shape)
-        print("DEBUG: multiplicity array values:", mult_tensor)
+        print("DEBUG: multiplicity array values (unique):", torch.unique(mult_tensor))
+        print("DEBUG: I_full before multiplicity scaling (first 10 elems):", I_full.flatten()[:10])
+
+        # Division step – note: mult_tensor.max()/mult_tensor performs elementwise division.
+        I_full = I_full / (mult_tensor.max() / mult_tensor)
+
+        print("DEBUG: I_full after multiplicity scaling (first 10 elems):", I_full.flatten()[:10])
+
+        I_full = I_full.to(self.device)
+        # Resize the computed map to the original sampling
+        sampling_original = [(int(self.hkl_grid[:, i].min()),
+                              int(self.hkl_grid[:, i].max()),
+                              self.hsampling[i]) for i in range(3)]
+        I_full_np = resize_map(I_full.cpu().numpy(), sampling_original, sampling_ravel)
+        
+        print("DEBUG: I_full_np shape after resize_map:", I_full_np.shape)
+        print("DEBUG: I_full_np (first 10 elems) after resize_map:", I_full_np.flatten()[:10])
+
+        I_full = torch.tensor(I_full_np, device=self.device, dtype=torch.float32)
         I_full = I_full / (mult_tensor.max() / mult_tensor)
         I_full = I_full.to(self.device)
         # Now resize the computed map to the original sampling
