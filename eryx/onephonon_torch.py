@@ -58,11 +58,11 @@ class OnePhononTorch(ModelRunner):
         if isinstance(sym_ops[0], dict):
             for key, op in sym_ops[0].items():
                 if op.ndim == 1 and op.shape[0] == 3:
-                    sym_ops[0][key] = np.diag(op)
+                    sym_ops[0][key] = np.diagflat(op)
         elif isinstance(sym_ops[0], np.ndarray):
             if sym_ops[0].ndim == 1 and sym_ops[0].shape[0] == 3:
                 # Replace the 1D array with its diagonal
-                sym_ops = (np.diag(sym_ops[0]), sym_ops[1])
+                sym_ops = (np.diagflat(sym_ops[0]), sym_ops[1])
                 self.gnm_torch.atomic_model.sym_ops = sym_ops
 
         # Similarly process the second symmetry set (if needed):
