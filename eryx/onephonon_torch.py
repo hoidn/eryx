@@ -38,6 +38,8 @@ class OnePhononTorch(ModelRunner):
         self.batch_size = batch_size
         self.n_processes = n_processes
         self.device = device
+        if self.device.type == 'cuda':
+            self.n_processes = 1  # Avoid CUDA re-init issues in forked subprocesses.
 
         # Use torch routines to set up the grid and q_grid
         atomic_model = AtomicModel(pdb_path, expand_p1=expand_p1, frame=-1)
@@ -68,8 +70,21 @@ class OnePhononTorch(ModelRunner):
         # Process the second symmetry set to ensure full (3,3) matrices.
         if isinstance(sym_ops[1], dict):
             for key, op in sym_ops[1].items():
-                if op.ndim != 2 or op.shape != (3, 3):
-                    sym_ops[1][key] = np.diag(op)
+                if op.ndim == 1:
+                    # If it’s a length-3 vector, assume no translation was provided.
+                    # For key 0, we want an identity (3x4) with a zero last column.
+                    if key == 0:
+                        sym_ops[1][key] = np.hstack([np.eye(3), np.zeros((3,1))])
+                    else:
+                        # If op has 4 elements, assume the first three form a diagonal and the fourth is the translation.
+                        # (Adjust the following logic if your expected operator differs.)
+                        if op.shape[0] == 4:
+                            D = np.diag(op[:3])
+                            T = op[3:].reshape(3, 1)
+                            sym_ops[1][key] = np.hstack([D, T])
+                        # Otherwise, if it’s only length 3, pad with zeros:
+                        else:
+                            sym_ops[1][key] = np.hstack([np.diag(op), np.zeros((3,1))])
         elif isinstance(sym_ops[1], np.ndarray):
             if sym_ops[1].ndim != 2 or sym_ops[1].shape != (3, 3):
                 sym_ops = (sym_ops[0], np.diagflat(sym_ops[1]))
@@ -101,7 +116,7 @@ class OnePhononTorch(ModelRunner):
         I_torch = torch.zeros(q_grid_torch.shape[0], device=self.device, dtype=torch.float32)
         if valid.any():
             # Use the torch-based structure_factors function to compute complex structure factors
-            I_torch[valid] = torch.square(torch.abs(structure_factors(q_grid_torch[valid],
+            I_torch[valid] = torch.square(torch.abs(structure_factors(q_grid_torch[valid].detach().cpu().numpy(),
                                                                       atomic_model.xyz,
                                                                       atomic_model.ff_a,
                                                                       atomic_model.ff_b,
