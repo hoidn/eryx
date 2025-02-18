@@ -44,38 +44,18 @@ def generate_grid(A_inv, hsampling, ksampling, lsampling, return_hkl=False):
         return q_grid, map_shape
 
 def get_symmetry_equivalents(hkl_grid, sym_ops):
-    hkl_grid = np.atleast_2d(hkl_grid)  # ENSURE hkl_grid is two-dimensional.
-    """
-    Get symmetry equivalent Miller indices of input hkl_grid.
-    The symmetry-equivalents are stacked horizontally, so that
-    the first dimension of the output array corresponds to the
-    nth asymmetric unit.
-    
-    Parameters
-    ----------
-    hkl_grid : numpy.ndarray, shape (n_points, 3)
-        hkl indices corresponding to flattened intensity map
-    sym_ops : dict
-        rotational symmetry operations as 3x3 arrays
-        
-    Returns
-    -------
-    hkl_grid_sym : numpy.ndarray, shape (n_asu, n_points, 3)
-        stacked hkl indices of symmetry-equivalents
-    """
-    hkl_grid_sym = np.empty(3)
-    for i,rot in sym_ops.items():
-        print(f"DEBUG: Processing symmetry op key {i}, op shape: {rot.shape}")
-        print(f"DEBUG: rot.T shape for key {i}: {rot.T.shape}")
-        hkl_grid_rot = np.matmul(hkl_grid, rot)
-        print(f"DEBUG: hkl_grid_rot shape for key {i}: {hkl_grid_rot.shape}")
-        print(f"DEBUG: hkl_grid_sym shape before vstack for key {i}: {hkl_grid_sym.shape}")
-        if hkl_grid_rot.shape[1] != hkl_grid_sym.shape[0]:
-            print(f"ERROR: Dimension mismatch for key {i}: hkl_grid_sym has {hkl_grid_sym.shape[0]} columns, but hkl_grid_rot has {hkl_grid_rot.shape[1]} columns.")
-        hkl_grid_sym = np.vstack((hkl_grid_sym, hkl_grid_rot))
-        print(f"DEBUG: hkl_grid_sym shape after vstack for key {i}: {hkl_grid_sym.shape}")
-    hkl_grid_sym = hkl_grid_sym[1:]
-    return hkl_grid_sym.reshape(len(sym_ops), hkl_grid.shape[0], 3)
+    hkl_list = []
+    for key, op in sym_ops.items():
+        print(f"DEBUG: Processing symmetry op key {key}, op.shape: {op.shape}")
+        # Compute the rotated grid and force 2D shape
+        hkl_grid_rot = np.dot(hkl_grid, op.T)
+        hkl_grid_rot = np.atleast_2d(hkl_grid_rot)
+        print(f"DEBUG: For key {key}, hkl_grid_rot.shape: {hkl_grid_rot.shape} (expected: (n_points, 3))")
+        hkl_list.append(hkl_grid_rot)
+
+    stacked = np.vstack(hkl_list)
+    print(f"DEBUG: Final stacked symmetry grid shape: {stacked.shape}")
+    return stacked
     
 def get_ravel_indices(hkl_grid_sym, sampling):
     """
