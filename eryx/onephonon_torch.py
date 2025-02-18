@@ -50,6 +50,7 @@ class OnePhononTorch(ModelRunner):
                                                       return_hkl=True)
         self.q_grid = torch.tensor(2 * np.pi * np.inner(atomic_model.A_inv.T, self.hkl_grid).T, device=self.device, dtype=torch.float32)
         logging.debug(f"q_grid shape (torch): {self.q_grid.shape}")
+        logging.debug(f"q_grid values (torch): {self.q_grid}")
 
         # Initialize the torch-based GNM
         self.gnm_torch = GaussianNetworkModelTorch(pdb_path, gnm_cutoff, gamma_intra, gamma_inter, device=device)
@@ -120,6 +121,7 @@ class OnePhononTorch(ModelRunner):
         crystal_transform = self._compute_crystal_transform_torch(q_grid_torch)
         Id = self._incoherent_sum_torch(crystal_transform)
         logging.debug(f"Id (diffuse intensity) shape: {Id.shape}, device: {Id.device}")
+        logging.debug(f"Id (diffuse intensity) values: {Id}")
         return Id
     def _compute_crystal_transform_torch(self, q_grid_torch: torch.Tensor) -> torch.Tensor:
         """
@@ -165,16 +167,20 @@ class OnePhononTorch(ModelRunner):
         # Print debug info about symmetry operations and grid before further processing.
         sym_ops_rot = self.gnm_torch.atomic_model.sym_ops[0]
         print("DEBUG: In _incoherent_sum_torch, sym_ops_rot:", sym_ops_rot)
+        print("DEBUG: In _incoherent_sum_torch, q_grid values:", self.q_grid)
         print("DEBUG: In _incoherent_sum_torch, input hkl_grid shape:", self.hkl_grid.shape)
+        print("DEBUG: In _incoherent_sum_torch, input hkl_grid values:", self.hkl_grid)
         
         hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops_rot)
         hs_shape = np.array(hkl_sym).shape
         print("DEBUG: hkl_sym shape after symmetry expansion:", hs_shape)
+        print("DEBUG: hkl_sym values after symmetry expansion:", hkl_sym)
         if hs_shape[1] != self.hkl_grid.shape[0]:
             print(f"WARNING: Expected second dimension {self.hkl_grid.shape[0]} but got {hs_shape[1]}")
         
         ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, (self.hsampling[2], self.ksampling[2], self.lsampling[2]))
         print("DEBUG: ravel_np (first few groups):", ravel_np[:2])
+        print("DEBUG: ravel_np (all groups):", ravel_np)
         print("DEBUG: map_shape_ravel:", map_shape_ravel)
         if transform.numel() == 0:
             I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
@@ -199,6 +205,7 @@ class OnePhononTorch(ModelRunner):
                 I_full[idx_tensor] = I_full[torch.tensor(primary_np[comm1], device='cpu', dtype=torch.long)]
         # This conversion is non-differentiable and breaks the gradient flow intentionally.
         I_full = I_full.to(self.device).detach()
+        logging.debug(f"I_full values after symmetry correction: {I_full}")
         I_full = I_full.view(*map_shape_ravel)
         # Compute centered sampling from the obtained map shape and the original sampling
         sampling = (self.hsampling[2], self.ksampling[2], self.lsampling[2])
