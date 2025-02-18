@@ -38,10 +38,10 @@ class OnePhononTorch(ModelRunner):
         self.n_processes = n_processes
         self.device = device
         if self.device.type == "cuda" and self.device.index is None:
-            self.device = torch.device("cuda")
+            self.device = torch.device("cuda:0")
 
         # Use numpy routines to set up the grid and q_grid
-        atomic_model = AtomicModel(pdb_path, expand_p1)
+        atomic_model = AtomicModel(pdb_path, expand_p1=expand_p1, frame=-1)
         from eryx.map_utils import generate_grid  # use existing method
         self.hkl_grid, self.map_shape = generate_grid(atomic_model.A_inv,
                                                       self.hsampling,
