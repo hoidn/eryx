@@ -171,17 +171,11 @@ class OnePhononTorch(ModelRunner):
             return I_full.to(self.device)
         logging.debug(f"[OnePhononTorch._incoherent_sum_torch] map_shape_ravel: {map_shape_ravel}, np.prod(map_shape_ravel): {np.prod(map_shape_ravel)}")
         I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
-        # Concatenate the tuple of index arrays so that indices has length = total number of grid points
-        indices = torch.tensor(np.concatenate(ravel_np), device='cpu', dtype=torch.long).flatten()
         transform_cpu = transform.to('cpu')
-        factor = int(np.prod(map_shape_ravel)) // int(self.q_grid.shape[0])
-        logging.debug(f"[OnePhononTorch._incoherent_sum_torch] Concatenated indices shape: {indices.shape}")
-        logging.debug(f"[OnePhononTorch._incoherent_sum_torch] transform_cpu.shape: {transform_cpu.shape}, factor: {factor}")
-        if factor == 0 or transform_cpu.numel() == 0:
-            logging.warning("Empty transform_cpu or zero factor in _incoherent_sum_torch – returning I_full as zeros.")
-            return I_full.to(self.device).flatten()
-        transform_rep = transform_cpu.repeat_interleave(factor)
-        I_full.index_add_(0, indices, transform_rep)
+        # Instead of concatenation, loop over each symmetry group from ravel_np.
+        for group in ravel_np:
+            idx_tensor = torch.tensor(group, device='cpu', dtype=torch.long)
+            I_full.index_add_(0, idx_tensor, transform_cpu)
         I_full = I_full.to(self.device)
         I_full = I_full.view(*map_shape_ravel)
         _, mult = compute_multiplicity(self.gnm_torch.atomic_model, 
