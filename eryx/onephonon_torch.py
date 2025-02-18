@@ -133,8 +133,13 @@ class OnePhononTorch(ModelRunner):
         """
         Compute the crystal transform in torch by leveraging the existing NP structure factors.
         """
-        # Get NP data from the atomic model
+        # -- DEBUG_HYP3: Compare NP and Torch q_grids. 
         atomic_model = self.gnm_torch.atomic_model
+        hkl = self.hkl_grid  # NP hkl
+        print("DEBUG_HYP3: hkl_grid shape from Torch branch:", hkl.shape)
+        q_grid_np = 2 * np.pi * np.inner(atomic_model.A_inv.T, hkl).T
+        diff_q = np.abs(q_grid_np - q_grid_torch.cpu().numpy())
+        print("DEBUG_HYP3: max difference between NP and Torch q_grid:", diff_q.max())
         hkl = self.hkl_grid  # already a NP array
         # Use atomic_model.cell only for the mask; use atomic_model.A_inv for dq and q_grid
         mask_np, _ = get_resolution_mask(atomic_model.cell, hkl, self.res_limit)
@@ -287,8 +292,10 @@ class OnePhononTorch(ModelRunner):
                               int(self.hkl_grid[:, i].max()),
                               self.hsampling[i]) for i in range(3)]
         I_full_np = resize_map(I_full.cpu().numpy(), sampling_original, sampling_ravel)
-        print("DEBUG: I_full_np shape after resize_map:", I_full_np.shape)
-        print("DEBUG: I_full_np (first 10 elems) after resize_map:", I_full_np.flatten()[:10])
+        print("DEBUG_HYP2: I_full_np shape after resize_map:", I_full_np.shape)
+        print("DEBUG_HYP2: I_full_np (first 10 elems) after resize_map:", I_full_np.flatten()[:10])
+        # (Optional test:) Uncomment the next line to disable any additional scaling:
+        # I_full_np = I_full_np  # No extra scaling here
         
         I_full = torch.tensor(I_full_np, device=self.device, dtype=torch.float32)
         return I_full.flatten()
