@@ -168,11 +168,12 @@ class OnePhononTorch(ModelRunner):
         print("DEBUG: In _incoherent_sum_torch, input hkl_grid shape:", self.hkl_grid.shape)
         
         hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops_rot)
-        print("DEBUG: hkl_sym shape after symmetry expansion:", np.array(hkl_sym).shape)
+        hs_shape = np.array(hkl_sym).shape
+        print("DEBUG: hkl_sym shape after symmetry expansion:", hs_shape)
+        if hs_shape[1] != self.hkl_grid.shape[0]:
+            print(f"WARNING: Expected second dimension {self.hkl_grid.shape[0]} but got {hs_shape[1]}")
         
-        # Use the sampling dimensions (oversampling values) as the second argument:
-        sampling = (self.hsampling[2], self.ksampling[2], self.lsampling[2])
-        ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, sampling)
+        ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, (self.hsampling[2], self.ksampling[2], self.lsampling[2]))
         print("DEBUG: ravel_np (first few groups):", ravel_np[:2])
         print("DEBUG: map_shape_ravel:", map_shape_ravel)
         if transform.numel() == 0:
