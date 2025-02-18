@@ -161,11 +161,19 @@ class OnePhononTorch(ModelRunner):
         Compute the diffuse intensity by incoherently summing the contributions
         from each asymmetric unit in a manner equivalent to NP’s incoherent_sum_real().
         """
+        # Print debug info about symmetry operations and grid before further processing.
         sym_ops_rot = self.gnm_torch.atomic_model.sym_ops[0]
+        print("DEBUG: In _incoherent_sum_torch, sym_ops_rot:", sym_ops_rot)
+        print("DEBUG: In _incoherent_sum_torch, input hkl_grid shape:", self.hkl_grid.shape)
+        
         hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops_rot)
+        print("DEBUG: hkl_sym shape after symmetry expansion:", np.array(hkl_sym).shape)
+        
         # Use the sampling dimensions (oversampling values) as the second argument:
         sampling = (self.hsampling[2], self.ksampling[2], self.lsampling[2])
         ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, sampling)
+        print("DEBUG: ravel_np (first few groups):", ravel_np[:2])
+        print("DEBUG: map_shape_ravel:", map_shape_ravel)
         if transform.numel() == 0:
             I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
             return I_full.to(self.device)

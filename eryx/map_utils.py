@@ -181,9 +181,20 @@ def expand_sym_ops(sym_ops):
     sym_ops_exp : dict
         sym_ops, expanded to account for Friedel symmetry
     """
+    # Begin debug prints for sym_ops input
+    print("DEBUG: expand_sym_ops called with type:", type(sym_ops))
+    print("DEBUG: expand_sym_ops input:", sym_ops)
+    # If sym_ops is a tuple or list, use the first element.
+    if isinstance(sym_ops, (tuple, list)):
+        sym_ops = sym_ops[0]
+        print("DEBUG: sym_ops extracted as first element (tuple/list); new type:", type(sym_ops))
     sym_ops_exp = dict(sym_ops)
-    for key in sym_ops:
-        sym_ops_exp[key + len(sym_ops)] = -1 * sym_ops[key]
+    n = len(sym_ops)
+    for key, op in sym_ops.items():
+        # Debug print each key and op type/shape before computing negative
+        print(f"DEBUG: Key: {key}; op type: {type(op)}; op shape: {getattr(op, 'shape', 'N/A')}")
+        sym_ops_exp[key + n] = -1 * op
+    print("DEBUG: expand_sym_ops returning sym_ops_exp:", sym_ops_exp)
     return sym_ops_exp
 
 def compute_multiplicity(model, hsampling, ksampling, lsampling):
