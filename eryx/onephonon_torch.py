@@ -178,10 +178,13 @@ class OnePhononTorch(ModelRunner):
             I_full.index_add_(0, idx_tensor, transform_cpu)
         I_full = I_full.to(self.device)
         I_full = I_full.view(*map_shape_ravel)
+        # Compute centered sampling from the obtained map shape and the original sampling
+        sampling = (self.hsampling[2], self.ksampling[2], self.lsampling[2])
+        sampling_ravel = get_centered_sampling(map_shape_ravel, sampling)
         _, mult = compute_multiplicity(self.gnm_torch.atomic_model, 
-                                       (-self.hsampling[1], self.hsampling[1], self.hsampling[2]),
-                                       (-self.ksampling[1], self.ksampling[1], self.ksampling[2]),
-                                       (-self.lsampling[1], self.lsampling[1], self.lsampling[2]))
+                                       sampling_ravel[0], 
+                                       sampling_ravel[1], 
+                                       sampling_ravel[2])
         mult_flat = torch.tensor(mult.flatten(), device=self.device, dtype=torch.float32)
         I_full = I_full / (mult_flat.max() / mult_flat)
         I_full = I_full.to(self.device)
