@@ -171,11 +171,11 @@ class OnePhononTorch(ModelRunner):
             return I_full.to(self.device)
         logging.debug(f"[OnePhononTorch._incoherent_sum_torch] map_shape_ravel: {map_shape_ravel}, np.prod(map_shape_ravel): {np.prod(map_shape_ravel)}")
         I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
-        # Convert the ravel indices array to a tensor on CPU:
-        indices = torch.tensor(ravel_np, device='cpu', dtype=torch.long).flatten()
-        # Move input transform to CPU and repeat as needed:
+        # Concatenate the tuple of index arrays so that indices has length = total number of grid points
+        indices = torch.tensor(np.concatenate(ravel_np), device='cpu', dtype=torch.long).flatten()
         transform_cpu = transform.to('cpu')
-        factor = len(ravel_np) // int(self.q_grid.shape[0])
+        factor = int(np.prod(map_shape_ravel)) // int(self.q_grid.shape[0])
+        logging.debug(f"[OnePhononTorch._incoherent_sum_torch] Concatenated indices shape: {indices.shape}")
         logging.debug(f"[OnePhononTorch._incoherent_sum_torch] transform_cpu.shape: {transform_cpu.shape}, factor: {factor}")
         if factor == 0 or transform_cpu.numel() == 0:
             logging.warning("Empty transform_cpu or zero factor in _incoherent_sum_torch – returning I_full as zeros.")
