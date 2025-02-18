@@ -154,7 +154,8 @@ class OnePhononTorch(ModelRunner):
 
             indices = torch.nonzero(valid, as_tuple=True)[0]  # 1D tensor of indices
             q_sel = q_grid_torch[indices].cpu().numpy()
-            # Force selection of the first asymmetric unit so that shapes become (n_atoms,4) and (n_atoms,)
+            # Compute the displacement parameter U from data (mirroring NP branch)
+            U = atomic_model.adp[0] / (8 * np.pi * np.pi)
             print("DEBUG: ff_a shape before indexing:", atomic_model.ff_a.shape)
             ff_a = atomic_model.ff_a[0]
             ff_b = atomic_model.ff_b[0]
@@ -168,7 +169,7 @@ class OnePhononTorch(ModelRunner):
                                            ff_a,
                                            ff_b,
                                            ff_c,
-                                           U=None,
+                                           U=U,
                                            batch_size=self.batch_size,
                                            n_processes=self.n_processes)
             # Convert the NP results back to a torch tensor on the correct device.
