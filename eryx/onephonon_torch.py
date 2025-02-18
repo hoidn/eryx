@@ -152,7 +152,7 @@ class OnePhononTorch(ModelRunner):
         Compute the diffuse intensity by incoherently summing the contributions
         from each asymmetric unit in a manner equivalent to NP’s incoherent_sum_real().
         """
-        sym_ops = expand_sym_ops(self.gnm_torch.atomic_model.sym_ops)
+        sym_ops = self.gnm_torch.atomic_model.sym_ops
         hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops)
         ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, self.map_shape)
         # Allocate a 1D accumulator (flattened over the full map)
