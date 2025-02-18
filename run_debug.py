@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 import logging
-import numpy as np
-from eryx.models import OnePhonon   # NP version
-from eryx.onephonon_torch import OnePhononTorch
 
 def setup_logging():
-    import logging
     # Remove any existing handlers.
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
@@ -75,8 +71,6 @@ def run_torch():
     np.save("torch_diffuse_intensity.npy", Id_torch.detach().cpu().numpy())
 
 if __name__ == "__main__":
-    setup_logging()
-    setup_logging()
     run_np()
     run_torch()
     logging.info("Completed debug run. Please check debug_output.log, np_diffuse_intensity.npy and torch_diffuse_intensity.npy")
