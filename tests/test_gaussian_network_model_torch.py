@@ -102,6 +102,9 @@ def test_inversion_stability_torch(gnm_model_torch, device):
             expected = torch.zeros((gnm_model_torch.n_asu, gnm_model_torch.n_atoms_per_asu),
                                    dtype=block.dtype, device=device)
             expected[i, j] = 1.0 + 0j
+            diff = torch.abs(block - expected)
+            maxdiff = diff.max().item()
+            logging.debug(f"[DEBUG test_inversion_stability] For i_asu={i}, atom index={j}, max diff={maxdiff:.8e}, block=\n{block}, expected=\n{expected}")
             assert torch.allclose(block, expected, rtol=1e-7)
 
 
@@ -111,7 +114,8 @@ def test_device_placement(gnm_model_torch, device):
     """
     assert gnm_model_torch.gamma.device.type == device.type
     hessian = gnm_model_torch.compute_hessian()
-    assert hessian.device == device
+    logging.debug(f"[DEBUG test_device_placement] hessian.device={hessian.device}, expected device={device}")
+    assert hessian.device.type == device.type
 
 
 def test_cuda_vs_cpu():

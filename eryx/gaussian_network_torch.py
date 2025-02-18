@@ -115,12 +115,15 @@ class GaussianNetworkModelTorch:
         for j_cell in range(self.n_cell):
             if j_cell == self.id_cell_ref:
                 continue
+            logging.debug(f"[DEBUG compute_K] Processing j_cell={j_cell}")
             # Get the cell origin (from the numpy Crystal object) and convert to torch tensor
             r_cell_np = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
             r_cell = torch.tensor(r_cell_np, device=self.device, dtype=torch.float32)
             phase = torch.dot(kvec, r_cell)
             eikr = torch.cos(phase) + 1j * torch.sin(phase)
+            logging.debug(f"[DEBUG compute_K] j_cell={j_cell}, r_cell={r_cell.cpu().numpy()}, phase={phase.item():.8f}, eikr={eikr}")
             Kmat -= hessian[:, :, j_cell, :, :] * eikr
+            logging.debug(f"[DEBUG compute_K] After j_cell={j_cell} update, Kmat norm={torch.norm(Kmat).item():.8f}")
         # logging.debug(f"Kmat shape: {Kmat.shape}")
         return Kmat
 
@@ -131,7 +134,9 @@ class GaussianNetworkModelTorch:
         Kmat = self.compute_K(hessian, kvec)
         shape = Kmat.shape  # (n_asu, n_atoms_per_asu, n_asu, n_atoms_per_asu)
         Kmat_flat = Kmat.reshape(shape[0] * shape[1], shape[2] * shape[3])
+        logging.debug(f"[DEBUG compute_Kinv] Kmat flat shape: {Kmat_flat.shape}, norm={torch.norm(Kmat_flat).item():.8f}")
         Kinv_flat = torch.linalg.pinv(Kmat_flat)
+        logging.debug(f"[DEBUG compute_Kinv] Kinv flat shape: {Kinv_flat.shape}, norm={torch.norm(Kinv_flat).item():.8f}")
         if reshape:
             Kinv = Kinv_flat.reshape((shape[0], shape[1], shape[2], shape[3]))
         else:
