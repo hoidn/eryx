@@ -122,7 +122,7 @@ class GaussianNetworkModelTorch:
             # Get the cell origin (from the numpy Crystal object) and convert to torch tensor
             r_cell_np = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
             r_cell = torch.tensor(r_cell_np, device=self.device, dtype=torch.float64)
-            phase = torch.dot(kvec, r_cell_tensor)
+            phase = torch.dot(kvec, r_cell)
             eikr = torch.cos(phase) + 1j * torch.sin(phase)
             logging.debug(f"[DEBUG compute_K] j_cell={j_cell}, r_cell={r_cell.cpu().numpy()}, phase={phase.item():.8f}, eikr={eikr}")
             Kmat += hessian[:, :, j_cell, :, :] * eikr
