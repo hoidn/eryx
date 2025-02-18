@@ -59,9 +59,12 @@ class OnePhononTorch(ModelRunner):
         # Ensure that sym_ops[0] contains full (3,3) matrices.
         if isinstance(sym_ops[0], dict):
             for key, op in sym_ops[0].items():
-                # If op is not a (3,3) array, replace it with its diagonal matrix.
-                if op.ndim != 2 or op.shape != (3, 3):
-                    sym_ops[0][key] = np.diag(op)
+                if op.ndim == 1:
+                    # For key 0, expect identity (i.e. all ones on the diag)
+                    if key == 0:
+                        sym_ops[0][key] = np.eye(3)
+                    else:
+                        sym_ops[0][key] = np.diag(op)
         elif isinstance(sym_ops[0], np.ndarray):
             if sym_ops[0].ndim != 2 or sym_ops[0].shape != (3, 3):
                 sym_ops = (np.diagflat(sym_ops[0]), sym_ops[1])
