@@ -223,6 +223,7 @@ class OnePhononTorch(ModelRunner):
         # Compute centered sampling from the obtained map shape and the original sampling
         sampling = (self.hsampling[2], self.ksampling[2], self.lsampling[2])
         sampling_ravel = get_centered_sampling(map_shape_ravel, sampling)
+        atomic_model = self.gnm_torch.atomic_model
         print("DEBUG: Before compute_multiplicity, ff_a[0] shape:", atomic_model.ff_a[0].shape)
         print("DEBUG: Before compute_multiplicity, xyz[0] shape:", atomic_model.xyz[0].shape)
         _, mult = compute_multiplicity(self.gnm_torch.atomic_model, 
