@@ -11,7 +11,7 @@ def device():
 @pytest.fixture
 def onephonon_torch(device):
     return OnePhononTorch(
-        "tests/pdbs/5zck.pdb", 
+        "tests/pdbs/5zck_p1.pdb", 
         [-2, 2, 1], [-2, 2, 1], [-2, 2, 1],
         expand_p1=True,
         gnm_cutoff=4.0,
