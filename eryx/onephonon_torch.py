@@ -266,7 +266,7 @@ class OnePhononTorch(ModelRunner):
         print("DEBUG_HYP1: I_full BEFORE scaling (first 10 elems):", I_full.flatten()[:10])
         # Option to disable multiplicity scaling (for debugging)
         if not getattr(self, "disable_scaling", False):
-            I_full = I_full / scaling_factor
+            I_full = I_full * scaling_factor
             logging.debug(f"Applied multiplicity scaling, scaling factor stats: max={scaling_factor.max()}, min={scaling_factor.min()}")
         else:
             logging.debug("Multiplicity scaling disabled for debugging")
