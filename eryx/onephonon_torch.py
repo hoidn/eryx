@@ -30,10 +30,10 @@ class OnePhononTorch(ModelRunner):
         Uses the torch GNM for phonon computations while keeping data loading in numpy.
         """
         self.pdb_path = pdb_path
-        # Adjust sampling parameters to match the high-resolution grid
-        self.hsampling = [-4, 4, 1]
-        self.ksampling = [-17, 17, 1]
-        self.lsampling = [-29, 29, 1]
+        # Use the input sampling parameters directly
+        self.hsampling = hsampling
+        self.ksampling = ksampling
+        self.lsampling = lsampling
         self.expand_p1 = expand_p1
         self.res_limit = res_limit
         self.batch_size = batch_size
