@@ -71,8 +71,14 @@ class OnePhononTorch(ModelRunner):
         Compute the crystal transform in torch in an equivalent way to the NP version.
         """
         # Use the Miller-index grid (self.hkl_grid) instead of self.q_grid
-        print(f"[DEBUG] xyz shape: {xyz.shape}, device: {xyz.device}")
         mask_np, res_map_np = get_resolution_mask(self.gnm_torch.atomic_model.cell, self.hkl_grid, self.res_limit)
+        dq_map_np = np.around(get_dq_map(self.gnm_torch.atomic_model.A_inv, self.hkl_grid), 5)
+        mask = torch.tensor(mask_np, device=self.device, dtype=torch.bool)
+        dq_mask = torch.tensor(np.isclose(dq_map_np, 0, atol=1e-5), device=self.device)
+        xyz = torch.tensor(self.gnm_torch.atomic_model.xyz, device=self.device, dtype=torch.float32)
+        if xyz.ndim > 2:
+            xyz = xyz.reshape(-1, xyz.shape[-1])
+        print(f"[DEBUG] xyz shape: {xyz.shape}, device: {xyz.device}")
         dq_map_np = np.around(get_dq_map(self.gnm_torch.atomic_model.A_inv, self.hkl_grid), 5)
         mask = torch.tensor(mask_np, device=self.device, dtype=torch.bool)
         dq_mask = torch.tensor(np.isclose(dq_map_np, 0, atol=1e-5), device=self.device)
