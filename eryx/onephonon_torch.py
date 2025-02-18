@@ -286,9 +286,11 @@ class OnePhononTorch(ModelRunner):
         # --- End debug prints for scaling study ---
 
         I_full = I_full.to(self.device)
-        sampling_original = [(int(self.hkl_grid[:, i].min()),
-                              int(self.hkl_grid[:, i].max()),
-                              self.hsampling[i]) for i in range(3)]
+        sampling_original = [
+            (int(self.hkl_grid[:, 0].min()), int(self.hkl_grid[:, 0].max()), self.hsampling[2]),
+            (int(self.hkl_grid[:, 1].min()), int(self.hkl_grid[:, 1].max()), self.ksampling[2]),
+            (int(self.hkl_grid[:, 2].min()), int(self.hkl_grid[:, 2].max()), self.lsampling[2])
+        ]
         print("DEBUG: self.hkl_grid.shape =", self.hkl_grid.shape)
         print("DEBUG: self.map_shape =", self.map_shape)
         print("DEBUG: sampling_original =", sampling_original)
