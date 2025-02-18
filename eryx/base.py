@@ -255,7 +255,12 @@ def incoherent_sum_real(model, hkl_grid, sampling, U=None, mask=None, batch_size
     # get symmetry information for expanded map
     sym_ops = expand_sym_ops(model.sym_ops)
     hkl_sym = get_symmetry_equivalents(hkl_grid, sym_ops)
+    print("NP DEBUG (real): hkl_sym shape after symmetry expansion:", np.array(hkl_sym).shape)
+    print("NP DEBUG (real): hkl_sym (first 2 groups):", np.array(hkl_sym)[:2])
+
     ravel, map_shape_ravel = get_ravel_indices(hkl_sym, sampling)
+    print("NP DEBUG (real): ravel indices (first few groups):", ravel[:2])
+    print("NP DEBUG (real): map_shape_ravel:", map_shape_ravel)
     sampling_ravel = get_centered_sampling(map_shape_ravel, sampling)
     hkl_grid_mult, mult = compute_multiplicity(model, 
                                                sampling_ravel[0], 
@@ -306,7 +311,12 @@ def incoherent_sum_reciprocal(model, hkl_grid, sampling, U=None, batch_size=1000
         intensity map of the molecular transform
     """
     hkl_grid_sym = get_symmetry_equivalents(hkl_grid, model.sym_ops)
+    print("NP DEBUG: hkl_grid_sym shape after symmetry expansion:", np.array(hkl_grid_sym).shape)
+    print("NP DEBUG: hkl_grid_sym (first 2 groups):", np.array(hkl_grid_sym)[:2])
+
     ravel, map_shape_ravel = get_ravel_indices(hkl_grid_sym, sampling)
+    print("NP DEBUG: ravel indices (first few groups):", ravel[:2])
+    print("NP DEBUG: map_shape_ravel:", map_shape_ravel)
     
     I_sym = np.zeros(ravel.shape)
     for asu in range(I_sym.shape[0]):
