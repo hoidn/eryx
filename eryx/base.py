@@ -2,6 +2,7 @@ import numpy as np
 import glob
 import re
 import os
+import logging
 from .pdb import AtomicModel
 from .map_utils import *
 from .scatter import structure_factors
@@ -111,8 +112,8 @@ def compute_crystal_transform(pdb_path, hsampling, ksampling, lsampling, U=None,
                                         lsampling, 
                                         return_hkl=True)
     q_grid = 2*np.pi*np.inner(model.A_inv.T, hkl_grid).T
-    print("DEBUG_HYP_NP-1: q_grid shape =", q_grid.shape)
-    print("DEBUG_HYP_NP-1: hkl_grid shape =", hkl_grid.shape)
+    logging.debug("DEBUG_HYP_NP-1: q_grid shape = %s", q_grid.shape)
+    logging.debug("DEBUG_HYP_NP-1: hkl_grid shape = %s", hkl_grid.shape)
     mask, res_map = get_resolution_mask(model.cell, hkl_grid, res_limit)
     dq_map = np.around(get_dq_map(model.A_inv, hkl_grid), 5)
     dq_map[~mask] = -1

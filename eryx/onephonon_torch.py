@@ -1,3 +1,4 @@
+import logging
 import torch
 import numpy as np
 import logging
@@ -144,7 +145,7 @@ class OnePhononTorch(ModelRunner):
         # -- DEBUG_HYP3: Compare NP and Torch q_grids. 
         atomic_model = self.gnm_torch.atomic_model
         hkl = self.hkl_grid  # NP hkl
-        print("DEBUG_HYP_TORCH: hkl_grid shape from Torch branch:", hkl.shape)
+        logging.debug("DEBUG_HYP_TORCH: hkl_grid shape from Torch branch: %s", hkl.shape)
         q_grid_np = 2 * np.pi * np.inner(atomic_model.A_inv.T, hkl).T
         diff_q = np.abs(q_grid_np - q_grid_torch.cpu().numpy())
         print("DEBUG_HYP_TORCH: np_q_grid.shape =", q_grid_np.shape)
@@ -228,11 +229,11 @@ class OnePhononTorch(ModelRunner):
         I_full[primary_indices] = transform_cpu  # assign primary values
 
         # For each subsequent group, copy the intensities from the primary positions
-        print("AGGRESSIVE_DEBUG_HYP_TORCH: Starting symmetry copy loop 1, I_full sum =", I_full.sum().item())
+        logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: Starting symmetry copy loop 1, I_full sum = %s", I_full.sum().item())
 
-        print("AGGRESSIVE_DEBUG_HYP_TORCH: After symmetry copy loop 1, I_full sum =", I_full.sum().item())
+        logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: After symmetry copy loop 1, I_full sum = %s", I_full.sum().item())
 
-        print("AGGRESSIVE_DEBUG_HYP_TORCH: Starting symmetry copy loop 2, I_full sum =", I_full.sum().item())
+        logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: Starting symmetry copy loop 2, I_full sum = %s", I_full.sum().item())
 
         for group in ravel_np[1:]:
             # Find the intersection between the primary ravel and this group.
@@ -258,7 +259,7 @@ class OnePhononTorch(ModelRunner):
         #         idx_tensor = torch.tensor(group_np[comm2], device='cpu', dtype=torch.long)
         #         I_full[idx_tensor] = I_full[torch.tensor(primary_np[comm1], device='cpu', dtype=torch.long)]
         # This conversion is non-differentiable and breaks the gradient flow intentionally.
-        print("AGGRESSIVE_DEBUG_HYP_TORCH: After symmetry copy loop 2, I_full sum =", I_full.sum().item())
+        logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: After symmetry copy loop 2, I_full sum = %s", I_full.sum().item())
 
         I_full = I_full.to(self.device).detach()
         logging.debug(f"I_full values after symmetry correction: {I_full}")
@@ -285,10 +286,9 @@ class OnePhononTorch(ModelRunner):
         print("DEBUG_HYP_TORCH: multiplicity tensor stats: min =", mult_tensor.min().item(), 
               "max =", mult_tensor.max().item(), 
               "unique =", torch.unique(mult_tensor))
-        print("AGGRESSIVE_DEBUG_HYP_TORCH: multiplicity tensor full stats: min =", mult_tensor.min().item(), 
-              "max =", mult_tensor.max().item(), "mean =", mult_tensor.float().mean().item(),
-              "25th percentile =", torch.quantile(mult_tensor.float(), 0.25).item(),
-              "75th percentile =", torch.quantile(mult_tensor.float(), 0.75).item())
+        logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: multiplicity tensor full stats: min = %s, max = %s, mean = %s, 25th percentile = %s, 75th percentile = %s",
+                      mult_tensor.min().item(), mult_tensor.max().item(), mult_tensor.float().mean().item(),
+                      torch.quantile(mult_tensor.float(), 0.25).item(), torch.quantile(mult_tensor.float(), 0.75).item())
         scaling_factor = mult_tensor.max() / mult_tensor
         # Before scaling:
         print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full BEFORE scaling: min =", I_full.min().item(), 
