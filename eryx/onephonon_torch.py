@@ -249,16 +249,14 @@ class OnePhononTorch(ModelRunner):
                 I_full[idx_tensor] = I_full[torch.tensor(primary_np[comm1], device='cpu', dtype=torch.long)]
                 after_copy = I_full[idx_tensor].clone()
                 print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full difference for copied indices, before copy (first element):", before_copy[0].item(), "after copy (first element):", after_copy[0].item())
-        for group in ravel_np[1:]:
-            # Find the intersection between the primary ravel and this group.
-            group_np = np.array(group)
-            primary_np = np.array(ravel_np[0])
-            # Compute indices in the primary array that match the current group.
-            intersect, comm1, comm2 = np.intersect1d(primary_np, group_np, return_indices=True)
-            if intersect.size:
-                # Copy the corresponding values from the primary result.
-                idx_tensor = torch.tensor(group_np[comm2], device='cpu', dtype=torch.long)
-                I_full[idx_tensor] = I_full[torch.tensor(primary_np[comm1], device='cpu', dtype=torch.long)]
+        # for group in ravel_np[1:]:
+        #     # Duplicate copy loop removed for hypothesis testing
+        #     group_np = np.array(group)
+        #     primary_np = np.array(ravel_np[0])
+        #     intersect, comm1, comm2 = np.intersect1d(primary_np, group_np, return_indices=True)
+        #     if intersect.size:
+        #         idx_tensor = torch.tensor(group_np[comm2], device='cpu', dtype=torch.long)
+        #         I_full[idx_tensor] = I_full[torch.tensor(primary_np[comm1], device='cpu', dtype=torch.long)]
         # This conversion is non-differentiable and breaks the gradient flow intentionally.
         print("AGGRESSIVE_DEBUG_HYP_TORCH: After symmetry copy loop 2, I_full sum =", I_full.sum().item())
 
