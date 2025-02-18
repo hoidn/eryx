@@ -69,10 +69,10 @@ class OnePhononTorch(ModelRunner):
         if isinstance(sym_ops[1], dict):
             for key, op in sym_ops[1].items():
                 if op.ndim == 1 and op.shape[0] == 3:
-                    sym_ops[1][key] = np.diag(op)
+                    sym_ops[1][key] = np.diagflat(op)
         elif isinstance(sym_ops[1], np.ndarray):
             if sym_ops[1].ndim == 1 and sym_ops[1].shape[0] == 3:
-                sym_ops = (sym_ops[0], np.diag(sym_ops[1]))
+                sym_ops = (sym_ops[0], np.diagflat(sym_ops[1]))
                 self.gnm_torch.atomic_model.sym_ops = sym_ops
 
     @log_method_call
