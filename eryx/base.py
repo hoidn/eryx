@@ -111,8 +111,8 @@ def compute_crystal_transform(pdb_path, hsampling, ksampling, lsampling, U=None,
                                         lsampling, 
                                         return_hkl=True)
     q_grid = 2*np.pi*np.inner(model.A_inv.T, hkl_grid).T
-    print("AGGRESSIVE_DEBUG_HYP_NP: q_grid shape =", q_grid.shape)
-    print("AGGRESSIVE_DEBUG_HYP_NP: hkl_grid shape =", hkl_grid.shape)
+    print("DEBUG_HYP_NP-1: q_grid shape =", q_grid.shape)
+    print("DEBUG_HYP_NP-1: hkl_grid shape =", hkl_grid.shape)
     mask, res_map = get_resolution_mask(model.cell, hkl_grid, res_limit)
     dq_map = np.around(get_dq_map(model.A_inv, hkl_grid), 5)
     dq_map[~mask] = -1
@@ -302,7 +302,20 @@ def incoherent_sum_real(model, hkl_grid, sampling, U=None, mask=None, batch_size
     I = resize_map(I, sampling_original, sampling_ravel)
     print("AGGRESSIVE_DEBUG_HYP_NP: AFTER resize_map: I_resized shape =", I.shape, "min =", np.nanmin(I), "max =", np.nanmax(I), "mean =", np.nanmean(I))
     
-    return I
+    print("DEBUG_HYP_NP-3: multiplicity stats: min =", mult.min(), "max =", mult.max(), "unique =", np.unique(mult))
+    print("DEBUG_HYP_NP-6: BEFORE resize_map: I shape =", I.shape, "min =", np.nanmin(I), "max =", np.nanmax(I), "mean =", np.nanmean(I))
+    I_resized = resize_map(I, sampling_original, sampling_ravel)
+    print("DEBUG_HYP_NP-6: AFTER resize_map: I_resized shape =", I_resized.shape, "min =", np.nanmin(I_resized), "max =", np.nanmax(I_resized), "mean =", np.nanmean(I_resized))
+    primary_indices = np.array(ravel[0])
+    all_indices = np.concatenate(ravel, axis=0)
+    unique_indices = np.unique(all_indices)
+    print("DEBUG_HYP_NP-7: Total indices in primary group =", primary_indices.size, 
+          "Total indices after symmetry expansion =", all_indices.size, 
+          "Unique indices =", unique_indices.size)
+    I_sum_unique = I.flatten()[unique_indices].sum()
+    I_sum_total = I.sum()
+    print("DEBUG_HYP_NP-7: Sum over unique indices =", I_sum_unique, "vs. total sum =", I_sum_total)
+    return I_resized
     
 def incoherent_sum_reciprocal(model, hkl_grid, sampling, U=None, batch_size=10000, n_processes=8):
     """
@@ -339,8 +352,8 @@ def incoherent_sum_reciprocal(model, hkl_grid, sampling, U=None, batch_size=1000
     print("NP DEBUG: hkl_grid_sym (first 2 groups):", np.array(hkl_grid_sym)[:2])
 
     ravel, map_shape_ravel = get_ravel_indices(hkl_grid_sym, sampling)
-    print("NP DEBUG: ravel indices (first few groups):", ravel[:2])
-    print("NP DEBUG: map_shape_ravel:", map_shape_ravel)
+    print("DEBUG_HYP_NP-2: ravel_np (first 2 groups):", ravel[:2])
+    print("DEBUG_HYP_NP-2: map_shape_ravel =", map_shape_ravel)
     
     I_sym = np.zeros(ravel.shape)
     for asu in range(I_sym.shape[0]):
@@ -366,5 +379,13 @@ def incoherent_sum_reciprocal(model, hkl_grid, sampling, U=None, batch_size=1000
                                                                    U=U,
                                                                    batch_size=batch_size)))
     I = np.sum(I_sym, axis=0)
+    print("DEBUG_HYP_NP-4: I BEFORE scaling (first 10 elems):", I.flatten()[:10])
+    I_before = I.copy()
+    I /= (mult.max() / mult)
+    print("DEBUG_HYP_NP-4: I AFTER scaling (first 10 elems):", I.flatten()[:10])
+    print("DEBUG_HYP_NP-5: Global I BEFORE scaling: sum =", I_before.sum(), 
+          "percentiles =", np.percentile(I_before.flatten(), [1, 25, 50, 75, 99]))
+    print("DEBUG_HYP_NP-5: Global I AFTER scaling: sum =", I.sum(), 
+          "percentiles =", np.percentile(I.flatten(), [1, 25, 50, 75, 99]))
     return I
 
