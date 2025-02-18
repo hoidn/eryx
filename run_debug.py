@@ -70,12 +70,8 @@ def run_torch():
     # Save for later comparison
     np.save("torch_diffuse_intensity.npy", Id_torch.detach().cpu().numpy())
 
-# Immediately configure logging before any other work or module import.
-setup_logging()
-
-# (Optionally, test your configuration now:)
-logging.debug("TEST: Logging is now configured.")
-
-import numpy as np
-from eryx.models import OnePhonon   # NP version
-from eryx.onephonon_torch import OnePhononTorch
+if __name__ == "__main__":
+    # After setting up and importing everything, call the run routines.
+    run_np()
+    run_torch()
+    logging.info("Completed debug run. Please check debug_output.log, np_diffuse_intensity.npy and torch_diffuse_intensity.npy")
