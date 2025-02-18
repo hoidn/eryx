@@ -35,7 +35,7 @@ class GaussianNetworkModelTorch:
         """
         # Create a torch tensor filled with gamma_inter (shape: [n_cell, n_asu, n_asu])
         self.gamma = torch.full((self.n_cell, self.n_asu, self.n_asu),
-                                self.gamma_inter, device=self.device, dtype=torch.float32)
+                                self.gamma_inter, device=self.device, dtype=torch.float64)
         # In the reference cell (id_cell_ref) set intra interaction gamma
         for i_asu in range(self.n_asu):
             self.gamma[self.id_cell_ref, i_asu, i_asu] = self.gamma_intra
@@ -64,9 +64,9 @@ class GaussianNetworkModelTorch:
            (n_asu, n_atoms_per_asu, n_cell, n_asu, n_atoms_per_asu) of dtype complex.
         """
         shape = (self.n_asu, self.n_atoms_per_asu, self.n_cell, self.n_asu, self.n_atoms_per_asu)
-        hessian = torch.zeros(shape, dtype=torch.complex64, device=self.device)
+        hessian = torch.zeros(shape, dtype=torch.complex128, device=self.device)
         hessian_diag = torch.zeros((self.n_asu, self.n_atoms_per_asu),
-                                   dtype=torch.complex64, device=self.device)
+                                   dtype=torch.complex128, device=self.device)
         # Loop over ASU and neighbor cells using the neighbor list
         for i_asu in range(self.n_asu):
             for i_cell in range(self.n_cell):
@@ -109,7 +109,9 @@ class GaussianNetworkModelTorch:
         Compute the dynamical matrix K(k) using torch.
         """
         if kvec is None:
-            kvec = torch.zeros(3, device=self.device, dtype=torch.float32)
+            kvec = torch.zeros(3, device=self.device, dtype=torch.float64)
+        else:
+            kvec = kvec.to(torch.float64)
         # Start with the reference cell term
         Kmat = hessian[:, :, self.id_cell_ref, :, :].clone()
         # Sum contributions from other cells
@@ -121,7 +123,7 @@ class GaussianNetworkModelTorch:
             r_cell_np = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
             r_cell = torch.tensor(r_cell_np, device=self.device, dtype=torch.float32)
             phase = torch.dot(kvec, r_cell)
-            eikr = torch.cos(phase) + 1j * torch.sin(phase)
+            eikr = torch.cos(phase) - 1j * torch.sin(phase)
             logging.debug(f"[DEBUG compute_K] j_cell={j_cell}, r_cell={r_cell.cpu().numpy()}, phase={phase.item():.8f}, eikr={eikr}")
             Kmat += hessian[:, :, j_cell, :, :] * eikr
             logging.debug(f"[DEBUG compute_K] After j_cell={j_cell} update, Kmat norm={torch.norm(Kmat).item():.8f}")
@@ -134,7 +136,7 @@ class GaussianNetworkModelTorch:
         """
         Kmat = self.compute_K(hessian, kvec)
         shape = Kmat.shape  # (n_asu, n_atoms_per_asu, n_asu, n_atoms_per_asu)
-        Kmat_flat = Kmat.reshape(shape[0] * shape[1], shape[2] * shape[3])
+        Kmat_flat = Kmat.reshape(shape[0] * shape[1], shape[2] * shape[3]).to(torch.complex128)
         logging.debug(f"[DEBUG compute_Kinv] Kmat flat shape: {Kmat_flat.shape}, norm={torch.norm(Kmat_flat).item():.8f}")
         Kinv_flat = torch.linalg.pinv(Kmat_flat)
         logging.debug(f"[DEBUG compute_Kinv] Kinv flat shape: {Kinv_flat.shape}, norm={torch.norm(Kinv_flat).item():.8f}")
