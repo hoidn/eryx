@@ -170,31 +170,38 @@ def get_hkl_extents(cell, resolution, oversampling=1):
 def expand_sym_ops(sym_ops):
     """
     Expand symmetry operations to include Friedel equivalents.
-    
+
     Parameters
     ----------
-    sym_ops : dict
-        rotational symmetry operations as 3x3 matrices
+    sym_ops : dict or tuple/list of dict
+        rotational symmetry operations as 3x3 matrices.
+        If a tuple or nested dict is provided, only the raw matrices are used.
     
     Returns
     -------
     sym_ops_exp : dict
-        sym_ops, expanded to account for Friedel symmetry
+        The input symmetry operations, plus their negative (Friedel) counterparts.
     """
-    # Begin debug prints for sym_ops input
-    print("DEBUG: expand_sym_ops called with type:", type(sym_ops))
-    print("DEBUG: expand_sym_ops input:", sym_ops)
-    # If sym_ops is a tuple or list, use the first element.
+    # If sym_ops is a tuple or list, use its first element.
     if isinstance(sym_ops, (tuple, list)):
         sym_ops = sym_ops[0]
-        print("DEBUG: sym_ops extracted as first element (tuple/list); new type:", type(sym_ops))
+    # If any value in sym_ops is a dict, merge them into one flat dict.
+    if any(isinstance(val, dict) for val in sym_ops.values()):
+        merged = {}
+        for sub in sym_ops.values():
+            if isinstance(sub, dict):
+                merged.update(sub)
+            else:
+                # If a non-dict value is encountered, add it with a new key.
+                merged[len(merged)] = sub
+        sym_ops = merged
     sym_ops_exp = dict(sym_ops)
     n = len(sym_ops)
     for key, op in sym_ops.items():
-        # Debug print each key and op type/shape before computing negative
-        print(f"DEBUG: Key: {key}; op type: {type(op)}; op shape: {getattr(op, 'shape', 'N/A')}")
+        # For each op, op should be a numpy array; if not, skip expansion for that key.
+        if not isinstance(op, np.ndarray):
+            continue
         sym_ops_exp[key + n] = -1 * op
-    print("DEBUG: expand_sym_ops returning sym_ops_exp:", sym_ops_exp)
     return sym_ops_exp
 
 def compute_multiplicity(model, hsampling, ksampling, lsampling):
