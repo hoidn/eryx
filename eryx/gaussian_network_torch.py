@@ -91,7 +91,7 @@ class GaussianNetworkModelTorch:
                                     f"i_at={i_at}, neighbors={neigh_indices}, gamma_val={gamma_val}. Exception: {e}"
                                 )
                                 raise
-                            hessian_diag[i_asu, i_at] -= val_to_assign * float(len(neigh_indices))
+                            hessian_diag[i_asu, i_at] += val_to_assign * float(len(neigh_indices))
                             logging.debug(
                                 f"[DEBUG compute_hessian] ASU={i_asu}, atom index={i_at}: processed {len(neigh_indices)} neighbors, "
                                 f"current diag accumulator = {hessian_diag[i_asu, i_at].item()}"
