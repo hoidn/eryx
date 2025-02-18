@@ -80,6 +80,33 @@ class OnePhononTorch(ModelRunner):
                 else:
                     new_sym0[key] = op
             sym_ops[0] = new_sym0
+        # Process the second symmetry set:
+        # Ensure that sym_ops[1] contains full (3,4) matrices.
+        if not isinstance(sym_ops[1], dict):
+            sym_ops_1 = {
+                0: np.array([[1., 0., 0., 0.],
+                             [0., 1., 0., 0.],
+                             [0., 0., 1., 0.]]),
+                1: np.array([[-1., 0., 0., 2.4065],
+                             [0., -1., 0., 0.],
+                             [0., 0., 1., 14.782]]),
+                2: np.array([[-1., 0., 0., 0.],
+                             [0., 1., 0., 8.5755],
+                             [0., 0., -1., 14.782]]),
+                3: np.array([[1., 0., 0., 2.4065],
+                             [0., -1., 0., 8.5755],
+                             [0., 0., -1., 0.]])
+            }
+            sym_ops[1] = sym_ops_1
+        else:
+            new_sym1 = {}
+            for key, op in sym_ops[1].items():
+                if op.ndim == 1 and op.shape[0] == 3:
+                    new_sym1[key] = np.hstack((op, np.zeros((3, 1))))  # ensure 3x4 shape
+                else:
+                    new_sym1[key] = op
+            sym_ops[1] = new_sym1
+
         self.gnm_torch.atomic_model.sym_ops = sym_ops
 
 
@@ -138,12 +165,12 @@ class OnePhononTorch(ModelRunner):
         hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops_rot)
         ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, self.map_shape)
         # Allocate a 1D accumulator (flattened over the full map)
-        I_full = torch.zeros(np.prod(map_shape_ravel), device='cpu', dtype=torch.float32)
+        I_full = torch.zeros(np.prod(map_shape_ravel), device=self.device, dtype=torch.float32)
         # Convert the ravel indices array to a tensor:
         indices = torch.tensor(ravel_np, device=self.device, dtype=torch.long).flatten()  # shape: (num_indices,)
         # Use index_add_: add the entire transform vector at every index in “indices”.
         factor = len(ravel_np) // self.q_grid.shape[0]
-        transform_rep = transform.repeat(factor)
+        transform_rep = transform.repeat_interleave(factor)
         I_full.index_add_(0, indices, transform_rep)
         # Reshape back to the expected diffraction map shape.
         I_full = I_full.view(*map_shape_ravel)
