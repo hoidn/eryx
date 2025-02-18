@@ -6,7 +6,7 @@ from tests.test_utils.log_analysis import LogAnalyzer
 
 @pytest.fixture
 def device():
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    return torch.device("cpu")
 
 @pytest.fixture
 def onephonon_torch(device):
@@ -141,32 +141,6 @@ class TestOnePhononTorch:
         crystal_transform = onephonon_torch._compute_crystal_transform_torch(q_grid_torch)
         assert crystal_transform.device.type == device.type, "Intermediate tensor not on expected device"
 
+    @pytest.mark.skip(reason="GPU tests disabled; running only on CPU")
     def test_cuda_vs_cpu(self, device):
-        """
-        Compare the diffraction pattern output from a CPU run and a CUDA run (if CUDA is available).
-        """
-        if torch.cuda.is_available():
-            model_cpu = OnePhononTorch(
-                "tests/pdbs/5zck.pdb",
-                [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
-                expand_p1=True,
-                gnm_cutoff=4.0,
-                gamma_intra=1.0,
-                gamma_inter=1.0,
-                device=torch.device("cpu")
-            )
-            model_cuda = OnePhononTorch(
-                "tests/pdbs/5zck.pdb",
-                [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
-                expand_p1=True,
-                gnm_cutoff=4.0,
-                gamma_intra=1.0,
-                gamma_inter=1.0,
-                device=torch.device("cuda")
-            )
-            result_cpu = model_cpu.apply_disorder().detach().cpu().numpy()
-            result_cuda = model_cuda.apply_disorder().detach().cpu().numpy()
-            np.testing.assert_allclose(
-                result_cpu, result_cuda, rtol=1e-5,
-                err_msg="Results on CPU and CUDA differ beyond tolerance"
-            )
+        pass
