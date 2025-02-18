@@ -174,6 +174,10 @@ class OnePhononTorch(ModelRunner):
         # Move input transform to CPU and repeat as needed:
         transform_cpu = transform.to('cpu')
         factor = len(ravel_np) // int(self.q_grid.shape[0])
+        logging.debug(f"[OnePhononTorch._incoherent_sum_torch] transform_cpu.shape: {transform_cpu.shape}, factor: {factor}")
+        if factor == 0 or transform_cpu.numel() == 0:
+            logging.warning("Empty transform_cpu or zero factor in _incoherent_sum_torch – returning I_full as zeros.")
+            return I_full.to(self.device).flatten()
         transform_rep = transform_cpu.repeat_interleave(factor)
         I_full.index_add_(0, indices, transform_rep)
         I_full = I_full.to(self.device)
