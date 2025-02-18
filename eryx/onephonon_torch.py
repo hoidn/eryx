@@ -160,13 +160,10 @@ class OnePhononTorch(ModelRunner):
             print("DEBUG: ff_c shape after squeeze:", ff_c.shape)
 
             results_np = structure_factors(q_sel,
+                                           xyz,
                                            ff_a,
                                            ff_b,
                                            ff_c,
-                                           xyz,
-                                           atomic_model.ff_a,
-                                           atomic_model.ff_b,
-                                           atomic_model.ff_c,
                                            U=None,
                                            batch_size=self.batch_size,
                                            n_processes=self.n_processes)
