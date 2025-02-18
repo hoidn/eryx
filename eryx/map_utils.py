@@ -53,7 +53,7 @@ def get_symmetry_equivalents(hkl_grid, sym_ops):
         print(f"DEBUG: For key {key}, hkl_grid_rot.shape: {hkl_grid_rot.shape} (expected: (n_points, 3))")
         hkl_list.append(hkl_grid_rot)
 
-    stacked = np.vstack(hkl_list)
+    stacked = np.stack(hkl_list, axis=0)
     print(f"DEBUG: Final stacked symmetry grid shape: {stacked.shape}")
     return stacked
     
