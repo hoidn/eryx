@@ -85,21 +85,18 @@ class OnePhononTorch(ModelRunner):
         # Process the second symmetry set to ensure full (3,3) matrices.
         if isinstance(sym_ops[1], dict):
             for key, op in sym_ops[1].items():
-                if op.ndim == 1:
-                    # If it’s a length-3 vector, assume no translation was provided.
-                    # For key 0, we want an identity (3x4) with a zero last column.
+                if op.ndim < 2:  # if given as a flat vector
                     if key == 0:
                         sym_ops[1][key] = np.hstack([np.eye(3), np.zeros((3,1))])
                     else:
-                        # If op has 4 elements, assume the first three form a diagonal and the fourth is the translation.
-                        # (Adjust the following logic if your expected operator differs.)
                         if op.shape[0] == 4:
                             D = np.diag(op[:3])
                             T = op[3:].reshape(3, 1)
                             sym_ops[1][key] = np.hstack([D, T])
-                        # Otherwise, if it’s only length 3, pad with zeros:
                         else:
                             sym_ops[1][key] = np.hstack([np.diag(op), np.zeros((3,1))])
+            # Force key 0 (no translation) to be the full 3x4 identity operator.
+            sym_ops[1][0] = np.hstack([np.eye(3), np.zeros((3,1))])
         elif isinstance(sym_ops[1], np.ndarray):
             if sym_ops[1].ndim != 2 or sym_ops[1].shape != (3, 3):
                 sym_ops = (sym_ops[0], np.diagflat(sym_ops[1]))
