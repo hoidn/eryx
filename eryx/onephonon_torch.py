@@ -104,7 +104,6 @@ class OnePhononTorch(ModelRunner):
                                                           n_processes=self.n_processes)))
     # Return the intensity as a torch tensor on self.device
     return torch.tensor(I_np, device=self.device, dtype=torch.float32)
-        return I
 
     def _incoherent_sum_torch(self, transform: torch.Tensor) -> torch.Tensor:
         """
