@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 import logging
 
+import numpy as np
+from eryx.onephonon_torch import OnePhononTorch
+from eryx.models import OnePhonon
+
 def setup_logging():
     # Remove any existing handlers.
     for handler in logging.root.handlers[:]:
@@ -67,6 +71,7 @@ def run_torch():
     logging.debug(f"Torch: q_grid range: min = {onephonon_torch.q_grid.cpu().min().item()}, max = {onephonon_torch.q_grid.cpu().max().item()}")
     Id_torch = onephonon_torch.apply_disorder()
     logging.info("Torch branch diffuse intensity stats: min=%s, max=%s", Id_torch.min().item(), Id_torch.max().item())
+    np.save("torch_diffuse_intensity.npy", Id_torch.detach().cpu().numpy())
     # Save for later comparison
     np.save("torch_diffuse_intensity.npy", Id_torch.detach().cpu().numpy())
 
