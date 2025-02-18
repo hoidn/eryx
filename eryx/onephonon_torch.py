@@ -228,6 +228,12 @@ class OnePhononTorch(ModelRunner):
         I_full[primary_indices] = transform_cpu  # assign primary values
 
         # For each subsequent group, copy the intensities from the primary positions
+        print("AGGRESSIVE_DEBUG_HYP_TORCH: Starting symmetry copy loop 1, I_full sum =", I_full.sum().item())
+
+        print("AGGRESSIVE_DEBUG_HYP_TORCH: After symmetry copy loop 1, I_full sum =", I_full.sum().item())
+
+        print("AGGRESSIVE_DEBUG_HYP_TORCH: Starting symmetry copy loop 2, I_full sum =", I_full.sum().item())
+
         for group in ravel_np[1:]:
             # Find the intersection between the primary ravel and this group.
             group_np = np.array(group)
@@ -254,6 +260,8 @@ class OnePhononTorch(ModelRunner):
                 idx_tensor = torch.tensor(group_np[comm2], device='cpu', dtype=torch.long)
                 I_full[idx_tensor] = I_full[torch.tensor(primary_np[comm1], device='cpu', dtype=torch.long)]
         # This conversion is non-differentiable and breaks the gradient flow intentionally.
+        print("AGGRESSIVE_DEBUG_HYP_TORCH: After symmetry copy loop 2, I_full sum =", I_full.sum().item())
+
         I_full = I_full.to(self.device).detach()
         logging.debug(f"I_full values after symmetry correction: {I_full}")
         I_full = I_full.view(*map_shape_ravel)
@@ -294,7 +302,15 @@ class OnePhononTorch(ModelRunner):
         print("DEBUG_HYP1: I_full BEFORE scaling (first 10 elems):", I_full.flatten()[:10])
         # Option to disable multiplicity scaling (for debugging)
         if not getattr(self, "disable_scaling", False):
+            # Before scaling:
+            print("AGGRESSIVE_DEBUG_HYP_TORCH: Global I_full BEFORE scaling: sum =", I_full.sum().item(), 
+                  "percentiles =", torch.quantile(I_full.flatten(), torch.tensor([0.01, 0.25, 0.5, 0.75, 0.99])).tolist())
+
             I_full = I_full * scaling_factor
+
+            # After scaling:
+            print("AGGRESSIVE_DEBUG_HYP_TORCH: Global I_full AFTER scaling: sum =", I_full.sum().item(), 
+                  "percentiles =", torch.quantile(I_full.flatten(), torch.tensor([0.01, 0.25, 0.5, 0.75, 0.99])).tolist())
             logging.debug(f"Applied multiplicity scaling, scaling factor stats: max={scaling_factor.max()}, min={scaling_factor.min()}")
         else:
             logging.debug("Multiplicity scaling disabled for debugging")
@@ -357,6 +373,17 @@ class OnePhononTorch(ModelRunner):
         print("TEST_HYP: scaled diffuse intensity stats -- min: {:.6f}, max: {:.6f}, mean: {:.6f}".
               format(np.nanmin(I_full_np_scaled), np.nanmax(I_full_np_scaled), np.nanmean(I_full_np_scaled)))
         print("TEST_HYP: first 10 elements of scaled map:", I_full_np_scaled.flatten()[:10])
+
+        primary_indices = np.array(ravel_np[0])
+        all_indices = np.concatenate(ravel_np, axis=0)
+        unique_indices = np.unique(all_indices)
+        print("AGGRESSIVE_DEBUG_HYP_TORCH: Total indices in primary group =", primary_indices.size, 
+              "Total indices after symmetry expansion =", all_indices.size, 
+              "Unique indices =", unique_indices.size)
+        I_sum_unique = I_full.flatten()[unique_indices].sum().item()
+        I_sum_total = I_full.sum().item()
+        print("AGGRESSIVE_DEBUG_HYP_TORCH: Sum over unique indices =", I_sum_unique, 
+              "vs. total sum =", I_sum_total)
 
         I_full = torch.tensor(I_full_np, device=self.device, dtype=torch.float32)
         return I_full.flatten()

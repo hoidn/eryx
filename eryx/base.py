@@ -293,7 +293,11 @@ def incoherent_sum_real(model, hkl_grid, sampling, U=None, mask=None, batch_size
     
     sampling_original = [(int(hkl_grid[:,i].min()),int(hkl_grid[:,i].max()),sampling[i]) for i in range(3)]
     print("AGGRESSIVE_DEBUG_HYP_NP: BEFORE resize_map: I shape =", I.shape, "min =", np.nanmin(I), "max =", np.nanmax(I), "mean =", np.nanmean(I))
+    print("AGGRESSIVE_DEBUG_HYP_NP: BEFORE resize_map: I shape =", I.shape, 
+          "min =", np.nanmin(I), "max =", np.nanmax(I), "mean =", np.nanmean(I))
     I = resize_map(I, sampling_original, sampling_ravel)
+    print("AGGRESSIVE_DEBUG_HYP_NP: AFTER resize_map: I_resized shape =", I.shape, 
+          "min =", np.nanmin(I), "max =", np.nanmax(I), "mean =", np.nanmean(I))
     print("AGGRESSIVE_DEBUG_HYP_NP: AFTER resize_map: I_resized shape =", I.shape, "min =", np.nanmin(I), "max =", np.nanmax(I), "mean =", np.nanmean(I))
     I = resize_map(I, sampling_original, sampling_ravel)
     print("AGGRESSIVE_DEBUG_HYP_NP: AFTER resize_map: I_resized shape =", I.shape, "min =", np.nanmin(I), "max =", np.nanmax(I), "mean =", np.nanmean(I))
