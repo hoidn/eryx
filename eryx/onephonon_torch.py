@@ -151,7 +151,7 @@ class OnePhononTorch(ModelRunner):
         hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops)
         ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, self.map_shape)
         # Allocate a 1D accumulator (flattened over the full map)
-        I_full = torch.zeros(np.prod(map_shape_ravel), device=self.device, dtype=torch.float32)
+        I_full = torch.zeros(np.prod(map_shape_ravel), device='cpu', dtype=torch.float32)
         # Convert the ravel indices array to a tensor:
         indices = torch.tensor(ravel_np, device=self.device, dtype=torch.long).flatten()  # shape: (num_indices,)
         # Use index_add_: add the entire transform vector at every index in “indices”.
@@ -164,4 +164,5 @@ class OnePhononTorch(ModelRunner):
                                        (-self.lsampling[1], self.lsampling[1], self.lsampling[2]))
         mult_flat = torch.tensor(mult.flatten(), device=self.device, dtype=torch.float32)
         I_full = I_full / (mult_flat.max() / mult_flat)
+        I_full = I_full.to(self.device)
         return I_full.flatten()
