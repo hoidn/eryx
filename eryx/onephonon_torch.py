@@ -138,10 +138,8 @@ class OnePhononTorch(ModelRunner):
         I_torch = torch.zeros(q_grid_torch.shape[0], device=self.device, dtype=torch.float32)
         if valid.any():
             # Use the torch-based structure_factors function to compute complex structure factors
-            # Ensure xyz is a 2D array: (n_atoms, 3)
-            xyz = atomic_model.xyz
-            if xyz.ndim != 2:
-                xyz = xyz.reshape(-1, 3)
+            # Select the coordinates of the first asymmetric unit.
+            xyz = atomic_model.xyz[0]
 
             indices = torch.nonzero(valid, as_tuple=True)[0]  # 1D tensor of indices
             q_sel = q_grid_torch[indices].cpu().numpy()
