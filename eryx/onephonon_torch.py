@@ -167,6 +167,7 @@ class OnePhononTorch(ModelRunner):
         if transform.numel() == 0:
             I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
             return I_full.to(self.device)
+        logging.debug(f"[OnePhononTorch._incoherent_sum_torch] map_shape_ravel: {map_shape_ravel}, np.prod(map_shape_ravel): {np.prod(map_shape_ravel)}")
         I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
         # Convert the ravel indices array to a tensor on CPU:
         indices = torch.tensor(ravel_np, device='cpu', dtype=torch.long).flatten()
