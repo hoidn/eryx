@@ -181,7 +181,8 @@ class OnePhononTorch(ModelRunner):
                                            U=U,
                                            batch_size=self.batch_size,
                                            n_processes=self.n_processes)
-            # Convert the NP results back to a torch tensor on the correct device.
+            print("AGGRESSIVE_DEBUG_HYP_TORCH: raw structure_factors result: min =", np.nanmin(results_np), 
+                  "max =", np.nanmax(results_np), "mean =", np.nanmean(np.abs(results_np)))
             # This step is non-differentiable and breaks the gradient flow intentionally.
             results_tensor = torch.from_numpy(results_np).to(self.device, dtype=torch.float32).clone().detach()
             I_torch[indices] = torch.square(torch.abs(results_tensor))
@@ -227,6 +228,10 @@ class OnePhononTorch(ModelRunner):
         I_full[primary_indices] = transform_cpu  # assign primary values
 
         # For each subsequent group, copy the intensities from the primary positions
+        print("AGGRESSIVE_DEBUG_HYP_TORCH: Copying for group; intersect size =", intersect.size)
+        print("  Primary indices (comm1):", primary_np[comm1][:10])
+        print("  Group indices (comm2):", group_np[comm2][:10])
+        before_copy = I_full[idx_tensor].clone()
         for group in ravel_np[1:]:
             # Find the intersection between the primary ravel and this group.
             group_np = np.array(group)
@@ -263,8 +268,16 @@ class OnePhononTorch(ModelRunner):
         print("DEBUG_HYP_TORCH: multiplicity tensor stats: min =", mult_tensor.min().item(), 
               "max =", mult_tensor.max().item(), 
               "unique =", torch.unique(mult_tensor))
-        print("DEBUG_HYP1: multiplicity tensor (min, max, unique):",
-              mult_tensor.min().item(), mult_tensor.max().item(), torch.unique(mult_tensor))
+        print("AGGRESSIVE_DEBUG_HYP_TORCH: multiplicity tensor full stats: min =", mult_tensor.min().item(), 
+              "max =", mult_tensor.max().item(), "mean =", mult_tensor.float().mean().item(),
+              "25th percentile =", torch.quantile(mult_tensor.float(), 0.25).item(),
+              "75th percentile =", torch.quantile(mult_tensor.float(), 0.75).item())
+        # Before scaling:
+        print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full BEFORE scaling: min =", I_full.min().item(), 
+              "max =", I_full.max().item(), "mean =", I_full.mean().item())
+        I_full_scaled = I_full * scaling_factor
+        print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full AFTER scaling: min =", I_full_scaled.min().item(), 
+              "max =", I_full_scaled.max().item(), "mean =", I_full_scaled.mean().item())
         scaling_factor = mult_tensor.max() / mult_tensor
         print("DEBUG_HYP_TORCH: computed scaling factor (first 10 elems):", scaling_factor.flatten()[:10])
         print("DEBUG_HYP1: I_full BEFORE scaling (first 10 elems):", I_full.flatten()[:10])
@@ -315,7 +328,11 @@ class OnePhononTorch(ModelRunner):
         print("DEBUG: sampling_ravel =", sampling_ravel)
         print("DEBUG: np.prod(map_shape_ravel) =", np.prod(map_shape_ravel))
         
+        print("AGGRESSIVE_DEBUG_HYP_TORCH: BEFORE resize_map: I_full shape =", I_full.shape, 
+              "min =", I_full.min().item(), "max =", I_full.max().item(), "mean =", I_full.mean().item())
         I_full_np = resize_map(I_full.cpu().numpy(), sampling_original, sampling_ravel)
+        print("AGGRESSIVE_DEBUG_HYP_TORCH: AFTER resize_map: I_full_np shape =", I_full_np.shape, 
+              "min =", np.nanmin(I_full_np), "max =", np.nanmax(I_full_np), "mean =", np.nanmean(I_full_np))
         print("DEBUG: I_full_np shape after resize_map =", I_full_np.shape)
         print("DEBUG_HYP_TORCH: I_full_np shape after resize_map:", I_full_np.shape)
         print("DEBUG_HYP_TORCH: I_full_np (first 10 elems) after resize_map:", I_full_np.flatten()[:10])

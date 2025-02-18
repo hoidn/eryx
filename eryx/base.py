@@ -248,14 +248,16 @@ def incoherent_sum_real(model, hkl_grid, sampling, U=None, mask=None, batch_size
     q_grid = 2*np.pi*np.inner(model.A_inv.T, hkl_grid).T
     I_asu = np.zeros(q_grid.shape[0])
     for asu in range(model.xyz.shape[0]):
-        I_asu[mask] += np.square(np.abs(structure_factors(q_grid[mask],
-                                                          model.xyz[asu],
-                                                          model.ff_a[asu], 
-                                                          model.ff_b[asu], 
-                                                          model.ff_c[asu], 
-                                                          U=U, 
-                                                          batch_size=batch_size,
-                                                          n_processes=n_processes)))
+        A = structure_factors(q_grid[mask],
+                              model.xyz[asu],
+                              model.ff_a[asu], 
+                              model.ff_b[asu], 
+                              model.ff_c[asu], 
+                              U=U, 
+                              batch_size=batch_size,
+                              n_processes=n_processes)
+        print("AGGRESSIVE_DEBUG_HYP_NP: asu", asu, "structure_factors: min =", np.nanmin(A), "max =", np.nanmax(A), "mean =", np.nanmean(np.abs(A)))
+        I_asu[mask] += np.square(np.abs(A))
         
     # get symmetry information for expanded map
     sym_ops = expand_sym_ops(model.sym_ops)
@@ -278,10 +280,17 @@ def incoherent_sum_real(model, hkl_grid, sampling, U=None, mask=None, batch_size
     for asu in range(1, ravel.shape[0]):
         I[ravel[asu]] += I_asu.copy()
     I = I.reshape(map_shape_ravel)
-    I /= (mult.max() / mult) 
+    print("AGGRESSIVE_DEBUG_HYP_NP: multiplicity stats: min =", mult.min(), "max =", mult.max(), 
+          "mean =", np.mean(mult), "25th percentile =", np.percentile(mult,25), "75th percentile =", np.percentile(mult,75))
+    I_before = I.copy()
+    I /= (mult.max() / mult)
+    print("AGGRESSIVE_DEBUG_HYP_NP: I BEFORE scaling: min =", np.nanmin(I_before), "max =", np.nanmax(I_before), "mean =", np.nanmean(I_before))
+    print("AGGRESSIVE_DEBUG_HYP_NP: I AFTER scaling: min =", np.nanmin(I), "max =", np.nanmax(I), "mean =", np.nanmean(I))
     
     sampling_original = [(int(hkl_grid[:,i].min()),int(hkl_grid[:,i].max()),sampling[i]) for i in range(3)]
+    print("AGGRESSIVE_DEBUG_HYP_NP: BEFORE resize_map: I shape =", I.shape, "min =", np.nanmin(I), "max =", np.nanmax(I), "mean =", np.nanmean(I))
     I = resize_map(I, sampling_original, sampling_ravel)
+    print("AGGRESSIVE_DEBUG_HYP_NP: AFTER resize_map: I_resized shape =", I.shape, "min =", np.nanmin(I), "max =", np.nanmax(I), "mean =", np.nanmean(I))
     
     return I
     
