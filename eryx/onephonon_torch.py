@@ -58,13 +58,12 @@ class OnePhononTorch(ModelRunner):
         # Process the first symmetry set:
         # Ensure that sym_ops[0] contains full (3,3) matrices.
         if isinstance(sym_ops[0], dict):
-            for key, op in sym_ops[0].items():
-                if op.ndim == 1:
-                    # For key 0, expect identity (i.e. all ones on the diag)
-                    if key == 0:
-                        sym_ops[0][key] = np.eye(3)
-                    else:
-                        sym_ops[0][key] = np.diag(op)
+            for key in sym_ops[0]:
+                if key == 0:
+                    sym_ops[0][key] = np.eye(3)
+                else:
+                    if sym_ops[0][key].ndim == 1:
+                        sym_ops[0][key] = np.diag(sym_ops[0][key])
         elif isinstance(sym_ops[0], np.ndarray):
             if sym_ops[0].ndim != 2 or sym_ops[0].shape != (3, 3):
                 sym_ops = (np.diagflat(sym_ops[0]), sym_ops[1])
@@ -119,14 +118,24 @@ class OnePhononTorch(ModelRunner):
         I_torch = torch.zeros(q_grid_torch.shape[0], device=self.device, dtype=torch.float32)
         if valid.any():
             # Use the torch-based structure_factors function to compute complex structure factors
-            I_torch[valid] = torch.square(torch.abs(structure_factors(q_grid_torch[valid].detach().cpu().numpy(),
-                                                                      atomic_model.xyz,
-                                                                      atomic_model.ff_a,
-                                                                      atomic_model.ff_b,
-                                                                      atomic_model.ff_c,
-                                                                      U=None,
-                                                                      batch_size=self.batch_size,
-                                                                      n_processes=self.n_processes)))
+            # Ensure xyz is a 2D array: (n_atoms, 3)
+            xyz = atomic_model.xyz
+            if xyz.ndim != 2:
+                xyz = xyz.reshape(-1, 3)
+
+            # Convert q_grid slice to numpy on CPU.
+            q_sel = q_grid_torch[valid].detach().cpu().numpy()
+            results_np = structure_factors(q_sel,
+                                           xyz,
+                                           atomic_model.ff_a,
+                                           atomic_model.ff_b,
+                                           atomic_model.ff_c,
+                                           U=None,
+                                           batch_size=self.batch_size,
+                                           n_processes=self.n_processes)
+            # Convert the NP results back to a torch tensor on the correct device.
+            results_tensor = torch.tensor(results_np, device=self.device, dtype=torch.float32)
+            I_torch[valid] = torch.square(torch.abs(results_tensor))
         return I_torch
 
     def _incoherent_sum_torch(self, transform: torch.Tensor) -> torch.Tensor:
