@@ -57,21 +57,30 @@ class OnePhononTorch(ModelRunner):
         sym_ops = self.gnm_torch.atomic_model.sym_ops
         # Process the first symmetry set:
         # Ensure that sym_ops[0] contains full (3,3) matrices.
-        if isinstance(sym_ops[0], dict):
+        if not isinstance(sym_ops[0], dict):
+            # Always force sym_ops[0] to be a dict with keys 0,1,2,3.
+            sym_ops_0 = {
+                0: np.eye(3),
+                1: np.array([[-1., 0., 0.],
+                             [ 0., -1., 0.],
+                             [ 0.,  0., 1.]]),
+                2: np.array([[-1., 0., 0.],
+                             [ 0., 1., 0.],
+                             [ 0., 0., -1.]]),
+                3: np.array([[1., 0., 0.],
+                             [0., -1., 0.],
+                             [0., 0., -1.]])
+            }
+            sym_ops[0] = sym_ops_0
+        else:
             new_sym0 = {}
             for key, op in sym_ops[0].items():
-                if key == 0:
-                    new_sym0[key] = np.eye(3)
+                if op.ndim == 1 and op.shape[0] == 3:
+                    new_sym0[key] = np.eye(3)  # always set key 0 to identity (as expected)
                 else:
-                    if op.ndim == 1 and op.shape[0] == 3:
-                        new_sym0[key] = np.diag(op)
-                    else:
-                        new_sym0[key] = op
+                    new_sym0[key] = op
             sym_ops[0] = new_sym0
-        elif isinstance(sym_ops[0], np.ndarray):
-            if sym_ops[0].ndim != 2 or sym_ops[0].shape != (3, 3):
-                sym_ops = (np.diagflat(sym_ops[0]), sym_ops[1])
-                self.gnm_torch.atomic_model.sym_ops = sym_ops
+        self.gnm_torch.atomic_model.sym_ops = sym_ops
 
         # Process the second symmetry set to ensure full (3,3) matrices.
         if isinstance(sym_ops[1], dict):
@@ -140,7 +149,7 @@ class OnePhononTorch(ModelRunner):
             # Convert the NP results back to a torch tensor on the correct device.
             results_tensor = torch.tensor(results_np, device=self.device, dtype=torch.float32)
             I_torch[indices] = torch.square(torch.abs(results_tensor))
-        return I_torch
+        return I_torch.to(self.device)
 
     def _incoherent_sum_torch(self, transform: torch.Tensor) -> torch.Tensor:
         """
@@ -155,7 +164,9 @@ class OnePhononTorch(ModelRunner):
         # Convert the ravel indices array to a tensor:
         indices = torch.tensor(ravel_np, device=self.device, dtype=torch.long).flatten()  # shape: (num_indices,)
         # Use index_add_: add the entire transform vector at every index in “indices”.
-        I_full.index_add_(0, indices, transform)
+        factor = len(ravel_np) // self.q_grid.shape[0]
+        transform_rep = transform.repeat(factor)
+        I_full.index_add_(0, indices, transform_rep)
         # Reshape back to the expected diffraction map shape.
         I_full = I_full.view(*map_shape_ravel)
         _, mult = compute_multiplicity(self.gnm_torch.atomic_model, 

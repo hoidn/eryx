@@ -139,7 +139,7 @@ class TestOnePhononTorch:
         # For example, call the internal crystal transform function and check its device.
         q_grid_torch = onephonon_torch.q_grid.clone().detach()
         crystal_transform = onephonon_torch._compute_crystal_transform_torch(q_grid_torch)
-        assert crystal_transform.device == device, "Intermediate tensor not on expected device"
+        assert crystal_transform.device.type == device.type, "Intermediate tensor not on expected device"
 
     def test_cuda_vs_cpu(self, device):
         """
