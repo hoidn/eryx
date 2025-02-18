@@ -200,8 +200,9 @@ class OnePhononTorch(ModelRunner):
             print(f"WARNING: Expected second dimension {self.hkl_grid.shape[0]} but got {hs_shape[1]}")
         
         ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, (self.hsampling[2], self.ksampling[2], self.lsampling[2]))
-        print("DEBUG: ravel_np (first two groups):", ravel_np[:2])
-        print("DEBUG: map_shape_ravel:", map_shape_ravel)
+        print("DEBUG_HYP4: ravel_np (first few groups):", ravel_np[:2])
+        print("DEBUG_HYP4: map_shape_ravel:", map_shape_ravel)
+        # Optionally, save the NP version of these indices to compare against
         print("DEBUG: ravel_np (first few groups):", ravel_np[:2])
         print("DEBUG: ravel_np (all groups):", ravel_np)
         print("DEBUG: map_shape_ravel:", map_shape_ravel)
