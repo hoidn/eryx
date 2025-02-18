@@ -29,8 +29,19 @@ def compute_form_factors(q_grid, ff_a, ff_b, ff_c):
     print(f"[DEBUG] compute_form_factors: ff_c.shape = {ff_c.shape}")
     
     Q = np.square(np.linalg.norm(q_grid, axis=1) / (4*np.pi))
+    print("[DEBUG] ff_a_original shape:", ff_a.shape)  # e.g., (4, 28, 4)
+    print("[DEBUG] ff_b_original shape:", ff_b.shape)  # e.g., (4, 28, 4)
+    print("[DEBUG] Q shape:", Q.shape)                 # e.g., (18585,)
+    temp_a = ff_a[:, :, np.newaxis]
+    temp_b = ff_b[:, :, None]
+    print("[DEBUG] temp_a shape (ff_a[:,:,np.newaxis]):", temp_a.shape)  # Expecting (4, 28, 1, 4)
+    print("[DEBUG] temp_b shape (ff_b[:,:,None]):", temp_b.shape)      # Expecting (4, 28, 1, 4)
+    temp_Q = Q[:, np.newaxis].T
+    print("[DEBUG] temp_Q shape (Q[:,np.newaxis].T):", temp_Q.shape)     # Expecting (1, 18585)
     print(f"[DEBUG] compute_form_factors: Q.shape = {Q.shape}")
-    fj = ff_a[:,:,np.newaxis] * np.exp(-1 * ff_b[:,:,None] * Q[:,np.newaxis].T)
+    exp_term = np.exp(-1 * temp_b * temp_Q)
+    print("[DEBUG] exp_term shape:", exp_term.shape)
+    fj = temp_a * exp_term
     print(f"[DEBUG] compute_form_factors: intermediate fj.shape = {fj.shape}")
     fj = np.sum(fj, axis=1) + ff_c[:,np.newaxis]
     mean_fj = np.mean(fj)
