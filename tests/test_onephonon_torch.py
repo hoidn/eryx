@@ -137,7 +137,7 @@ class TestOnePhononTorch:
         Verify that intermediate tensor operations occur on the proper device.
         """
         # For example, call the internal crystal transform function and check its device.
-        q_grid_torch = torch.tensor(onephonon_torch.q_grid, device=device, dtype=torch.float32)
+        q_grid_torch = onephonon_torch.q_grid.clone().detach()
         crystal_transform = onephonon_torch._compute_crystal_transform_torch(q_grid_torch)
         assert crystal_transform.device == device, "Intermediate tensor not on expected device"
 
