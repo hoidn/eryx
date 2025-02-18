@@ -92,14 +92,13 @@ class OnePhononTorch(ModelRunner):
         """
         # Get NP data from the atomic model
         atomic_model = self.gnm_torch.atomic_model
-        cell = atomic_model.cell
         hkl = self.hkl_grid  # already a NP array
-        # Compute NP masks and dq map
-        mask_np, _ = get_resolution_mask(cell, hkl, self.res_limit)
-        dq_map_np = np.around(get_dq_map(cell.A_inv, hkl), 5)
+        # Use atomic_model.cell only for the mask; use atomic_model.A_inv for dq and q_grid
+        mask_np, _ = get_resolution_mask(atomic_model.cell, hkl, self.res_limit)
+        dq_map_np = np.around(get_dq_map(atomic_model.A_inv, hkl), 5)
         valid = (dq_map_np == 0) & mask_np
-        # Recompute the full NP q_grid (as in base.py)
-        q_grid_np = 2 * np.pi * np.inner(cell.A_inv.T, hkl).T
+        # Recompute the full q_grid using atomic_model.A_inv
+        q_grid_np = 2 * np.pi * np.inner(atomic_model.A_inv.T, hkl).T
         # Allocate intensity array
         I_np = np.zeros(q_grid_np.shape[0], dtype=np.float32)
         if np.any(valid):
