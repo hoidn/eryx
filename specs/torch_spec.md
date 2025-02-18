@@ -25,87 +25,101 @@
  - Add detailed logging for debugging                                                                                                                                             
  - Follow existing code structure where possible                                                                                                                                  
                                                                                                                                                                                   
- ## Context                                                                                                                                                                       
+ ## Test Requirements                                                                                                                                                             
                                                                                                                                                                                   
- ### Beginning Context                                                                                                                                                            
+ ### GaussianNetworkModelTorch Tests                                                                                                                                              
+ 1. Test neighbor list construction                                                                                                                                               
+    - Verify matches numpy implementation                                                                                                                                         
+    - Check connectivity patterns                                                                                                                                                 
+    - Validate distance cutoffs                                                                                                                                                   
                                                                                                                                                                                   
-
-/eryx /tests /pdbs/ 5zck.pdb /eryx /pdb.py  # Contains numpy GNM /models.py  # Contains numpy OnePhonon                                                                           
-
+ 2. Test Hessian computation                                                                                                                                                      
+    - Verify symmetry properties                                                                                                                                                  
+    - Match numpy output exactly                                                                                                                                                  
+    - Test with and without k-vectors                                                                                                                                             
+    - Validate shape and dtype                                                                                                                                                    
                                                                                                                                                                                   
+ 3. Test K matrix computation                                                                                                                                                     
+    - Verify phase factors                                                                                                                                                        
+    - Test eigenvalue properties                                                                                                                                                  
+    - Match numpy implementation                                                                                                                                                  
+    - Handle edge cases                                                                                                                                                           
                                                                                                                                                                                   
- ### Ending Context                                                                                                                                                               
+ 4. Test numerical stability                                                                                                                                                      
+    - Verify matrix inversion                                                                                                                                                     
+    - Test gradient flow                                                                                                                                                          
+    - Validate device transfers                                                                                                                                                   
                                                                                                                                                                                   
-
-/eryx /tests /test_gaussian_network_torch.py /test_one_phonon_torch.py /eryx /gaussian_network_torch.py /one_phonon_torch.py                                                      
-
+ ### OnePhononTorch Tests                                                                                                                                                         
+ 1. Test initialization                                                                                                                                                           
+    - Verify parameter handling                                                                                                                                                   
+    - Check device placement                                                                                                                                                      
+    - Validate tensor conversions                                                                                                                                                 
                                                                                                                                                                                   
+ 2. Test disorder application                                                                                                                                                     
+    - Match numpy implementation                                                                                                                                                  
+    - Verify shape consistency                                                                                                                                                    
+    - Test numerical accuracy                                                                                                                                                     
+    - Handle edge cases                                                                                                                                                           
                                                                                                                                                                                   
- ## Low-Level Tasks                                                                                                                                                               
+ 3. Test integration                                                                                                                                                              
+    - End-to-end workflow                                                                                                                                                         
+    - Device compatibility                                                                                                                                                        
+    - Memory efficiency                                                                                                                                                           
+    - Gradient computation                                                                                                                                                        
                                                                                                                                                                                   
- 1. Create GaussianNetworkModelTorch Class                                                                                                                                        
- ```aider                                                                                                                                                                         
- CREATE eryx/gaussian_network_torch.py:                                                                                                                                           
-   ADD GaussianNetworkModelTorch class:                                                                                                                                           
-     - Takes same inputs as numpy version                                                                                                                                         
-     - Converts key computations to PyTorch                                                                                                                                       
-     - Maintains numpy preprocessing                                                                                                                                              
-     - Implements compute_hessian() and compute_Kinv()                                                                                                                            
-     - Matches numpy output exactly                                                                                                                                               
+ ## Implementation Order                                                                                                                                                          
+ 1. GaussianNetworkModelTorch                                                                                                                                                     
+    - Basic initialization                                                                                                                                                        
+    - Neighbor list computation                                                                                                                                                   
+    - Hessian computation                                                                                                                                                         
+    - K matrix operations                                                                                                                                                         
+    - Device support                                                                                                                                                              
                                                                                                                                                                                   
-
- 2 Create OnePhononTorch Class                                                                                                                                                    
-
+ 2. OnePhononTorch                                                                                                                                                                
+    - Model initialization                                                                                                                                                        
+    - GNM integration                                                                                                                                                             
+    - Disorder computation                                                                                                                                                        
+    - Device support                                                                                                                                                              
                                                                                                                                                                                   
- CREATE eryx/one_phonon_torch.py:                                                                                                                                                 
-   ADD OnePhononTorch class:                                                                                                                                                      
-     - Uses GaussianNetworkModelTorch                                                                                                                                             
-     - Implements apply_disorder()                                                                                                                                                
-     - Matches numpy output exactly                                                                                                                                               
+ 3. Testing Infrastructure                                                                                                                                                        
+    - Unit tests                                                                                                                                                                  
+    - Integration tests                                                                                                                                                           
+    - Performance benchmarks                                                                                                                                                      
+    - Validation utilities                                                                                                                                                        
                                                                                                                                                                                   
-
- 3 Create GNM Tests                                                                                                                                                               
-
+ ## Validation Requirements                                                                                                                                                       
+ - Exact numerical match with numpy (within float precision)                                                                                                                      
+ - All tests must pass on both CPU and GPU                                                                                                                                        
+ - Memory usage should be reasonable                                                                                                                                              
+ - Gradients should flow properly                                                                                                                                                 
+ - Log key computations for debugging                                                                                                                                             
                                                                                                                                                                                   
- TRANSLATE tests/test_gaussian_network_model.py to torch:                                                                                                                         
-  TODO details
+ ## Key Implementation Details                                                                                                                                                    
                                                                                                                                                                                   
-
- TRANSLATE tests/test_onephonon.py to torch:                                                                                                                         
-  TODO details
-
+ ### GaussianNetworkModelTorch                                                                                                                                                    
+ - Keep AtomicModel loading in numpy                                                                                                                                              
+ - Convert coordinates to torch.tensor after loading                                                                                                                              
+ - Implement compute_hessian() using torch operations                                                                                                                             
+ - Implement compute_Kinv() using torch.linalg                                                                                                                                    
+ - Add device support via .to(device)                                                                                                                                             
                                                                                                                                                                                   
+ ### OnePhononTorch                                                                                                                                                               
+ - Use GaussianNetworkModelTorch for phonon computation                                                                                                                           
+ - Keep molecular transform computation in numpy initially                                                                                                                        
+ - Convert key matrices to torch tensors                                                                                                                                          
+ - Implement apply_disorder() using torch operations                                                                                                                              
                                                                                                                                                                                   
-
-Key Implementation Details:                                                                                                                                                       
-
- 1 GaussianNetworkModelTorch:                                                                                                                                                     
-
- • Keep AtomicModel loading in numpy                                                                                                                                              
- • Convert coordinates to torch.tensor after loading                                                                                                                              
- • Implement compute_hessian() using torch operations                                                                                                                             
- • Implement compute_Kinv() using torch.linalg                                                                                                                                    
- • Add device support via .to(device)                                                                                                                                             
-
- 2 OnePhononTorch:                                                                                                                                                                
-
- • Use GaussianNetworkModelTorch for phonon computation                                                                                                                           
- • Keep molecular transform computation in numpy initially                                                                                                                        
- • Convert key matrices to torch tensors                                                                                                                                          
- • Implement apply_disorder() using torch operations                                                                                                                              
-
- 3 Testing Strategy:                                                                                                                                                              
- TODO basically have to mirror the existing tests
-
- 4 Validation Requirements:                                                                                                                                                       
-
- • Exact numerical match with numpy (within float precision)                                                                                                                      
- • All tests must pass on both CPU and GPU                                                                                                                                        
- • Memory usage should be reasonable                                                                                                                                              
- • Gradients should flow properly                                                                                                                                                 
-
-The implementation should proceed in order:                                                                                                                                       
-
- 1 GNM implementation and tests                                                                                                                                                   
- 2 OnePhonon implementation and tests                                                                                                                                             
- 3 GPU support                                                                                                                                                                    
+ ### Testing Strategy                                                                                                                                                             
+ - Create parallel test files for torch implementations                                                                                                                           
+ - Ensure exact numerical match with numpy versions                                                                                                                               
+ - Test both CPU and GPU paths                                                                                                                                                    
+ - Validate edge cases and error conditions                                                                                                                                       
+ - Test gradient computation where applicable                                                                                                                                     
+                                                                                                                                                                                  
+ ### Logging Requirements                                                                                                                                                         
+ - Log tensor shapes and devices                                                                                                                                                  
+ - Track memory usage                                                                                                                                                             
+ - Record computation times                                                                                                                                                       
+ - Enable detailed debugging                                                                                                                                                      
+ - Compare against numpy results                                                                                                                                                  
