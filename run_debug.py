@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import logging
 
+logging.debug("TEST: Logging is now configured.")
+
 def setup_logging():
     # Remove any existing handlers.
     for handler in logging.root.handlers[:]:

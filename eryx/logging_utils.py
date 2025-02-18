@@ -15,11 +15,12 @@ from contextlib import contextmanager
 DEFAULT_FORMAT = '[%(levelname)s] [%(asctime)s] [%(name)s] %(message)s'
 DEFAULT_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 
-logging.basicConfig(
-    level=logging.INFO,
-    format=DEFAULT_FORMAT,
-    datefmt=DEFAULT_DATE_FORMAT,
-)
+# Removed basicConfig call here.
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format=DEFAULT_FORMAT,
+#     datefmt=DEFAULT_DATE_FORMAT,
+# )
 
 def log_method_call(func):
     """Decorator to log method entry/exit with timing.
