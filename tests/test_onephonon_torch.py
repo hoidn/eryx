@@ -12,7 +12,7 @@ def device():
 def onephonon_torch(device):
     return OnePhononTorch(
         "tests/pdbs/5zck_p1.pdb", 
-        [-2, 2, 1], [-2, 2, 1], [-2, 2, 1],
+        [-4, 4, 3], [-4, 4, 3], [-4, 4, 3],
         expand_p1=True,
         gnm_cutoff=4.0,
         gamma_intra=1.0,
