@@ -127,8 +127,8 @@ class OnePhononTorch(ModelRunner):
             if xyz.ndim != 2:
                 xyz = xyz.reshape(-1, 3)
 
-            # Convert q_grid slice to numpy on CPU.
-            q_sel = q_grid_torch[valid].cpu().numpy()
+            indices = torch.nonzero(valid, as_tuple=True)[0]  # 1D tensor of indices
+            q_sel = q_grid_torch[indices].cpu().numpy()
             results_np = structure_factors(q_sel,
                                            xyz,
                                            atomic_model.ff_a,
@@ -139,7 +139,7 @@ class OnePhononTorch(ModelRunner):
                                            n_processes=self.n_processes)
             # Convert the NP results back to a torch tensor on the correct device.
             results_tensor = torch.tensor(results_np, device=self.device, dtype=torch.float32)
-            I_torch[valid] = torch.square(torch.abs(results_tensor))
+            I_torch[indices] = torch.square(torch.abs(results_tensor))
         return I_torch
 
     def _incoherent_sum_torch(self, transform: torch.Tensor) -> torch.Tensor:
