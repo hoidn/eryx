@@ -27,10 +27,9 @@ def run_np():
     # Use a small grid for testing; adjust parameters as necessary.
     logging.info("Starting NP branch computation")
     pdb_path = "tests/pdbs/5zck_p1.pdb"
-    sampling = [-4, 4, 3]
     onephonon_np = OnePhonon(
         pdb_path,
-        sampling, sampling, sampling,
+        [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
         expand_p1=True,
         res_limit=0.0,
         gnm_cutoff=4.0,
