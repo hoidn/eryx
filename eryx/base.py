@@ -201,6 +201,11 @@ def compute_molecular_transform(pdb_path, hsampling, ksampling, lsampling, U=Non
             I = I.reshape(map_shape)
             I[~mask.reshape(map_shape)] = 0
 
+    print("DEBUG: multiplicity max (scalar):", mult.max())
+    print("DEBUG: multiplicity unique values:", np.unique(mult))
+    print("DEBUG: I before scaling (first 10 elems):", I.flatten()[:10])
+    I /= (mult.max() / mult)
+    print("DEBUG: I after scaling (first 10 elems):", I.flatten()[:10])
     return q_grid, I
 
 def incoherent_sum_real(model, hkl_grid, sampling, U=None, mask=None, batch_size=10000, n_processes=8):
