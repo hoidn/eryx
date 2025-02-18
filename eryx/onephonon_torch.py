@@ -152,7 +152,8 @@ class OnePhononTorch(ModelRunner):
                                            batch_size=self.batch_size,
                                            n_processes=self.n_processes)
             # Convert the NP results back to a torch tensor on the correct device.
-            results_tensor = torch.tensor(results_np, device=self.device, dtype=torch.float32)
+            # This step is non-differentiable and breaks the gradient flow intentionally.
+            results_tensor = torch.tensor(results_np, device=self.device, dtype=torch.float32).detach()
             I_torch[indices] = torch.square(torch.abs(results_tensor))
         return I_torch.to(self.device)
 
@@ -184,7 +185,8 @@ class OnePhononTorch(ModelRunner):
         for group in ravel_np:
             idx_tensor = torch.tensor(group, device='cpu', dtype=torch.long)
             I_full.index_add_(0, idx_tensor, transform_cpu)
-        I_full = I_full.to(self.device)
+        # This conversion is non-differentiable and breaks the gradient flow intentionally.
+        I_full = I_full.to(self.device).detach()
         I_full = I_full.view(*map_shape_ravel)
         # Compute centered sampling from the obtained map shape and the original sampling
         sampling = (self.hsampling[2], self.ksampling[2], self.lsampling[2])
