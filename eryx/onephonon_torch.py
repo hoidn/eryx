@@ -246,11 +246,45 @@ class OnePhononTorch(ModelRunner):
         print("DEBUG: I_full before multiplicity scaling (first 10 elems):", I_full.flatten()[:10])
 
         # Division step – note: mult_tensor.max()/mult_tensor performs elementwise division.
+        # --- Begin debug prints for scaling study ---
+        # Temporarily replace sym_ops with its flattened (first) set so that compute_multiplicity works as expected.
+        original_sym_ops = self.gnm_torch.atomic_model.sym_ops
+        if isinstance(original_sym_ops, (tuple, list)):
+            self.gnm_torch.atomic_model.sym_ops = original_sym_ops[0]
+        else:
+            self.gnm_torch.atomic_model.sym_ops = self.gnm_torch.atomic_model.sym_ops.get(0, original_sym_ops)
+        
+        _, mult = compute_multiplicity(self.gnm_torch.atomic_model, 
+                                       sampling_ravel[0], 
+                                       sampling_ravel[1], 
+                                       sampling_ravel[2])
+        # Restore the original symmetry operations.
+        self.gnm_torch.atomic_model.sym_ops = original_sym_ops
+        
+        mult_tensor = torch.tensor(mult, device=self.device, dtype=torch.float32)
+        print("DEBUG: multiplicity tensor shape:", mult_tensor.shape)
+        print("DEBUG: multiplicity unique values:", torch.unique(mult_tensor))
+        print("DEBUG: multiplicity max (scalar):", mult_tensor.max().item())
+        print("DEBUG: I_full before scaling (first 10 elems):", I_full.flatten()[:10])
+        
+        # Apply the scaling: in the NP branch they do I /= (mult.max() / mult)
         I_full = I_full / (mult_tensor.max() / mult_tensor)
+        
+        print("DEBUG: I_full after scaling (first 10 elems):", I_full.flatten()[:10])
+        
+        # --- End debug prints for scaling study ---
 
         print("DEBUG: I_full after multiplicity scaling (first 10 elems):", I_full.flatten()[:10])
 
         I_full = I_full.to(self.device)
+        sampling_original = [(int(self.hkl_grid[:, i].min()),
+                              int(self.hkl_grid[:, i].max()),
+                              self.hsampling[i]) for i in range(3)]
+        I_full_np = resize_map(I_full.cpu().numpy(), sampling_original, sampling_ravel)
+        print("DEBUG: I_full_np shape after resize_map:", I_full_np.shape)
+        print("DEBUG: I_full_np (first 10 elems) after resize_map:", I_full_np.flatten()[:10])
+        
+        I_full = torch.tensor(I_full_np, device=self.device, dtype=torch.float32)
         # Resize the computed map to the original sampling
         sampling_original = [(int(self.hkl_grid[:, i].min()),
                               int(self.hkl_grid[:, i].max()),
