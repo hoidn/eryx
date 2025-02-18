@@ -52,6 +52,13 @@ class OnePhononTorch(ModelRunner):
                                                       self.lsampling,
                                                       return_hkl=True)
         self.q_grid = torch.tensor(2 * np.pi * np.inner(atomic_model.A_inv.T, self.hkl_grid).T, device=self.device, dtype=torch.float32)
+        # Compare with NP version for consistency
+        _np_q_grid = 2 * np.pi * np.inner(atomic_model.A_inv.T, self.hkl_grid).T
+        _diff = np.abs(_np_q_grid - self.q_grid.cpu().numpy())
+        if _diff.max() >= 1e-6:
+            logging.error(f"q_grid mismatch: max diff {_diff.max()} exceeds tolerance")
+        else:
+            logging.debug(f"q_grid consistent: max diff {_diff.max()}")
         logging.debug(f"q_grid shape (torch): {self.q_grid.shape}")
         logging.debug(f"q_grid values (torch): {self.q_grid}")
 
@@ -257,7 +264,12 @@ class OnePhononTorch(ModelRunner):
         scaling_factor = mult_tensor.max() / mult_tensor
         print("DEBUG_HYP1: computed scaling factor (first 10 elems):", scaling_factor.flatten()[:10])
         print("DEBUG_HYP1: I_full BEFORE scaling (first 10 elems):", I_full.flatten()[:10])
-        I_full = I_full / scaling_factor
+        # Option to disable multiplicity scaling (for debugging)
+        if not getattr(self, "disable_scaling", False):
+            I_full = I_full / scaling_factor
+            logging.debug(f"Applied multiplicity scaling, scaling factor stats: max={scaling_factor.max()}, min={scaling_factor.min()}")
+        else:
+            logging.debug("Multiplicity scaling disabled for debugging")
         print("DEBUG_HYP1: I_full AFTER scaling (first 10 elems):", I_full.flatten()[:10])
         if isinstance(original_sym_ops, (tuple, list)):
             self.gnm_torch.atomic_model.sym_ops = original_sym_ops[0]
@@ -292,6 +304,7 @@ class OnePhononTorch(ModelRunner):
             (int(self.hkl_grid[:, 1].min()), int(self.hkl_grid[:, 1].max()), self.ksampling[2]),
             (int(self.hkl_grid[:, 2].min()), int(self.hkl_grid[:, 2].max()), self.lsampling[2])
         ]
+        logging.debug(f"Original sampling: {sampling_original}; sampling_ravel: {sampling_ravel}")
         print("DEBUG: self.hkl_grid.shape =", self.hkl_grid.shape)
         print("DEBUG: self.map_shape =", self.map_shape)
         print("DEBUG: sampling_original =", sampling_original)
