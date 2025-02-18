@@ -39,16 +39,15 @@ class OnePhononTorch(ModelRunner):
         self.n_processes = n_processes
         self.device = device
 
-        # Use numpy routines to set up the grid and q_grid
+        # Use torch routines to set up the grid and q_grid
         atomic_model = AtomicModel(pdb_path, expand_p1=expand_p1, frame=-1)
-        from eryx.map_utils import generate_grid  # use existing method
         self.hkl_grid, self.map_shape = generate_grid(atomic_model.A_inv,
                                                       self.hsampling,
                                                       self.ksampling,
                                                       self.lsampling,
                                                       return_hkl=True)
-        self.q_grid = 2 * np.pi * np.inner(atomic_model.A_inv.T, self.hkl_grid).T
-        logging.debug(f"q_grid shape (numpy): {self.q_grid.shape}")
+        self.q_grid = torch.tensor(2 * np.pi * np.inner(atomic_model.A_inv.T, self.hkl_grid).T, device=self.device, dtype=torch.float32)
+        logging.debug(f"q_grid shape (torch): {self.q_grid.shape}")
 
         # Initialize the torch-based GNM
         self.gnm_torch = GaussianNetworkModelTorch(pdb_path, gnm_cutoff, gamma_intra, gamma_inter, device=device)
@@ -66,8 +65,7 @@ class OnePhononTorch(ModelRunner):
                 sym_ops = (np.diagflat(sym_ops[0]), sym_ops[1])
                 self.gnm_torch.atomic_model.sym_ops = sym_ops
 
-        # Similarly process the second symmetry set (if needed):
-        # Similarly process sym_ops[1] to ensure full (3,3) matrices.
+        # Process the second symmetry set to ensure full (3,3) matrices.
         if isinstance(sym_ops[1], dict):
             for key, op in sym_ops[1].items():
                 if op.ndim != 2 or op.shape != (3, 3):
@@ -102,19 +100,18 @@ class OnePhononTorch(ModelRunner):
         # Recompute the full q_grid using atomic_model.A_inv
         q_grid_np = 2 * np.pi * np.inner(atomic_model.A_inv.T, hkl).T
         # Allocate intensity array
-        I_np = np.zeros(q_grid_np.shape[0], dtype=np.float32)
-        if np.any(valid):
-            # Use the NP structure_factors function to compute complex structure factors
-            I_np[valid] = np.square(np.abs(structure_factors(q_grid_np[valid],
-                                                              atomic_model.xyz,
-                                                              atomic_model.ff_a,
-                                                              atomic_model.ff_b,
-                                                              atomic_model.ff_c,
-                                                              U=None,
-                                                              batch_size=self.batch_size,
-                                                              n_processes=self.n_processes)))
-        # Return the intensity as a torch tensor on self.device
-        return torch.tensor(I_np, device=self.device, dtype=torch.float32)
+        I_torch = torch.zeros(q_grid_torch.shape[0], device=self.device, dtype=torch.float32)
+        if valid.any():
+            # Use the torch-based structure_factors function to compute complex structure factors
+            I_torch[valid] = torch.square(torch.abs(structure_factors(q_grid_torch[valid],
+                                                                      atomic_model.xyz,
+                                                                      atomic_model.ff_a,
+                                                                      atomic_model.ff_b,
+                                                                      atomic_model.ff_c,
+                                                                      U=None,
+                                                                      batch_size=self.batch_size,
+                                                                      n_processes=self.n_processes)))
+        return I_torch
 
     def _incoherent_sum_torch(self, transform: torch.Tensor) -> torch.Tensor:
         """
@@ -124,15 +121,13 @@ class OnePhononTorch(ModelRunner):
         sym_ops = expand_sym_ops(self.gnm_torch.atomic_model.sym_ops)
         hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops)
         ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, (self.hsampling[2], self.ksampling[2], self.lsampling[2]))
-        I_np = transform.detach().cpu().numpy()
-        I_full = np.zeros(map_shape_ravel).flatten()
+        I_full = torch.zeros(map_shape_ravel, device=self.device, dtype=torch.float32)
         for i in range(ravel_np.shape[0]):
-            I_full[ravel_np[i]] += I_np.copy()
+            I_full[ravel_np[i]] += transform
         _, mult = compute_multiplicity(self.gnm_torch.atomic_model, 
                                        (-self.hsampling[1], self.hsampling[1], self.hsampling[2]),
                                        (-self.ksampling[1], self.ksampling[1], self.ksampling[2]),
                                        (-self.lsampling[1], self.lsampling[1], self.lsampling[2]))
-        mult_flat = mult.flatten()
+        mult_flat = torch.tensor(mult.flatten(), device=self.device, dtype=torch.float32)
         I_full = I_full / (mult_flat.max() / mult_flat)
-        I_torch = torch.tensor(I_full, device=self.device, dtype=torch.float32)
-        return I_torch.flatten()
+        return I_full.flatten()
