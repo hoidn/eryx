@@ -55,23 +55,25 @@ class OnePhononTorch(ModelRunner):
         # Ensure full symmetry matrices in atomic_model.
         sym_ops = self.gnm_torch.atomic_model.sym_ops
         # Process the first symmetry set:
+        # Ensure that sym_ops[0] contains full (3,3) matrices.
         if isinstance(sym_ops[0], dict):
             for key, op in sym_ops[0].items():
-                if op.ndim == 1 and op.shape[0] == 3:
-                    sym_ops[0][key] = np.diagflat(op)
+                # If op is not a (3,3) array, replace it with its diagonal matrix.
+                if op.ndim != 2 or op.shape != (3, 3):
+                    sym_ops[0][key] = np.diag(op)
         elif isinstance(sym_ops[0], np.ndarray):
-            if sym_ops[0].ndim == 1 and sym_ops[0].shape[0] == 3:
-                # Replace the 1D array with its diagonal
+            if sym_ops[0].ndim != 2 or sym_ops[0].shape != (3, 3):
                 sym_ops = (np.diagflat(sym_ops[0]), sym_ops[1])
                 self.gnm_torch.atomic_model.sym_ops = sym_ops
 
         # Similarly process the second symmetry set (if needed):
+        # Similarly process sym_ops[1] to ensure full (3,3) matrices.
         if isinstance(sym_ops[1], dict):
             for key, op in sym_ops[1].items():
-                if op.ndim == 1 and op.shape[0] == 3:
-                    sym_ops[1][key] = np.diagflat(op)
+                if op.ndim != 2 or op.shape != (3, 3):
+                    sym_ops[1][key] = np.diag(op)
         elif isinstance(sym_ops[1], np.ndarray):
-            if sym_ops[1].ndim == 1 and sym_ops[1].shape[0] == 3:
+            if sym_ops[1].ndim != 2 or sym_ops[1].shape != (3, 3):
                 sym_ops = (sym_ops[0], np.diagflat(sym_ops[1]))
                 self.gnm_torch.atomic_model.sym_ops = sym_ops
 

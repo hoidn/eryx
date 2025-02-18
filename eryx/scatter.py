@@ -46,7 +46,7 @@ def compute_form_factors(q_grid, ff_a, ff_b, ff_c):
     fj = np.sum(fj, axis=1) + ff_c[:,np.newaxis]
     mean_fj = np.mean(fj)
     logging.debug(f"[TestReference] Mean of form factors: {mean_fj:.8f}")
-    return fj.T
+    return fj.reshape(ff_a.shape[0]*ff_a.shape[1], -1).T
 
 def structure_factors_batch(q_grid, xyz, ff_a, ff_b, ff_c, U=None,
                             compute_qF=False, project_on_components=None,
