@@ -42,6 +42,8 @@ class OnePhononTorch(ModelRunner):
             self.n_processes = 1  # Avoid CUDA re-init issues in forked subprocesses.
 
         # Use torch routines to set up the grid and q_grid
+        print("DEBUG: Initial ff_a shape:", atomic_model.ff_a.shape)
+        print("DEBUG: Initial xyz shape:", atomic_model.xyz.shape)
         atomic_model = AtomicModel(pdb_path, expand_p1=expand_p1, frame=-1)
         self.hkl_grid, self.map_shape = generate_grid(atomic_model.A_inv,
                                                       self.hsampling,
@@ -53,6 +55,8 @@ class OnePhononTorch(ModelRunner):
         logging.debug(f"q_grid values (torch): {self.q_grid}")
 
         # Initialize the torch-based GNM
+        print("DEBUG: Before compute_multiplicity, ff_a shape:", atomic_model.ff_a.shape)
+        print("DEBUG: Before compute_multiplicity, xyz shape:", atomic_model.xyz.shape)
         self.gnm_torch = GaussianNetworkModelTorch(pdb_path, gnm_cutoff, gamma_intra, gamma_inter, device=device)
         # Ensure full symmetry matrices in atomic_model.
         sym_ops = self.gnm_torch.atomic_model.sym_ops
@@ -219,6 +223,8 @@ class OnePhononTorch(ModelRunner):
         # Compute centered sampling from the obtained map shape and the original sampling
         sampling = (self.hsampling[2], self.ksampling[2], self.lsampling[2])
         sampling_ravel = get_centered_sampling(map_shape_ravel, sampling)
+        print("DEBUG: Before compute_multiplicity, ff_a[0] shape:", atomic_model.ff_a[0].shape)
+        print("DEBUG: Before compute_multiplicity, xyz[0] shape:", atomic_model.xyz[0].shape)
         _, mult = compute_multiplicity(self.gnm_torch.atomic_model, 
                                        sampling_ravel[0], 
                                        sampling_ravel[1], 
