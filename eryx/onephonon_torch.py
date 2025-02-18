@@ -228,10 +228,21 @@ class OnePhononTorch(ModelRunner):
         I_full[primary_indices] = transform_cpu  # assign primary values
 
         # For each subsequent group, copy the intensities from the primary positions
-        print("AGGRESSIVE_DEBUG_HYP_TORCH: Copying for group; intersect size =", intersect.size)
-        print("  Primary indices (comm1):", primary_np[comm1][:10])
-        print("  Group indices (comm2):", group_np[comm2][:10])
-        before_copy = I_full[idx_tensor].clone()
+        for group in ravel_np[1:]:
+            # Find the intersection between the primary ravel and this group.
+            group_np = np.array(group)
+            primary_np = np.array(ravel_np[0])
+            # Compute indices in the primary array that match the current group.
+            intersect, comm1, comm2 = np.intersect1d(primary_np, group_np, return_indices=True)
+            if intersect.size:
+                print("AGGRESSIVE_DEBUG_HYP_TORCH: Copying for group; intersect size =", intersect.size)
+                print("  Primary indices (comm1):", primary_np[comm1][:10])
+                print("  Group indices (comm2):", group_np[comm2][:10])
+                idx_tensor = torch.tensor(group_np[comm2], device='cpu', dtype=torch.long)
+                before_copy = I_full[idx_tensor].clone()
+                I_full[idx_tensor] = I_full[torch.tensor(primary_np[comm1], device='cpu', dtype=torch.long)]
+                after_copy = I_full[idx_tensor].clone()
+                print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full difference for copied indices, before copy (first element):", before_copy[0].item(), "after copy (first element):", after_copy[0].item())
         for group in ravel_np[1:]:
             # Find the intersection between the primary ravel and this group.
             group_np = np.array(group)
@@ -272,13 +283,13 @@ class OnePhononTorch(ModelRunner):
               "max =", mult_tensor.max().item(), "mean =", mult_tensor.float().mean().item(),
               "25th percentile =", torch.quantile(mult_tensor.float(), 0.25).item(),
               "75th percentile =", torch.quantile(mult_tensor.float(), 0.75).item())
+        scaling_factor = mult_tensor.max() / mult_tensor
         # Before scaling:
         print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full BEFORE scaling: min =", I_full.min().item(), 
               "max =", I_full.max().item(), "mean =", I_full.mean().item())
         I_full_scaled = I_full * scaling_factor
         print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full AFTER scaling: min =", I_full_scaled.min().item(), 
               "max =", I_full_scaled.max().item(), "mean =", I_full_scaled.mean().item())
-        scaling_factor = mult_tensor.max() / mult_tensor
         print("DEBUG_HYP_TORCH: computed scaling factor (first 10 elems):", scaling_factor.flatten()[:10])
         print("DEBUG_HYP1: I_full BEFORE scaling (first 10 elems):", I_full.flatten()[:10])
         # Option to disable multiplicity scaling (for debugging)
