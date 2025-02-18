@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 import logging
 
-logging.debug("TEST: Logging is now configured.")
-
 def setup_logging():
     # Remove any existing handlers.
     for handler in logging.root.handlers[:]:
@@ -72,8 +70,11 @@ def run_torch():
     # Save for later comparison
     np.save("torch_diffuse_intensity.npy", Id_torch.detach().cpu().numpy())
 
-# Call logging setup *before* any NP modules are imported:
+# Immediately configure logging before any other work or module import.
 setup_logging()
+
+# (Optionally, test your configuration now:)
+logging.debug("TEST: Logging is now configured.")
 
 import numpy as np
 from eryx.models import OnePhonon   # NP version
