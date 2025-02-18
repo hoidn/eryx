@@ -168,7 +168,7 @@ class OnePhononTorch(ModelRunner):
                                            n_processes=self.n_processes)
             # Convert the NP results back to a torch tensor on the correct device.
             # This step is non-differentiable and breaks the gradient flow intentionally.
-            results_tensor = torch.tensor(results_np, device=self.device, dtype=torch.float32).detach()
+            results_tensor = torch.from_numpy(results_np).to(self.device, dtype=torch.float32).clone().detach()
             I_torch[indices] = torch.square(torch.abs(results_tensor))
         return I_torch.to(self.device)
 
@@ -195,6 +195,8 @@ class OnePhononTorch(ModelRunner):
             print(f"WARNING: Expected second dimension {self.hkl_grid.shape[0]} but got {hs_shape[1]}")
         
         ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, (self.hsampling[2], self.ksampling[2], self.lsampling[2]))
+        print("DEBUG: ravel_np (first two groups):", ravel_np[:2])
+        print("DEBUG: map_shape_ravel:", map_shape_ravel)
         print("DEBUG: ravel_np (first few groups):", ravel_np[:2])
         print("DEBUG: ravel_np (all groups):", ravel_np)
         print("DEBUG: map_shape_ravel:", map_shape_ravel)
@@ -241,6 +243,9 @@ class OnePhononTorch(ModelRunner):
         # Restore the full symmetry operations.
         self.gnm_torch.atomic_model.sym_ops = original_sym_ops
         mult_tensor = torch.tensor(mult, device=self.device, dtype=torch.float32)
+        # DEBUG: Report complete multiplicity info
+        print("DEBUG: complete mult_tensor stats -- min:", mult_tensor.min().item(),
+              " max:", mult_tensor.max().item(), " unique:", torch.unique(mult_tensor))
         print("DEBUG: multiplicity array shape:", mult_tensor.shape)
         print("DEBUG: multiplicity array values (unique):", torch.unique(mult_tensor))
         print("DEBUG: multiplicity max (scalar):", mult_tensor.max().item())
@@ -270,7 +275,8 @@ class OnePhononTorch(ModelRunner):
         
         # Apply the scaling: in the NP branch they do I /= (mult.max() / mult)
         # Apply the scaling: in the NP branch they do I /= (mult.max() / mult)
-        I_full = I_full / (mult_tensor.max() / mult_tensor)
+        # Temporarily disable scaling (for testing Hypothesis 2)
+        # I_full = I_full / (mult_tensor.max() / mult_tensor)
         
         print("DEBUG: I_full after scaling (first 10 elems):", I_full.flatten()[:10])
         
