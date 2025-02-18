@@ -227,12 +227,19 @@ class OnePhononTorch(ModelRunner):
         sampling = (self.hsampling[2], self.ksampling[2], self.lsampling[2])
         sampling_ravel = get_centered_sampling(map_shape_ravel, sampling)
         atomic_model = self.gnm_torch.atomic_model
-        print("DEBUG: Before compute_multiplicity, ff_a[0] shape:", atomic_model.ff_a[0].shape)
-        print("DEBUG: Before compute_multiplicity, xyz[0] shape:", atomic_model.xyz[0].shape)
+        # Temporarily replace sym_ops with its flattened (first) set.
+        original_sym_ops = self.gnm_torch.atomic_model.sym_ops
+        if isinstance(original_sym_ops, (tuple, list)):
+            self.gnm_torch.atomic_model.sym_ops = original_sym_ops[0]
+        else:
+            # If not a tuple, try copying the flat part from key 0 if it’s a dict.
+            self.gnm_torch.atomic_model.sym_ops = self.gnm_torch.atomic_model.sym_ops.get(0, original_sym_ops)
         _, mult = compute_multiplicity(self.gnm_torch.atomic_model, 
                                        sampling_ravel[0], 
                                        sampling_ravel[1], 
                                        sampling_ravel[2])
+        # Restore the full symmetry operations.
+        self.gnm_torch.atomic_model.sym_ops = original_sym_ops
         mult_tensor = torch.tensor(mult, device=self.device, dtype=torch.float32)
         print("DEBUG: multiplicity array shape:", mult_tensor.shape)
         print("DEBUG: multiplicity array values:", mult_tensor)
