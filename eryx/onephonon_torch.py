@@ -82,7 +82,7 @@ class OnePhononTorch(ModelRunner):
         """
         hessian_torch = self.gnm_torch.compute_hessian()  # already on device
         q_grid_torch = torch.tensor(self.q_grid, device=self.device, dtype=torch.float32)
-        crystal_transform = self._compute_crystal_transform_torch(q_grid_torch)
+        crystal_transform = self._compute_crystal_transform_torch(q_grid_torch.detach().cpu().numpy())
         Id = self._incoherent_sum_torch(crystal_transform)
         logging.debug(f"Id (diffuse intensity) shape: {Id.shape}, device: {Id.device}")
         return Id
@@ -96,9 +96,7 @@ class OnePhononTorch(ModelRunner):
         # Use atomic_model.cell only for the mask; use atomic_model.A_inv for dq and q_grid
         mask_np, _ = get_resolution_mask(atomic_model.cell, hkl, self.res_limit)
         dq_map_np = np.around(get_dq_map(atomic_model.A_inv, hkl), 5)
-        valid = (dq_map_np == 0) & mask_np
-        # Recompute the full q_grid using atomic_model.A_inv
-        q_grid_np = 2 * np.pi * np.inner(atomic_model.A_inv.T, hkl).T
+        valid = torch.tensor((dq_map_np == 0) & mask_np, device=self.device)
         # Allocate intensity array
         I_torch = torch.zeros(q_grid_torch.shape[0], device=self.device, dtype=torch.float32)
         if valid.any():
