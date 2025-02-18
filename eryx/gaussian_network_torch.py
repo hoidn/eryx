@@ -12,6 +12,7 @@ class GaussianNetworkModelTorch:
         Loads the atomic model (using existing numpy code) and converts key arrays to torch tensors.
         """
         self.device = device
+        self.device = torch.device(self.device.type)
         # Load and set up the atomic model (using existing numpy routines)
         self.atomic_model = AtomicModel(pdb_path, expand_p1=True)
         self.crystal = Crystal(self.atomic_model)
@@ -122,7 +123,7 @@ class GaussianNetworkModelTorch:
             phase = torch.dot(kvec, r_cell)
             eikr = torch.cos(phase) + 1j * torch.sin(phase)
             logging.debug(f"[DEBUG compute_K] j_cell={j_cell}, r_cell={r_cell.cpu().numpy()}, phase={phase.item():.8f}, eikr={eikr}")
-            Kmat -= hessian[:, :, j_cell, :, :] * eikr
+            Kmat += hessian[:, :, j_cell, :, :] * eikr
             logging.debug(f"[DEBUG compute_K] After j_cell={j_cell} update, Kmat norm={torch.norm(Kmat).item():.8f}")
         # logging.debug(f"Kmat shape: {Kmat.shape}")
         return Kmat
