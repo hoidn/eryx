@@ -164,15 +164,17 @@ class OnePhononTorch(ModelRunner):
         sym_ops_rot = self.gnm_torch.atomic_model.sym_ops[0]
         hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops_rot)
         ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, self.map_shape)
-        # Allocate a 1D accumulator (flattened over the full map)
-        I_full = torch.zeros(np.prod(map_shape_ravel), device=self.device, dtype=torch.float32)
+        # (Optional debug logs, e.g.: print("I_full shape:", I_full.shape, "transform shape:", transform.shape))
+        if transform.numel() == 0:
+            return I_full.to(self.device)
+        I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
         # Convert the ravel indices array to a tensor:
         indices = torch.tensor(ravel_np, device=self.device, dtype=torch.long).flatten()  # shape: (num_indices,)
         # Use index_add_: add the entire transform vector at every index in “indices”.
         factor = len(ravel_np) // self.q_grid.shape[0]
         transform_rep = transform.repeat_interleave(factor)
         I_full.index_add_(0, indices, transform_rep)
-        # Reshape back to the expected diffraction map shape.
+        I_full = I_full.to(self.device)
         I_full = I_full.view(*map_shape_ravel)
         _, mult = compute_multiplicity(self.gnm_torch.atomic_model, 
                                        (-self.hsampling[1], self.hsampling[1], self.hsampling[2]),
