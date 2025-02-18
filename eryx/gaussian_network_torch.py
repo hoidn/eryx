@@ -81,7 +81,7 @@ class GaussianNetworkModelTorch:
                             #     f"i_at={i_at}, neighbors={neigh_indices}, gamma_val (float)={gamma_val.item() if torch.is_tensor(gamma_val) else gamma_val}"
                             # )
                             idxs = torch.tensor(neigh_indices, device=self.device)
-                            val_to_assign = -gamma_val.to(torch.complex64)
+                            val_to_assign = -gamma_val.to(torch.complex128)
                             # logging.debug(f"[DEBUG - compute_hessian] Attempting assignment: hessian[{i_asu}, {i_at}, {i_cell}, {j_asu}, {idxs.tolist()}] = {val_to_assign}")
                             try:
                                 hessian[i_asu, i_at, i_cell, j_asu, idxs] = val_to_assign
