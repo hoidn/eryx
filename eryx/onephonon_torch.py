@@ -318,5 +318,13 @@ class OnePhononTorch(ModelRunner):
         # (Optional test:) Uncomment the next line to disable any additional scaling:
         # I_full_np = I_full_np  # No extra scaling here
         
+        # Test the hypothesis: apply the tentative normalization factor
+        test_scale = 2.5e-4  # Use 2.5e-4 (adjust as needed)
+        I_full_np_scaled = I_full_np * test_scale
+        # Print statistics for the scaled result
+        print("TEST_HYP: scaled diffuse intensity stats -- min: {:.6f}, max: {:.6f}, mean: {:.6f}".
+              format(np.nanmin(I_full_np_scaled), np.nanmax(I_full_np_scaled), np.nanmean(I_full_np_scaled)))
+        print("TEST_HYP: first 10 elements of scaled map:", I_full_np_scaled.flatten()[:10])
+
         I_full = torch.tensor(I_full_np, device=self.device, dtype=torch.float32)
         return I_full.flatten()
