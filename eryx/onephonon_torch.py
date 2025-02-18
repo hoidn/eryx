@@ -58,12 +58,12 @@ class OnePhononTorch(ModelRunner):
         # Process the first symmetry set:
         # Ensure that sym_ops[0] contains full (3,3) matrices.
         if isinstance(sym_ops[0], dict):
-            for key in sym_ops[0]:
-                if key == 0:
-                    sym_ops[0][key] = np.eye(3)
-                else:
-                    if sym_ops[0][key].ndim == 1:
-                        sym_ops[0][key] = np.diag(sym_ops[0][key])
+            for key, op in sym_ops[0].items():
+                if (op.ndim != 2) or (op.shape != (3, 3)):
+                    if key == 0:
+                        sym_ops[0][key] = np.eye(3)
+                    else:
+                        sym_ops[0][key] = np.diag(op)
         elif isinstance(sym_ops[0], np.ndarray):
             if sym_ops[0].ndim != 2 or sym_ops[0].shape != (3, 3):
                 sym_ops = (np.diagflat(sym_ops[0]), sym_ops[1])
@@ -99,7 +99,7 @@ class OnePhononTorch(ModelRunner):
         """
         hessian_torch = self.gnm_torch.compute_hessian()  # already on device
         q_grid_torch = torch.tensor(self.q_grid, device=self.device, dtype=torch.float32)
-        crystal_transform = self._compute_crystal_transform_torch(q_grid_torch.detach().cpu().numpy())
+        crystal_transform = self._compute_crystal_transform_torch(q_grid_torch)
         Id = self._incoherent_sum_torch(crystal_transform)
         logging.debug(f"Id (diffuse intensity) shape: {Id.shape}, device: {Id.device}")
         return Id
@@ -124,7 +124,7 @@ class OnePhononTorch(ModelRunner):
                 xyz = xyz.reshape(-1, 3)
 
             # Convert q_grid slice to numpy on CPU.
-            q_sel = q_grid_torch[valid].detach().cpu().numpy()
+            q_sel = q_grid_torch[valid].cpu().numpy()
             results_np = structure_factors(q_sel,
                                            xyz,
                                            atomic_model.ff_a,
