@@ -57,7 +57,7 @@ class OnePhononTorch(ModelRunner):
         # Ensure full symmetry matrices in atomic_model.
         sym_ops = self.gnm_torch.atomic_model.sym_ops
         # Process the first symmetry set:
-        # Ensure that sym_ops[0] contains full (3,3) matrices.
+        # Ensure that sym_ops[0] is a flat dictionary (keys -> 3x3 matrices).
         if not isinstance(sym_ops[0], dict):
             # Always force sym_ops[0] to be a dict with keys 0,1,2,3.
             sym_ops_0 = {
@@ -76,8 +76,10 @@ class OnePhononTorch(ModelRunner):
         else:
             new_sym0 = {}
             for key, op in sym_ops[0].items():
-                if op.ndim == 1 and op.shape[0] == 3:
-                    new_sym0[key] = np.eye(3)  # always set key 0 to identity (as expected)
+                # If the operation is itself a dict, replace it by (for example)
+                # its entry with key 0 (or use another rule as appropriate)
+                if isinstance(op, dict):
+                    new_sym0[key] = op.get(0, list(op.values())[0])
                 else:
                     new_sym0[key] = op
             sym_ops[0] = new_sym0
