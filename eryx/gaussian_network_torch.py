@@ -75,13 +75,13 @@ class GaussianNetworkModelTorch:
                         if neigh_indices:
                             gamma_val = self.gamma[i_cell, i_asu, j_asu]
                             # Log details before assignment
-                            logging.debug(
-                                f"[DEBUG - compute_hessian] i_asu={i_asu}, i_cell={i_cell}, j_asu={j_asu}, "
-                                f"i_at={i_at}, neighbors={neigh_indices}, gamma_val (float)={gamma_val.item() if torch.is_tensor(gamma_val) else gamma_val}"
-                            )
+                            # logging.debug(
+                            #     f"[DEBUG - compute_hessian] i_asu={i_asu}, i_cell={i_cell}, j_asu={j_asu}, "
+                            #     f"i_at={i_at}, neighbors={neigh_indices}, gamma_val (float)={gamma_val.item() if torch.is_tensor(gamma_val) else gamma_val}"
+                            # )
                             idxs = torch.tensor(neigh_indices, device=self.device)
                             val_to_assign = -gamma_val.to(torch.complex64)
-                            logging.debug(f"[DEBUG - compute_hessian] Attempting assignment: hessian[{i_asu}, {i_at}, {i_cell}, {j_asu}, {idxs.tolist()}] = {val_to_assign}")
+                            # logging.debug(f"[DEBUG - compute_hessian] Attempting assignment: hessian[{i_asu}, {i_at}, {i_cell}, {j_asu}, {idxs.tolist()}] = {val_to_assign}")
                             try:
                                 hessian[i_asu, i_at, i_cell, j_asu, idxs] = val_to_assign
                             except Exception as e:
@@ -91,16 +91,16 @@ class GaussianNetworkModelTorch:
                                 )
                                 raise
                             hessian_diag[i_asu, i_at] -= val_to_assign * float(len(neigh_indices))
-                            logging.debug(
-                                f"[DEBUG - compute_hessian] Updated hessian_diag[{i_asu}, {i_at}] = {hessian_diag[i_asu, i_at]}"
-                            )
+                            # logging.debug(
+                            #     f"[DEBUG - compute_hessian] Updated hessian_diag[{i_asu}, {i_at}] = {hessian_diag[i_asu, i_at]}"
+                            # )
         # Set the diagonal (reference cell)
         for i_asu in range(self.n_asu):
             for i_at in range(self.n_atoms_per_asu):
                 hessian[i_asu, i_at, self.id_cell_ref, i_asu, i_at] = -hessian_diag[i_asu, i_at] - self.gamma[self.id_cell_ref, i_asu, i_asu].to(torch.complex64)
-        logging.debug("[DEBUG - compute_hessian] Final hessian sample (first ASU block):")
-        logging.debug(hessian[0, :, :, 0, :])
-        logging.debug(f"Hessian shape: {hessian.shape}")
+        # logging.debug("[DEBUG - compute_hessian] Final hessian sample (first ASU block):")
+        # logging.debug(hessian[0, :, :, 0, :])
+        # logging.debug(f"Hessian shape: {hessian.shape}")
         return hessian
 
     def compute_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
@@ -121,7 +121,7 @@ class GaussianNetworkModelTorch:
             phase = torch.dot(kvec, r_cell)
             eikr = torch.cos(phase) + 1j * torch.sin(phase)
             Kmat += hessian[:, :, j_cell, :, :] * eikr
-        logging.debug(f"Kmat shape: {Kmat.shape}")
+        # logging.debug(f"Kmat shape: {Kmat.shape}")
         return Kmat
 
     def compute_Kinv(self, hessian: torch.Tensor, kvec: torch.Tensor = None, reshape: bool = True) -> torch.Tensor:
@@ -136,5 +136,5 @@ class GaussianNetworkModelTorch:
             Kinv = Kinv_flat.reshape((shape[0], shape[1], shape[2], shape[3]))
         else:
             Kinv = Kinv_flat
-        logging.debug(f"Kinv shape: {Kinv.shape}")
+        # logging.debug(f"Kinv shape: {Kinv.shape}")
         return Kinv
