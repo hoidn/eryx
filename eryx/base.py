@@ -204,9 +204,7 @@ def compute_molecular_transform(pdb_path, hsampling, ksampling, lsampling, U=Non
             I = I.reshape(map_shape)
             I[~mask.reshape(map_shape)] = 0
 
-    print("AGGRESSIVE_DEBUG_HYP_NP: multiplicity tensor stats: min =", mult.min(), 
-          "max =", mult.max(), "mean =", np.mean(mult),
-          "unique =", np.unique(mult))
+    logging.debug("AGGRESSIVE_DEBUG_HYP_NP: multiplicity tensor stats: min = %s, max = %s, mean = %s, unique = %s", mult.min(), mult.max(), np.mean(mult), np.unique(mult))
     print("AGGRESSIVE_DEBUG_HYP_NP: I BEFORE scaling (first 10 elems):", I.flatten()[:10])
     I /= (mult.max() / mult)
     print("AGGRESSIVE_DEBUG_HYP_NP: I AFTER scaling (first 10 elems):", I.flatten()[:10])

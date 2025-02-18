@@ -182,8 +182,7 @@ class OnePhononTorch(ModelRunner):
                                            U=U,
                                            batch_size=self.batch_size,
                                            n_processes=self.n_processes)
-            print("AGGRESSIVE_DEBUG_HYP_TORCH: raw structure_factors result: min =", np.nanmin(results_np), 
-                  "max =", np.nanmax(results_np), "mean =", np.nanmean(np.abs(results_np)))
+            logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: raw structure_factors result: min = %s, max = %s, mean = %s", np.nanmin(results_np), np.nanmax(results_np), np.nanmean(np.abs(results_np)))
             # This step is non-differentiable and breaks the gradient flow intentionally.
             results_tensor = torch.from_numpy(results_np).to(self.device, dtype=torch.float32).clone().detach()
             I_torch[indices] = torch.square(torch.abs(results_tensor))
