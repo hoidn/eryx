@@ -249,18 +249,14 @@ class OnePhononTorch(ModelRunner):
         # Restore the full symmetry operations.
         self.gnm_torch.atomic_model.sym_ops = original_sym_ops
         mult_tensor = torch.tensor(mult, device=self.device, dtype=torch.float32)
-        # DEBUG: Report complete multiplicity info
-        print("DEBUG: complete mult_tensor stats -- min:", mult_tensor.min().item(),
-              " max:", mult_tensor.max().item(), " unique:", torch.unique(mult_tensor))
-        print("DEBUG: multiplicity array shape:", mult_tensor.shape)
-        print("DEBUG: multiplicity array values (unique):", torch.unique(mult_tensor))
-        print("DEBUG: multiplicity max (scalar):", mult_tensor.max().item())
-        print("DEBUG: I_full before scaling (first 10 elems):", I_full.flatten()[:10])
-
-        # Division step – note: mult_tensor.max()/mult_tensor performs elementwise division.
-        # --- Begin debug prints for scaling study ---
-        # Temporarily replace sym_ops with its flattened (first) set so that compute_multiplicity works as expected.
-        original_sym_ops = self.gnm_torch.atomic_model.sym_ops
+        print("DEBUG_HYP1: multiplicity tensor shape:", mult_tensor.shape)
+        print("DEBUG_HYP1: multiplicity tensor (min, max, unique):",
+              mult_tensor.min().item(), mult_tensor.max().item(), torch.unique(mult_tensor))
+        scaling_factor = mult_tensor.max() / mult_tensor
+        print("DEBUG_HYP1: computed scaling factor (first 10 elems):", scaling_factor.flatten()[:10])
+        print("DEBUG_HYP1: I_full BEFORE scaling (first 10 elems):", I_full.flatten()[:10])
+        I_full = I_full / scaling_factor
+        print("DEBUG_HYP1: I_full AFTER scaling (first 10 elems):", I_full.flatten()[:10])
         if isinstance(original_sym_ops, (tuple, list)):
             self.gnm_torch.atomic_model.sym_ops = original_sym_ops[0]
         else:
