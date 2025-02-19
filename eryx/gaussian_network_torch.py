@@ -152,3 +152,116 @@ class GaussianNetworkModelTorch:
             Kinv = Kinv_flat
         # logging.debug(f"Kinv shape: {Kinv.shape}")
         return Kinv
+
+    def compute_hessian_torch(self) -> torch.Tensor:
+        """
+        Compute the Hessian matrix using pure torch operations.
+        
+        Returns:
+            torch.Tensor: shape (n_asu, n_atoms_per_asu, n_cell, n_asu, n_atoms_per_asu)
+                Complex tensor containing the Hessian.
+        """
+        shape = (self.n_asu, self.n_atoms_per_asu, self.n_cell, self.n_asu, self.n_atoms_per_asu)
+        hessian = torch.zeros(shape, dtype=torch.complex64, device=self.device)
+        hessian_diag = torch.zeros((self.n_asu, self.n_atoms_per_asu), dtype=torch.complex64, device=self.device)
+        
+        for i_asu in range(self.n_asu):
+            for i_cell in range(self.n_cell):
+                for j_asu in range(self.n_asu):
+                    # Iterate through atoms of ASU i_asu; neighbor list is a Python list per atom.
+                    for i_at, neigh_indices in enumerate(self.asu_neighbors[i_asu][i_cell][j_asu]):
+                        if len(neigh_indices) > 0:
+                            idxs = torch.tensor(neigh_indices, device=self.device, dtype=torch.long)
+                            gamma_val = self.gamma[i_cell, i_asu, j_asu].to(torch.complex64)
+                            hessian[i_asu, i_at, i_cell, j_asu, idxs] = -gamma_val
+                            hessian_diag[i_asu, i_at] += -gamma_val * float(len(neigh_indices))
+        # Set diagonal elements for the reference cell
+        for i_asu in range(self.n_asu):
+            for i_at in range(self.n_atoms_per_asu):
+                ref_gamma = self.gamma[self.id_cell_ref, i_asu, i_asu].to(torch.complex64)
+                hessian[i_asu, i_at, self.id_cell_ref, i_asu, i_at] = -hessian_diag[i_asu, i_at] - ref_gamma
+        return hessian
+
+    def compute_K_torch(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
+        """
+        Compute the dynamical matrix K(k) for a given k-vector.
+        
+        Args:
+            hessian: The Hessian from compute_hessian_torch(), shape (n_asu, n_atoms, n_cell, n_asu, n_atoms)
+            kvec: Phonon wavevector, shape (3,)
+        
+        Returns:
+            torch.Tensor: K-matrix for this k-point, reshaped as (n_total, n_total)
+        """
+        if kvec is None:
+            kvec = torch.zeros(3, device=self.device, dtype=torch.float64)
+        else:
+            kvec = kvec.to(torch.float64)
+        shape = hessian.shape
+        Kmat = hessian[:, :, self.id_cell_ref, :, :].clone().to(torch.complex64)
+        for i_cell in range(self.n_cell):
+            if i_cell == self.id_cell_ref:
+                continue
+            r_cell_np = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(i_cell))
+            r_cell = torch.tensor(r_cell_np, device=self.device, dtype=torch.float64)
+            phase = torch.dot(kvec, r_cell)
+            eikr = torch.exp(1j * phase)
+            Kmat += hessian[:, :, i_cell, :, :] * eikr
+        n_total = shape[0] * shape[1]
+        return Kmat.reshape(n_total, n_total)
+
+    def compute_gnm_phonons_torch(self):
+        """
+        Compute phonon modes using differentiable operations.
+        
+        Stores:
+            self.V: Eigenvectors for each k-point (stacked along a new axis)
+            self.Winv: Inverse squared frequencies for each k-point
+        """
+        # For demonstration, define a small grid along one direction.
+        k_points = [torch.tensor([kx, 0.0, 0.0], device=self.device, dtype=torch.float64)
+                    for kx in torch.linspace(-0.1, 0.1, steps=5)]
+        V_list = []
+        Winv_list = []
+        hessian_torch = self.compute_hessian_torch()
+        for k in k_points:
+            Kmat = self.compute_K_torch(hessian_torch, kvec=k)
+            Dmat = self._mass_weight_dynamical_matrix(Kmat)
+            U, S, _ = torch.linalg.svd(Dmat)
+            U_processed, S_processed = self._process_eigensystem(U, S)
+            V_list.append(U_processed)
+            Winv_list.append(1.0 / (S_processed ** 2))
+        self.V = torch.stack(V_list, dim=0)
+        self.Winv = torch.stack(Winv_list, dim=0)
+        print("DEBUG_HYP_TORCH: Computed phonon modes with shapes V:", self.V.shape, "Winv:", self.Winv.shape)
+
+    def _mass_weight_dynamical_matrix(self, Kmat: torch.Tensor) -> torch.Tensor:
+        """
+        Apply mass weighting to the dynamical matrix.
+        
+        Args:
+            Kmat: Raw dynamical matrix, shape (n_total, n_total)
+        
+        Returns:
+            torch.Tensor: Mass–weighted matrix D = L⁻¹ · Kmat · L⁻ᵀ.
+        """
+        n = Kmat.shape[0]
+        L_inv = torch.eye(n, device=self.device, dtype=Kmat.dtype)
+        return L_inv @ Kmat @ L_inv.T
+
+    def _process_eigensystem(self, v: torch.Tensor, w: torch.Tensor, epsilon: float = 1e-6) -> (torch.Tensor, torch.Tensor):
+        """
+        Process eigenvalues and vectors obtained from SVD.
+        
+        Replaces eigenvalues below epsilon and returns the processed system.
+        
+        Args:
+            v (torch.Tensor): Eigenvector matrix from torch.linalg.svd().
+            w (torch.Tensor): Singular values.
+            epsilon (float): Small-value threshold.
+        
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Processed eigenvectors and eigenvalues.
+        """
+        w_processed = torch.where(w < epsilon, torch.tensor(epsilon, device=self.device, dtype=w.dtype), w)
+        return v, w_processed
