@@ -321,10 +321,7 @@ class OnePhononTorch(ModelRunner):
         # Before scaling:
         print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full BEFORE scaling: min =", I_full.min().item(), 
               "max =", I_full.max().item(), "mean =", I_full.mean().item())
-        I_full_scaled = I_full * scaling_factor
-        print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full AFTER scaling: min =", I_full_scaled.min().item(), 
-              "max =", I_full_scaled.max().item(), "mean =", I_full_scaled.mean().item())
-        print("DEBUG_HYP_TORCH: computed scaling factor (first 10 elems):", scaling_factor.flatten()[:10])
+        # The manual scaling factor is applied above, so no additional scaling is needed here.
         print("DEBUG_HYP1: I_full BEFORE scaling (first 10 elems):", I_full.flatten()[:10])
         # The manual scaling factor is applied above, so no additional scaling is needed here.
         print("DEBUG_HYP_TORCH: I_full AFTER scaling (first 10 elems):", I_full.flatten()[:10])
