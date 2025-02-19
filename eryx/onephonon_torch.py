@@ -326,20 +326,7 @@ class OnePhononTorch(ModelRunner):
               "max =", I_full_scaled.max().item(), "mean =", I_full_scaled.mean().item())
         print("DEBUG_HYP_TORCH: computed scaling factor (first 10 elems):", scaling_factor.flatten()[:10])
         print("DEBUG_HYP1: I_full BEFORE scaling (first 10 elems):", I_full.flatten()[:10])
-        # Option to disable multiplicity scaling (for debugging)
-        if not getattr(self, "disable_scaling", False):
-            # Before scaling:
-            print("AGGRESSIVE_DEBUG_HYP_TORCH: Global I_full BEFORE scaling: sum =", I_full.sum().item(), 
-                  "percentiles =", torch.quantile(I_full.flatten(), torch.tensor([0.01, 0.25, 0.5, 0.75, 0.99])).tolist())
-
-            I_full = I_full * scaling_factor
-
-            # After scaling:
-            print("AGGRESSIVE_DEBUG_HYP_TORCH: Global I_full AFTER scaling: sum =", I_full.sum().item(), 
-                  "percentiles =", torch.quantile(I_full.flatten(), torch.tensor([0.01, 0.25, 0.5, 0.75, 0.99])).tolist())
-            logging.debug(f"Applied multiplicity scaling, scaling factor stats: max={scaling_factor.max()}, min={scaling_factor.min()}")
-        else:
-            logging.debug("Multiplicity scaling disabled for debugging")
+        # The manual scaling factor is applied above, so no additional scaling is needed here.
         print("DEBUG_HYP_TORCH: I_full AFTER scaling (first 10 elems):", I_full.flatten()[:10])
         if isinstance(original_sym_ops, (tuple, list)):
             self.gnm_torch.atomic_model.sym_ops = original_sym_ops[0]
