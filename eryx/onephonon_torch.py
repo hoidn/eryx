@@ -379,9 +379,9 @@ class OnePhononTorch(ModelRunner):
         
         print("AGGRESSIVE_DEBUG_HYP_TORCH: BEFORE resize_map: I_full shape =", I_full.shape, 
               "min =", I_full.min().item(), "max =", I_full.max().item(), "mean =", I_full.mean().item())
+        I_full_np = resize_map(I_full.cpu().numpy(), sampling_original, sampling_ravel)
         logging.debug("DEBUG_HYP_TORCH: After resize_map: I_full_np shape=%s, min=%.6f, max=%.6f, mean=%.6f",
                       I_full_np.shape, np.nanmin(I_full_np), np.nanmax(I_full_np), np.nanmean(I_full_np))
-        I_full_np = resize_map(I_full.cpu().numpy(), sampling_original, sampling_ravel)
         print("AGGRESSIVE_DEBUG_HYP_TORCH: AFTER resize_map: I_full_np shape =", I_full_np.shape, 
               "min =", np.nanmin(I_full_np), "max =", np.nanmax(I_full_np), "mean =", np.nanmean(I_full_np))
         print("DEBUG: I_full_np shape after resize_map =", I_full_np.shape)
