@@ -112,7 +112,9 @@ def compute_crystal_transform(pdb_path, hsampling, ksampling, lsampling, U=None,
                                         lsampling, 
                                         return_hkl=True)
     q_grid = 2*np.pi*np.inner(model.A_inv.T, hkl_grid).T
-    logging.debug("DEBUG_HYP_NP-1: q_grid shape = %s", q_grid.shape)
+    logging.debug("DEBUG_HYP_NP-1: hkl_grid shape = %s", hkl_grid.shape)
+    logging.debug("DEBUG_HYP_NP-1: q_grid (NP) shape = %s", q_grid.shape)
+    logging.debug("DEBUG_HYP_NP-1: q_grid min = %s, max = %s", q_grid.min(), q_grid.max())
     logging.debug("DEBUG_HYP_NP-1: hkl_grid shape = %s", hkl_grid.shape)
     mask, res_map = get_resolution_mask(model.cell, hkl_grid, res_limit)
     dq_map = np.around(get_dq_map(model.A_inv, hkl_grid), 5)
@@ -264,9 +266,15 @@ def incoherent_sum_real(model, hkl_grid, sampling, U=None, mask=None, batch_size
     # get symmetry information for expanded map
     sym_ops = expand_sym_ops(model.sym_ops)
     hkl_sym = get_symmetry_equivalents(hkl_grid, sym_ops)
-    print("AGGRESSIVE_DEBUG_HYP_NP: hkl_sym shape after symmetry expansion:", np.array(hkl_sym).shape)
-    print("AGGRESSIVE_DEBUG_HYP_NP: first few ravel_np groups:", ravel[:2])
-    print("AGGRESSIVE_DEBUG_HYP_NP: map_shape_ravel:", map_shape_ravel)
+    logging.debug("DEBUG_HYP_NP-2: ravel_np (first 2 groups): %s", ravel[:2])
+    logging.debug("DEBUG_HYP_NP-2: map_shape_ravel = %s", map_shape_ravel)
+    logging.debug("AGGRESSIVE_DEBUG_HYP_NP: multiplicity stats: min = %s, max = %s, mean = %s, unique = %s", 
+                  mult.min(), mult.max(), np.mean(mult), np.unique(mult))
+    logging.debug("AGGRESSIVE_DEBUG_HYP_NP: I BEFORE scaling (first 10 elems): %s", I.flatten()[:10])
+    logging.debug("AGGRESSIVE_DEBUG_HYP_NP: I AFTER scaling (first 10 elems): %s", I.flatten()[:10])
+    logging.debug("DEBUG_HYP_NP-7: Total indices in primary group = %s, Total indices after symmetry expansion = %s, Unique indices = %s", 
+                  primary_indices.size, all_indices.size, unique_indices.size)
+    logging.debug("DEBUG_HYP_NP-7: Sum over unique indices = %s, vs. total sum = %s", I_sum_unique, I_sum_total)
 
     ravel, map_shape_ravel = get_ravel_indices(hkl_sym, sampling)
     print("NP DEBUG (real): ravel indices (first few groups):", ravel[:2])
@@ -283,32 +291,6 @@ def incoherent_sum_real(model, hkl_grid, sampling, U=None, mask=None, batch_size
     for asu in range(1, ravel.shape[0]):
         I[ravel[asu]] += I_asu.copy()
     I = I.reshape(map_shape_ravel)
-    print("AGGRESSIVE_DEBUG_HYP_NP: multiplicity stats: min = %s, max = %s, mean = %s, 25th percentile = %s, 75th percentile = %s", mult.min(), mult.max(), np.mean(mult), np.percentile(mult,25), np.percentile(mult,75))
-    I_before = I.copy()
-    I /= (mult.max() / mult)
-    print("AGGRESSIVE_DEBUG_HYP_NP: I BEFORE scaling: min = %s, max = %s, mean = %s", np.nanmin(I_before), np.nanmax(I_before), np.nanmean(I_before))
-    print("AGGRESSIVE_DEBUG_HYP_NP: I AFTER scaling: min = %s, max = %s, mean = %s", np.nanmin(I), np.nanmax(I), np.nanmean(I))
-    
-    sampling_original = [(int(hkl_grid[:,i].min()),int(hkl_grid[:,i].max()),sampling[i]) for i in range(3)]
-    print("AGGRESSIVE_DEBUG_HYP_NP: BEFORE resize_map: I shape = %s, min = %s, max = %s, mean = %s", I.shape, np.nanmin(I), np.nanmax(I), np.nanmean(I))
-    print("AGGRESSIVE_DEBUG_HYP_NP: BEFORE resize_map: I shape = %s, min = %s, max = %s, mean = %s", I.shape, np.nanmin(I), np.nanmax(I), np.nanmean(I))
-    I = resize_map(I, sampling_original, sampling_ravel)
-    print("AGGRESSIVE_DEBUG_HYP_NP: AFTER resize_map: I_resized shape = %s, min = %s, max = %s, mean = %s", I.shape, np.nanmin(I), np.nanmax(I), np.nanmean(I))
-    print("AGGRESSIVE_DEBUG_HYP_NP: AFTER resize_map: I_resized shape = %s, min = %s, max = %s, mean = %s", I.shape, np.nanmin(I), np.nanmax(I), np.nanmean(I))
-    I = resize_map(I, sampling_original, sampling_ravel)
-    print("AGGRESSIVE_DEBUG_HYP_NP: AFTER resize_map: I_resized shape = %s, min = %s, max = %s, mean = %s", I.shape, np.nanmin(I), np.nanmax(I), np.nanmean(I))
-    
-    print("DEBUG_HYP_NP-3: multiplicity stats: min = %s, max = %s, unique = %s", mult.min(), mult.max(), np.unique(mult))
-    print("DEBUG_HYP_NP-6: BEFORE resize_map: I shape = %s, min = %s, max = %s, mean = %s", I.shape, np.nanmin(I), np.nanmax(I), np.nanmean(I))
-    I_resized = resize_map(I, sampling_original, sampling_ravel)
-    print("DEBUG_HYP_NP-6: AFTER resize_map: I_resized shape = %s, min = %s, max = %s, mean = %s", I_resized.shape, np.nanmin(I_resized), np.nanmax(I_resized), np.nanmean(I_resized))
-    primary_indices = np.array(ravel[0])
-    all_indices = np.concatenate(ravel, axis=0)
-    unique_indices = np.unique(all_indices)
-    print("DEBUG_HYP_NP-7: Total indices in primary group = %s, Total indices after symmetry expansion = %s, Unique indices = %s", primary_indices.size, all_indices.size, unique_indices.size)
-    I_sum_unique = I.flatten()[unique_indices].sum()
-    I_sum_total = I.sum()
-    print("DEBUG_HYP_NP-7: Sum over unique indices = %s, vs. total sum = %s", I_sum_unique, I_sum_total)
     return I_resized
     
 def incoherent_sum_reciprocal(model, hkl_grid, sampling, U=None, batch_size=10000, n_processes=8):
