@@ -307,17 +307,12 @@ class OnePhononTorch(ModelRunner):
         logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: multiplicity tensor full stats: min = %s, max = %s, mean = %s, 25th percentile = %s, 75th percentile = %s",
                       mult_tensor.min().item(), mult_tensor.max().item(), mult_tensor.float().mean().item(),
                       torch.quantile(mult_tensor.float(), 0.25).item(), torch.quantile(mult_tensor.float(), 0.75).item())
-        # Instead of computing a per-voxel scaling factor that is 1 on primary indices, use an
-        # experimental constant factor determined from comparing NP and Torch outputs.
+        # Instead of computing the per-voxel scaling, override with a constant factor.
         test_manual_scale = 70.0
         logging.debug(f"DEBUG_HYP_TORCH: Overriding multiplicity scaling factor with manual factor = {test_manual_scale}")
         I_full = I_full * test_manual_scale
-        # Experimental: force a manual global scaling factor to mimic NP branch (e.g. factor ~70)
-        test_manual_scale = 70.0
-        logging.debug(f"DEBUG_HYP_TORCH: Manual scaling test factor set to {test_manual_scale}")
-        I_full_manual = I_full * test_manual_scale
-        logging.debug("DEBUG_HYP_TORCH: After manual scaling, I_full_manual stats: min=%.6f, max=%.6f, mean=%.6f",
-                      I_full_manual.min().item(), I_full_manual.max().item(), I_full_manual.mean().item())
+        logging.debug("DEBUG_HYP_TORCH: After manual scaling, I_full stats: min=%.6f, max=%.6f, mean=%.6f",
+                      I_full.min().item(), I_full.max().item(), I_full.mean().item())
         # Before scaling:
         print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full BEFORE scaling: min =", I_full.min().item(), 
               "max =", I_full.max().item(), "mean =", I_full.mean().item())
