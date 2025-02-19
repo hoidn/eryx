@@ -1,0 +1,478 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.16, pytest-8.3.4, pluggy-1.5.0 -- /home/ollie/miniconda3_test/envs/sicilx/bin/python3.10
+cachedir: .pytest_cache
+rootdir: /home/ollie/Documents/eryx
+plugins: anyio-4.8.0
+collecting ... collected 7 items
+
+tests/test_onephonon_torch.py::TestOnePhononTorch::test_input_parameters_torch remove_ligands_and_waters(): missing entity_type in chain A
+
+-------------------------------- live log setup --------------------------------
+DEBUG    root:logging_utils.py:53 [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+       [0., 1., 0.],
+       [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0.,  1.]]), 2: array([[-1.,  0.,  0.],
+       [ 0.,  1.,  0.],
+       [ 0.,  0., -1.]]), 3: array([[ 1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0., -1.]])}, {0: array([[1., 0., 0., 0.],
+       [0., 1., 0., 0.],
+       [0., 0., 1., 0.]]), 1: array([[-1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  0.    ],
+       [ 0.    ,  0.    ,  1.    , 14.782 ]]), 2: array([[-1.    ,  0.    ,  0.    ,  0.    ],
+       [ 0.    ,  1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    ,  0.    ]])})
+DEBUG    root:logging_utils.py:112 [Array Shape] xyz initial is None
+DEBUG: Initial ff_a shape: (16, 28, 4)
+DEBUG: Initial xyz shape: (16, 28, 3)
+DEBUG    root:onephonon_torch.py:61 q_grid consistent: max diff 2.3549962069324692e-07
+DEBUG    root:onephonon_torch.py:62 q_grid shape (torch): torch.Size([450625, 3])
+DEBUG    root:onephonon_torch.py:63 q_grid values (torch): tensor([[-5.2218, -6.2279, -6.1633],
+        [-5.2218, -6.2279, -6.0925],
+        [-5.2218, -6.2279, -6.0216],
+        ...,
+        [ 5.2218,  6.2279,  6.0216],
+        [ 5.2218,  6.2279,  6.0925],
+        [ 5.2218,  6.2279,  6.1633]])
+DEBUG: Before compute_multiplicity, ff_a shape: (28, 4)
+DEBUG: Before compute_multiplicity, xyz shape: (28, 3)
+remove_ligands_and_waters(): missing entity_type in chain A
+DEBUG    root:logging_utils.py:53 [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+       [0., 1., 0.],
+       [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0.,  1.]]), 2: array([[-1.,  0.,  0.],
+       [ 0.,  1.,  0.],
+       [ 0.,  0., -1.]]), 3: array([[ 1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0., -1.]])}, {0: array([[1., 0., 0., 0.],
+       [0., 1., 0., 0.],
+       [0., 0., 1., 0.]]), 1: array([[-1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  0.    ],
+       [ 0.    ,  0.    ,  1.    , 14.782 ]]), 2: array([[-1.    ,  0.    ,  0.    ,  0.    ],
+       [ 0.    ,  1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    ,  0.    ]])})
+DEBUG    root:logging_utils.py:112 [Array Shape] xyz initial is None
+PASSED
+tests/test_onephonon_torch.py::TestOnePhononTorch::test_log_sequence_torch PASSED
+tests/test_onephonon_torch.py::TestOnePhononTorch::test_sym_ops_return_value_torch remove_ligands_and_waters(): missing entity_type in chain A
+
+-------------------------------- live log setup --------------------------------
+DEBUG    root:logging_utils.py:53 [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+       [0., 1., 0.],
+       [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0.,  1.]]), 2: array([[-1.,  0.,  0.],
+       [ 0.,  1.,  0.],
+       [ 0.,  0., -1.]]), 3: array([[ 1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0., -1.]])}, {0: array([[1., 0., 0., 0.],
+       [0., 1., 0., 0.],
+       [0., 0., 1., 0.]]), 1: array([[-1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  0.    ],
+       [ 0.    ,  0.    ,  1.    , 14.782 ]]), 2: array([[-1.    ,  0.    ,  0.    ,  0.    ],
+       [ 0.    ,  1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    ,  0.    ]])})
+DEBUG    root:logging_utils.py:112 [Array Shape] xyz initial is None
+DEBUG: Initial ff_a shape: (16, 28, 4)
+DEBUG: Initial xyz shape: (16, 28, 3)
+DEBUG    root:onephonon_torch.py:61 q_grid consistent: max diff 2.3549962069324692e-07
+DEBUG    root:onephonon_torch.py:62 q_grid shape (torch): torch.Size([450625, 3])
+DEBUG    root:onephonon_torch.py:63 q_grid values (torch): tensor([[-5.2218, -6.2279, -6.1633],
+        [-5.2218, -6.2279, -6.0925],
+        [-5.2218, -6.2279, -6.0216],
+        ...,
+        [ 5.2218,  6.2279,  6.0216],
+        [ 5.2218,  6.2279,  6.0925],
+        [ 5.2218,  6.2279,  6.1633]])
+DEBUG: Before compute_multiplicity, ff_a shape: (28, 4)
+DEBUG: Before compute_multiplicity, xyz shape: (28, 3)
+remove_ligands_and_waters(): missing entity_type in chain A
+DEBUG    root:logging_utils.py:53 [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+       [0., 1., 0.],
+       [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0.,  1.]]), 2: array([[-1.,  0.,  0.],
+       [ 0.,  1.,  0.],
+       [ 0.,  0., -1.]]), 3: array([[ 1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0., -1.]])}, {0: array([[1., 0., 0., 0.],
+       [0., 1., 0., 0.],
+       [0., 0., 1., 0.]]), 1: array([[-1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  0.    ],
+       [ 0.    ,  0.    ,  1.    , 14.782 ]]), 2: array([[-1.    ,  0.    ,  0.    ,  0.    ],
+       [ 0.    ,  1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    ,  0.    ]])})
+DEBUG    root:logging_utils.py:112 [Array Shape] xyz initial is None
+PASSED
+tests/test_onephonon_torch.py::TestOnePhononTorch::test_computation_validation_torch remove_ligands_and_waters(): missing entity_type in chain A
+
+-------------------------------- live log setup --------------------------------
+DEBUG    root:logging_utils.py:53 [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+       [0., 1., 0.],
+       [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0.,  1.]]), 2: array([[-1.,  0.,  0.],
+       [ 0.,  1.,  0.],
+       [ 0.,  0., -1.]]), 3: array([[ 1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0., -1.]])}, {0: array([[1., 0., 0., 0.],
+       [0., 1., 0., 0.],
+       [0., 0., 1., 0.]]), 1: array([[-1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  0.    ],
+       [ 0.    ,  0.    ,  1.    , 14.782 ]]), 2: array([[-1.    ,  0.    ,  0.    ,  0.    ],
+       [ 0.    ,  1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    ,  0.    ]])})
+DEBUG    root:logging_utils.py:112 [Array Shape] xyz initial is None
+DEBUG: Initial ff_a shape: (16, 28, 4)
+DEBUG: Initial xyz shape: (16, 28, 3)
+DEBUG    root:onephonon_torch.py:61 q_grid consistent: max diff 2.3549962069324692e-07
+DEBUG    root:onephonon_torch.py:62 q_grid shape (torch): torch.Size([450625, 3])
+DEBUG    root:onephonon_torch.py:63 q_grid values (torch): tensor([[-5.2218, -6.2279, -6.1633],
+        [-5.2218, -6.2279, -6.0925],
+        [-5.2218, -6.2279, -6.0216],
+        ...,
+        [ 5.2218,  6.2279,  6.0216],
+        [ 5.2218,  6.2279,  6.0925],
+        [ 5.2218,  6.2279,  6.1633]])
+DEBUG: Before compute_multiplicity, ff_a shape: (28, 4)
+DEBUG: Before compute_multiplicity, xyz shape: (28, 3)
+remove_ligands_and_waters(): missing entity_type in chain A
+DEBUG    root:logging_utils.py:53 [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+       [0., 1., 0.],
+       [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0.,  1.]]), 2: array([[-1.,  0.,  0.],
+       [ 0.,  1.,  0.],
+       [ 0.,  0., -1.]]), 3: array([[ 1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0., -1.]])}, {0: array([[1., 0., 0., 0.],
+       [0., 1., 0., 0.],
+       [0., 0., 1., 0.]]), 1: array([[-1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  0.    ],
+       [ 0.    ,  0.    ,  1.    , 14.782 ]]), 2: array([[-1.    ,  0.    ,  0.    ,  0.    ],
+       [ 0.    ,  1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    ,  0.    ]])})
+DEBUG    root:logging_utils.py:112 [Array Shape] xyz initial is None
+DEBUG_HYP3: hkl_grid shape from Torch branch: (450625, 3)
+DEBUG_HYP3: max difference between NP and Torch q_grid: 2.3549962069324692e-07
+DEBUG: ff_a shape before indexing: (4, 28, 4)
+DEBUG: ff_a shape after indexing: (28, 4)
+DEBUG: ff_b shape after indexing: (28, 4)
+DEBUG: ff_c shape after indexing: (28,)
+-------------------------------- live log call ---------------------------------
+DEBUG    root:scatter.py:30 [TestReference] Mean of form factors: 2.17854840
+-------------------------------- live log call ---------------------------------
+DEBUG    root:scatter.py:126 [TestReference] First element of structure factors: (1.2229186015783016-1.9565293130875385j)
+DEBUG: In _incoherent_sum_torch, sym_ops_rot: {0: array([[1., 0., 0.],
+       [0., 1., 0.],
+       [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0.,  1.]]), 2: array([[-1.,  0.,  0.],
+       [ 0.,  1.,  0.],
+       [ 0.,  0., -1.]]), 3: array([[ 1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0., -1.]])}
+DEBUG: In _incoherent_sum_torch, q_grid values: tensor([[-5.2218, -6.2279, -6.1633],
+        [-5.2218, -6.2279, -6.0925],
+        [-5.2218, -6.2279, -6.0216],
+        ...,
+        [ 5.2218,  6.2279,  6.0216],
+        [ 5.2218,  6.2279,  6.0925],
+        [ 5.2218,  6.2279,  6.1633]])
+DEBUG: In _incoherent_sum_torch, input hkl_grid shape: (450625, 3)
+DEBUG: In _incoherent_sum_torch, input hkl_grid values: [[ -4.         -17.         -29.        ]
+ [ -4.         -17.         -28.66666667]
+ [ -4.         -17.         -28.33333333]
+ ...
+ [  4.          17.          28.33333333]
+ [  4.          17.          28.66666667]
+ [  4.          17.          29.        ]]
+DEBUG: atomic_model.sym_ops[0]: {0: array([[1., 0., 0.],
+       [0., 1., 0.],
+       [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0.,  1.]]), 2: array([[-1.,  0.,  0.],
+       [ 0.,  1.,  0.],
+       [ 0.,  0., -1.]]), 3: array([[ 1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0., -1.]])}
+DEBUG: atomic_model.sym_ops[1]: {0: array([[1., 0., 0., 0.],
+       [0., 1., 0., 0.],
+       [0., 0., 1., 0.]]), 1: array([[-1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  0.    ],
+       [ 0.    ,  0.    ,  1.    , 14.782 ]]), 2: array([[-1.    ,  0.    ,  0.    ,  0.    ],
+       [ 0.    ,  1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    ,  0.    ]])}
+DEBUG: hkl_sym shape after symmetry expansion: (4, 450625, 3)
+DEBUG: hkl_sym values after symmetry expansion: [[[ -4.         -17.         -29.        ]
+  [ -4.         -17.         -28.66666667]
+  [ -4.         -17.         -28.33333333]
+  ...
+  [  4.          17.          28.33333333]
+  [  4.          17.          28.66666667]
+  [  4.          17.          29.        ]]
+
+ [[  4.          17.         -29.        ]
+  [  4.          17.         -28.66666667]
+  [  4.          17.         -28.33333333]
+  ...
+  [ -4.         -17.          28.33333333]
+  [ -4.         -17.          28.66666667]
+  [ -4.         -17.          29.        ]]
+
+ [[  4.         -17.          29.        ]
+  [  4.         -17.          28.66666667]
+  [  4.         -17.          28.33333333]
+  ...
+  [ -4.          17.         -28.33333333]
+  [ -4.          17.         -28.66666667]
+  [ -4.          17.         -29.        ]]
+
+ [[ -4.          17.          29.        ]
+  [ -4.          17.          28.66666667]
+  [ -4.          17.          28.33333333]
+  ...
+  [  4.         -17.         -28.33333333]
+  [  4.         -17.         -28.66666667]
+  [  4.         -17.         -29.        ]]]
+DEBUG_HYP4: ravel_np (first few groups): [[     0      1      2 ... 450622 450623 450624]
+ [450450 450451 450452 ...    172    173    174]]
+DEBUG_HYP4: map_shape_ravel: (25, 103, 175)
+DEBUG: ravel_np (first few groups): [[     0      1      2 ... 450622 450623 450624]
+ [450450 450451 450452 ...    172    173    174]]
+DEBUG: ravel_np (all groups): [[     0      1      2 ... 450622 450623 450624]
+ [450450 450451 450452 ...    172    173    174]
+ [432774 432773 432772 ...  17852  17851  17850]
+ [ 18024  18023  18022 ... 432602 432601 432600]]
+DEBUG: map_shape_ravel: (25, 103, 175)
+DEBUG    root:onephonon_torch.py:221 [OnePhononTorch._incoherent_sum_torch] map_shape_ravel: (25, 103, 175), np.prod(map_shape_ravel): 450625
+DEBUG    root:onephonon_torch.py:241 I_full values after symmetry correction: tensor([1.4955, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 1.4955])
+DEBUG_HYP1: multiplicity tensor shape: torch.Size([25, 103, 175])
+DEBUG_HYP1: multiplicity tensor (min, max, unique): 1.0 8.0 tensor([1., 2., 4., 8.])
+DEBUG_HYP1: computed scaling factor (first 10 elems): tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])
+DEBUG_HYP1: I_full BEFORE scaling (first 10 elems): tensor([1.4955, 0.0000, 0.0000, 1.1323, 0.0000, 0.0000, 0.3717, 0.0000, 0.0000,
+        0.1851])
+DEBUG    root:onephonon_torch.py:270 Applied multiplicity scaling, scaling factor stats: max=8.0, min=1.0
+DEBUG_HYP1: I_full AFTER scaling (first 10 elems): tensor([1.4955, 0.0000, 0.0000, 1.1323, 0.0000, 0.0000, 0.3717, 0.0000, 0.0000,
+        0.1851])
+DEBUG: multiplicity tensor shape: torch.Size([25, 103, 175])
+DEBUG: multiplicity unique values: tensor([1., 2., 4., 8.])
+DEBUG: multiplicity max (scalar): 8.0
+DEBUG: I_full before scaling (first 10 elems): tensor([1.4955, 0.0000, 0.0000, 1.1323, 0.0000, 0.0000, 0.3717, 0.0000, 0.0000,
+        0.1851])
+DEBUG: I_full after scaling (first 10 elems): tensor([1.4955, 0.0000, 0.0000, 1.1323, 0.0000, 0.0000, 0.3717, 0.0000, 0.0000,
+        0.1851])
+DEBUG    root:onephonon_torch.py:307 Original sampling: [(-4, 4, 3), (-17, 17, 3), (-29, 29, 3)]; sampling_ravel: [(-4.0, 4.0, 3), (-17.0, 17.0, 3), (-29.0, 29.0, 3)]
+DEBUG: self.hkl_grid.shape = (450625, 3)
+DEBUG: self.map_shape = (25, 103, 175)
+DEBUG: sampling_original = [(-4, 4, 3), (-17, 17, 3), (-29, 29, 3)]
+DEBUG: sampling_ravel = [(-4.0, 4.0, 3), (-17.0, 17.0, 3), (-29.0, 29.0, 3)]
+DEBUG: np.prod(map_shape_ravel) = 450625
+DEBUG: I_full_np shape after resize_map = (25, 103, 175)
+DEBUG_HYP2: I_full_np shape after resize_map: (25, 103, 175)
+DEBUG_HYP2: I_full_np (first 10 elems) after resize_map: [1.49553    0.         0.         1.1322944  0.         0.
+ 0.3717267  0.         0.         0.18513206]
+TEST_HYP: scaled diffuse intensity stats -- min: 0.000000, max: 1.069020, mean: 0.000313
+TEST_HYP: first 10 elements of scaled map: [3.7388253e-04 0.0000000e+00 0.0000000e+00 2.8307360e-04 0.0000000e+00
+ 0.0000000e+00 9.2931674e-05 0.0000000e+00 0.0000000e+00 4.6283018e-05]
+DEBUG    root:onephonon_torch.py:137 Id (diffuse intensity) shape: torch.Size([450625]), device: cpu
+DEBUG    root:onephonon_torch.py:138 Id (diffuse intensity) values: tensor([1.4955, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 1.4955])
+DEBUG    root:logging_utils.py:53 [OnePhononTorch.apply_disorder] Return value: tensor([1.4955, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 1.4955])
+FAILED
+tests/test_onephonon_torch.py::TestOnePhononTorch::test_edge_case_invalid_gamma_torch PASSED
+tests/test_onephonon_torch.py::TestOnePhononTorch::test_device_placement remove_ligands_and_waters(): missing entity_type in chain A
+
+-------------------------------- live log setup --------------------------------
+DEBUG    root:logging_utils.py:53 [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+       [0., 1., 0.],
+       [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0.,  1.]]), 2: array([[-1.,  0.,  0.],
+       [ 0.,  1.,  0.],
+       [ 0.,  0., -1.]]), 3: array([[ 1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0., -1.]])}, {0: array([[1., 0., 0., 0.],
+       [0., 1., 0., 0.],
+       [0., 0., 1., 0.]]), 1: array([[-1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  0.    ],
+       [ 0.    ,  0.    ,  1.    , 14.782 ]]), 2: array([[-1.    ,  0.    ,  0.    ,  0.    ],
+       [ 0.    ,  1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    ,  0.    ]])})
+DEBUG    root:logging_utils.py:112 [Array Shape] xyz initial is None
+DEBUG: Initial ff_a shape: (16, 28, 4)
+DEBUG: Initial xyz shape: (16, 28, 3)
+DEBUG    root:onephonon_torch.py:61 q_grid consistent: max diff 2.3549962069324692e-07
+DEBUG    root:onephonon_torch.py:62 q_grid shape (torch): torch.Size([450625, 3])
+DEBUG    root:onephonon_torch.py:63 q_grid values (torch): tensor([[-5.2218, -6.2279, -6.1633],
+        [-5.2218, -6.2279, -6.0925],
+        [-5.2218, -6.2279, -6.0216],
+        ...,
+        [ 5.2218,  6.2279,  6.0216],
+        [ 5.2218,  6.2279,  6.0925],
+        [ 5.2218,  6.2279,  6.1633]])
+DEBUG: Before compute_multiplicity, ff_a shape: (28, 4)
+DEBUG: Before compute_multiplicity, xyz shape: (28, 3)
+remove_ligands_and_waters(): missing entity_type in chain A
+DEBUG    root:logging_utils.py:53 [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+       [0., 1., 0.],
+       [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0.,  1.]]), 2: array([[-1.,  0.,  0.],
+       [ 0.,  1.,  0.],
+       [ 0.,  0., -1.]]), 3: array([[ 1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0., -1.]])}, {0: array([[1., 0., 0., 0.],
+       [0., 1., 0., 0.],
+       [0., 0., 1., 0.]]), 1: array([[-1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  0.    ],
+       [ 0.    ,  0.    ,  1.    , 14.782 ]]), 2: array([[-1.    ,  0.    ,  0.    ,  0.    ],
+       [ 0.    ,  1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    ,  0.    ]])})
+DEBUG    root:logging_utils.py:112 [Array Shape] xyz initial is None
+DEBUG_HYP3: hkl_grid shape from Torch branch: (450625, 3)
+DEBUG_HYP3: max difference between NP and Torch q_grid: 2.3549962069324692e-07
+DEBUG: ff_a shape before indexing: (4, 28, 4)
+DEBUG: ff_a shape after indexing: (28, 4)
+DEBUG: ff_b shape after indexing: (28, 4)
+DEBUG: ff_c shape after indexing: (28,)
+-------------------------------- live log call ---------------------------------
+DEBUG    root:scatter.py:30 [TestReference] Mean of form factors: 2.17854840
+-------------------------------- live log call ---------------------------------
+DEBUG    root:scatter.py:126 [TestReference] First element of structure factors: (1.2229186015783016-1.9565293130875385j)
+PASSED
+tests/test_onephonon_torch.py::TestOnePhononTorch::test_cuda_vs_cpu SKIPPED
+
+=================================== FAILURES ===================================
+_____________ TestOnePhononTorch.test_computation_validation_torch _____________
+
+self = <test_onephonon_torch.TestOnePhononTorch object at 0x7802fe1ee2f0>
+onephonon_torch = <eryx.onephonon_torch.OnePhononTorch object at 0x7802fe1edc00>
+
+    def test_computation_validation_torch(self, onephonon_torch):
+        """
+        Verify that the diffraction pattern computed by the torch model matches
+        the ground-truth reference (using rtol=1e-2).
+        """
+        Id = onephonon_torch.apply_disorder()
+        # Ensure the result stays on the device until final comparison
+        Id_np = Id.detach().cpu().numpy().reshape(onephonon_torch.map_shape)
+        ref = np.load("tests/test_data/reference/np_diffuse_intensity.npy")
+        valid_mask = ~np.isnan(ref)
+>       np.testing.assert_allclose(
+            Id_np.flatten()[valid_mask.flatten()],
+            ref.flatten()[valid_mask.flatten()],
+            rtol=1e-2,
+            err_msg="Computed diffraction pattern does not match reference data"
+        )
+
+tests/test_onephonon_torch.py:115: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (<function assert_allclose.<locals>.compare at 0x7802f8d69630>, array([1.49553, 0.     , 0.     , ..., 0.     , 0.    ...     dtype=float32), array([12.76820455, 38.82012753, 45.01087587, ..., 45.01087587,
+       38.82012753, 12.76820455]))
+kwds = {'equal_nan': True, 'err_msg': 'Computed diffraction pattern does not match reference data', 'header': 'Not equal to tolerance rtol=0.01, atol=0', 'verbose': True}
+
+    @wraps(func)
+    def inner(*args, **kwds):
+        with self._recreate_cm():
+>           return func(*args, **kwds)
+E           AssertionError: 
+E           Not equal to tolerance rtol=0.01, atol=0
+E           Computed diffraction pattern does not match reference data
+E           Mismatched elements: 450593 / 450625 (100%)
+E           Max absolute difference: 4276.08056641
+E           Max relative difference: 81.40414395
+E            x: array([1.49553, 0.     , 0.     , ..., 0.     , 0.     , 1.49553],
+E                 dtype=float32)
+E            y: array([12.768205, 38.820128, 45.010876, ..., 45.010876, 38.820128,
+E                  12.768205])
+
+../../miniconda3_test/envs/sicilx/lib/python3.10/contextlib.py:79: AssertionError
+------------------------------ Captured log setup ------------------------------
+DEBUG    root:logging_utils.py:53 [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+       [0., 1., 0.],
+       [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0.,  1.]]), 2: array([[-1.,  0.,  0.],
+       [ 0.,  1.,  0.],
+       [ 0.,  0., -1.]]), 3: array([[ 1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0., -1.]])}, {0: array([[1., 0., 0., 0.],
+       [0., 1., 0., 0.],
+       [0., 0., 1., 0.]]), 1: array([[-1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  0.    ],
+       [ 0.    ,  0.    ,  1.    , 14.782 ]]), 2: array([[-1.    ,  0.    ,  0.    ,  0.    ],
+       [ 0.    ,  1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    ,  0.    ]])})
+DEBUG    root:logging_utils.py:112 [Array Shape] xyz initial is None
+DEBUG    root:onephonon_torch.py:61 q_grid consistent: max diff 2.3549962069324692e-07
+DEBUG    root:onephonon_torch.py:62 q_grid shape (torch): torch.Size([450625, 3])
+DEBUG    root:onephonon_torch.py:63 q_grid values (torch): tensor([[-5.2218, -6.2279, -6.1633],
+        [-5.2218, -6.2279, -6.0925],
+        [-5.2218, -6.2279, -6.0216],
+        ...,
+        [ 5.2218,  6.2279,  6.0216],
+        [ 5.2218,  6.2279,  6.0925],
+        [ 5.2218,  6.2279,  6.1633]])
+DEBUG    root:logging_utils.py:53 [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+       [0., 1., 0.],
+       [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0.,  1.]]), 2: array([[-1.,  0.,  0.],
+       [ 0.,  1.,  0.],
+       [ 0.,  0., -1.]]), 3: array([[ 1.,  0.,  0.],
+       [ 0., -1.,  0.],
+       [ 0.,  0., -1.]])}, {0: array([[1., 0., 0., 0.],
+       [0., 1., 0., 0.],
+       [0., 0., 1., 0.]]), 1: array([[-1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  0.    ],
+       [ 0.    ,  0.    ,  1.    , 14.782 ]]), 2: array([[-1.    ,  0.    ,  0.    ,  0.    ],
+       [ 0.    ,  1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
+       [ 0.    , -1.    ,  0.    ,  8.5755],
+       [ 0.    ,  0.    , -1.    ,  0.    ]])})
+DEBUG    root:logging_utils.py:112 [Array Shape] xyz initial is None
+------------------------------ Captured log call -------------------------------
+DEBUG    root:scatter.py:126 [TestReference] First element of structure factors: (1.2229186015783016-1.9565293130875385j)
+DEBUG    root:onephonon_torch.py:221 [OnePhononTorch._incoherent_sum_torch] map_shape_ravel: (25, 103, 175), np.prod(map_shape_ravel): 450625
+DEBUG    root:onephonon_torch.py:241 I_full values after symmetry correction: tensor([1.4955, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 1.4955])
+DEBUG    root:onephonon_torch.py:270 Applied multiplicity scaling, scaling factor stats: max=8.0, min=1.0
+DEBUG    root:onephonon_torch.py:307 Original sampling: [(-4, 4, 3), (-17, 17, 3), (-29, 29, 3)]; sampling_ravel: [(-4.0, 4.0, 3), (-17.0, 17.0, 3), (-29.0, 29.0, 3)]
+DEBUG    root:onephonon_torch.py:137 Id (diffuse intensity) shape: torch.Size([450625]), device: cpu
+DEBUG    root:onephonon_torch.py:138 Id (diffuse intensity) values: tensor([1.4955, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 1.4955])
+DEBUG    root:logging_utils.py:53 [OnePhononTorch.apply_disorder] Return value: tensor([1.4955, 0.0000, 0.0000,  ..., 0.0000, 0.0000, 1.4955])
+=============================== warnings summary ===============================
+tests/test_onephonon_torch.py::TestOnePhononTorch::test_computation_validation_torch
+  /home/ollie/Documents/eryx/eryx/onephonon_torch.py:134: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+    q_grid_torch = torch.tensor(self.q_grid, device=self.device, dtype=torch.float32)
+
+tests/test_onephonon_torch.py::TestOnePhononTorch::test_computation_validation_torch
+  /home/ollie/Documents/eryx/eryx/onephonon_torch.py:185: UserWarning: Casting complex values to real discards the imaginary part (Triggered internally at /pytorch/aten/src/ATen/native/Copy.cpp:308.)
+    results_tensor = torch.from_numpy(results_np).to(self.device, dtype=torch.float32).clone().detach()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_onephonon_torch.py::TestOnePhononTorch::test_computation_validation_torch
+============== 1 failed, 5 passed, 1 skipped, 2 warnings in 3.18s ==============

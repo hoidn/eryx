@@ -110,7 +110,7 @@ class TestOnePhononTorch:
         Id = onephonon_torch.apply_disorder()
         # Ensure the result stays on the device until final comparison
         Id_np = Id.detach().cpu().numpy().reshape(onephonon_torch.map_shape)
-        ref = np.load("tests/test_data/reference/diffraction_pattern.npy")
+        ref = np.load("tests/test_data/reference/np_diffuse_intensity.npy")
         valid_mask = ~np.isnan(ref)
         np.testing.assert_allclose(
             Id_np.flatten()[valid_mask.flatten()],

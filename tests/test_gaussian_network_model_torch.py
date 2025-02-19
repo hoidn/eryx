@@ -161,7 +161,8 @@ def test_k_matrix_torch(gnm_model_torch):
     kvec = torch.tensor([1.0, 0.0, 0.0], device=gnm_model_torch.device, dtype=torch.float64)
     Kmat_torch = gnm_model_torch.compute_K_torch(hessian_torch, kvec=kvec)
     Kmat_np = gnm_model_torch.compute_K(hessian_torch, kvec=kvec).cpu().numpy()
-    np.testing.assert_allclose(Kmat_torch.cpu().numpy(), Kmat_np.reshape(-1, -1), rtol=1e-5,
+    # TODO convert back and forth from block structured to 2d
+    np.testing.assert_allclose(Kmat_torch.cpu().numpy(), Kmat_np.reshape(Kmat_torch.cpu().numpy().shape), rtol=1e-5,
                                err_msg="K-matrix mismatch between Torch and NP methods")
 
 def test_phonon_modes_torch(gnm_model_torch):

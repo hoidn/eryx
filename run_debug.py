@@ -14,9 +14,6 @@ console.setLevel(logging.DEBUG)
 console.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
 logging.getLogger("").addHandler(console)
 
-import numpy as np
-from eryx.onephonon_torch import OnePhononTorch
-from eryx.models import OnePhonon
 
 def setup_logging():
     # Remove any existing handlers.
@@ -88,14 +85,12 @@ def run_torch():
     # Save for later comparison
     np.save("torch_diffuse_intensity.npy", Id_torch.detach().cpu().numpy())
 
-def main():
-    setup_logging()
-    run_np()
-    run_torch()
-    logging.info("Completed debug run. Please check debug_output.log, np_diffuse_intensity.npy and torch_diffuse_intensity.npy")
-
 if __name__ == "__main__":
-    main()
+    setup_logging()
+    import numpy as np
+    from eryx.onephonon_torch import OnePhononTorch
+    from eryx.models import OnePhonon
+
     # After setting up and importing everything, call the run routines.
     run_np()
     run_torch()

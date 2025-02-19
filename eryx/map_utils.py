@@ -44,18 +44,30 @@ def generate_grid(A_inv, hsampling, ksampling, lsampling, return_hkl=False):
         return q_grid, map_shape
 
 def get_symmetry_equivalents(hkl_grid, sym_ops):
-    hkl_list = []
-    for key, op in sym_ops.items():
-        print(f"DEBUG: Processing symmetry op key {key}, op.shape: {op.shape}")
-        # Compute the rotated grid and force 2D shape
-        hkl_grid_rot = np.dot(hkl_grid, op.T)
-        hkl_grid_rot = np.atleast_2d(hkl_grid_rot)
-        print(f"DEBUG: For key {key}, hkl_grid_rot.shape: {hkl_grid_rot.shape} (expected: (n_points, 3))")
-        hkl_list.append(hkl_grid_rot)
-
-    stacked = np.stack(hkl_list, axis=0)
-    print(f"DEBUG: Final stacked symmetry grid shape: {stacked.shape}")
-    return stacked
+    """
+    Get symmetry equivalent Miller indices of input hkl_grid.
+    The symmetry-equivalents are stacked horizontally, so that
+    the first dimension of the output array corresponds to the
+    nth asymmetric unit.
+    
+    Parameters
+    ----------
+    hkl_grid : numpy.ndarray, shape (n_points, 3)
+        hkl indices corresponding to flattened intensity map
+    sym_ops : dict
+        rotational symmetry operations as 3x3 arrays
+        
+    Returns
+    -------
+    hkl_grid_sym : numpy.ndarray, shape (n_asu, n_points, 3)
+        stacked hkl indices of symmetry-equivalents
+    """
+    hkl_grid_sym = np.empty(3)
+    for i,rot in sym_ops.items():
+        hkl_grid_rot = np.matmul(hkl_grid, rot)
+        hkl_grid_sym = np.vstack((hkl_grid_sym, hkl_grid_rot))
+    hkl_grid_sym = hkl_grid_sym[1:]
+    return hkl_grid_sym.reshape(len(sym_ops), hkl_grid.shape[0], 3)
     
 def get_ravel_indices(hkl_grid_sym, sampling):
     """
@@ -158,38 +170,20 @@ def get_hkl_extents(cell, resolution, oversampling=1):
 def expand_sym_ops(sym_ops):
     """
     Expand symmetry operations to include Friedel equivalents.
-
+    
     Parameters
     ----------
-    sym_ops : dict or tuple/list of dict
-        rotational symmetry operations as 3x3 matrices.
-        If a tuple or nested dict is provided, only the raw matrices are used.
+    sym_ops : dict
+        rotational symmetry operations as 3x3 matrices
     
     Returns
     -------
     sym_ops_exp : dict
-        The input symmetry operations, plus their negative (Friedel) counterparts.
+        sym_ops, expanded to account for Friedel symmetry
     """
-    # If sym_ops is a tuple or list, use its first element.
-    if isinstance(sym_ops, (tuple, list)):
-        sym_ops = sym_ops[0]
-    # If any value in sym_ops is a dict, merge them into one flat dict.
-    if any(isinstance(val, dict) for val in sym_ops.values()):
-        merged = {}
-        for sub in sym_ops.values():
-            if isinstance(sub, dict):
-                merged.update(sub)
-            else:
-                # If a non-dict value is encountered, add it with a new key.
-                merged[len(merged)] = sub
-        sym_ops = merged
     sym_ops_exp = dict(sym_ops)
-    n = len(sym_ops)
-    for key, op in sym_ops.items():
-        # For each op, op should be a numpy array; if not, skip expansion for that key.
-        if not isinstance(op, np.ndarray):
-            continue
-        sym_ops_exp[key + n] = -1 * op
+    for key in sym_ops:
+        sym_ops_exp[key + len(sym_ops)] = -1 * sym_ops[key]
     return sym_ops_exp
 
 def compute_multiplicity(model, hsampling, ksampling, lsampling):
@@ -216,11 +210,7 @@ def compute_multiplicity(model, hsampling, ksampling, lsampling):
     """
     sym_ops_exp = expand_sym_ops(model.sym_ops)
     hkl_grid, map_shape = generate_grid(model.A_inv, hsampling, ksampling, lsampling, return_hkl=True)
-    # Filter to keep only symmetry operators whose dot–product output would have the same number of columns as hkl_grid.
-    valid_sym_ops = { key: op for key, op in sym_ops_exp.items() if op.shape[1] == hkl_grid.shape[1] }
-    if not valid_sym_ops:
-        raise ValueError("No symmetry operators match the grid dimensions.")
-    hkl_sym = get_symmetry_equivalents(hkl_grid, valid_sym_ops)
+    hkl_sym = get_symmetry_equivalents(hkl_grid, sym_ops_exp)
     ravel, map_shape_ravel = get_ravel_indices(hkl_sym, (hsampling[2], ksampling[2], lsampling[2]))
     multiplicity = (np.diff(np.sort(ravel.T,axis=1),axis=1)!=0).sum(axis=1)+1
     return hkl_grid, multiplicity.reshape(map_shape)
