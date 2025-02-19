@@ -143,3 +143,43 @@ def test_cuda_vs_cpu():
         hessian_cuda = model_cuda.compute_hessian()
         hessian_cpu = model_cpu.compute_hessian()
         assert torch.allclose(hessian_cuda.cpu(), hessian_cpu.cpu(), rtol=1e-7)
+
+def test_hessian_torch(gnm_model_torch):
+    """
+    Verify that the torch-computed Hessian matches the numpy version within tolerance.
+    """
+    hessian_torch = gnm_model_torch.compute_hessian_torch()
+    hessian_np = gnm_model_torch.compute_hessian().cpu().numpy()
+    np.testing.assert_allclose(hessian_torch.cpu().numpy(), hessian_np, rtol=1e-5,
+                               err_msg="Hessian mismatch between Torch and NP methods")
+
+def test_k_matrix_torch(gnm_model_torch):
+    """
+    Check that the K-matrix computed using Torch matches the numpy version.
+    """
+    hessian_torch = gnm_model_torch.compute_hessian_torch()
+    kvec = torch.tensor([1.0, 0.0, 0.0], device=gnm_model_torch.device, dtype=torch.float64)
+    Kmat_torch = gnm_model_torch.compute_K_torch(hessian_torch, kvec=kvec)
+    Kmat_np = gnm_model_torch.compute_K(hessian_torch, kvec=kvec).cpu().numpy()
+    np.testing.assert_allclose(Kmat_torch.cpu().numpy(), Kmat_np, rtol=1e-5,
+                               err_msg="K-matrix mismatch between Torch and NP methods")
+
+def test_phonon_modes_torch(gnm_model_torch):
+    """
+    Validate the computed phonon modes (frequencies and eigenvectors) using Torch.
+    """
+    gnm_model_torch.compute_gnm_phonons_torch()
+    V = gnm_model_torch.V.cpu().numpy()
+    Winv = gnm_model_torch.Winv.cpu().numpy()
+    assert not np.isnan(V).any(), "Eigenvectors contain NaN values"
+    assert (Winv > 0).all(), "Inverse squared frequencies should be positive"
+
+def test_gradient_flow(gnm_model_torch):
+    """
+    Verify that gradients propagate through the entire phonon computation.
+    """
+    gnm_model_torch.gamma.requires_grad_()
+    gnm_model_torch.compute_gnm_phonons_torch()
+    loss = sum([winv.sum() for winv in gnm_model_torch.Winv])
+    loss.backward()
+    assert gnm_model_torch.gamma.grad is not None, "Gradients did not propagate to the gamma parameter"
