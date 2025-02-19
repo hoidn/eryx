@@ -6,12 +6,14 @@ logging.debug("AGGRESSIVE_HELLO_SCATTER_NP")
 
 def setup_logging_worker():
     import logging
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s %(levelname)s: %(message)s",
-        filename="debug_output.log",
-        filemode="a"  # append so messages from workers add into the same log
-    )
+    # Only configure logging if no handlers have been set up yet.
+    if not logging.getLogger().handlers:
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(asctime)s %(levelname)s: %(message)s",
+            filename="debug_output.log",
+            filemode="a"  # append so worker messages join the same log
+        )
 from functools import partial
 
 def compute_form_factors(q_grid, ff_a, ff_b, ff_c):
