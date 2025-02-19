@@ -1,68 +1,46 @@
-# Debugging Strategy: Grid Consistency and Diffuse Intensity Comparison
-
-# Debugging Report: Hypotheses and Future Steps for Diffuse Intensity Discrepancies
+# Updated Debugging Strategy: Diffuse Intensity Scale Mismatch in OnePhononTorch
 
 ## Background
 
-Our recent debugging efforts have focused on comparing the intermediate outputs of the NP (NumPy) implementation and the Torch implementation of the one-phonon diffuse scattering model. We have inserted detailed and “numbered” debug print statements (using prefixes such as `DEBUG_HYP_NP-1`/`DEBUG_HYP_TORCH` and `AGGRESSIVE_DEBUG_HYP_*`) into both code paths to allow a step-by-step comparison of:
+The failing test indicates that the computed diffuse intensity from the Torch branch (after calling `apply_disorder()`) is much lower (e.g. first few nonzero values ≈ 0.18–0.63) than the corresponding NP reference values (e.g. roughly 12–45). In addition, the overall maximum relative difference is enormous (max relative ≈ 9356, absolute differences on the order of millions). Note that the debug outputs reveal:
 
-- Grid generation (hkl_grid and q_grid shapes, coordinate ranges, and differences)
-- Symmetry expansion (ravel indices, map shapes, and the list of symmetry groups)
-- Multiplicity computation and the statistics thereof (min, max, mean, quartile values)
-- The scaling step (how the intensity arrays are corrected with multiplicity factors)
+- The structure–factor calculations for each ASU (using the function `structure_factors`) yield similar shapes and statistical profiles in both branches.
+- The symmetry copying step in `_incoherent_sum_torch()` shows that the “primary group” indices span the full grid.
+- The multiplicity map computed (using `compute_multiplicity`) has a shape of (25, 103, 175) with unique values [1, 2, 4, 8]. In the Torch branch, the scaling factor is computed as `mult_tensor.max() / mult_tensor`. However, at primary (i.e. the voxel indices where the intensity is directly computed) the multiplicity value appears to be 8 everywhere, so the scaling factor becomes 1.0.  
+- In the NP branch the raw intensity is later scaled (or effectively summed) to give the reference values on the order of tens, while the Torch branch output remains several tens of milli-units.
 
 ## Hypotheses
 
-Based on our current debug output, we have formulated several hypotheses regarding the differences in diffuse intensity between the NP and Torch branches:
+1. **Multiplicity Scaling Discrepancy:**  
+   In the NP branch, the full (or unflattened) multiplicity distribution is used to rescale the diffuse intensity. In the Torch branch, however, only the primary-group indices (which all have the maximal multiplicity, here 8) are used—thus, the computed scaling factor is unity at those voxels. If the NP branch is effectively summing contributions from all symmetry‐equivalent groups (or applying a different scaling), the Torch branch would under‐estimate the amplitude by roughly a factor of 70 (e.g. reference 12.77 versus computed 0.1842, ratio ~70).
 
-1. **Grid and Sampling Consistency**  
-   Both branches generate nearly identical q_grids and hkl_grids (with maximum differences on the order of 10⁻⁷).  
-   **Hypothesis:** The discrepancy is not originating from the grid generation.
+2. **Mismatch in Sampling/Resizing Routines:**  
+   The NP branch computes the multiplicity using the original (hkl) sampling and then applies a subsequent call to `resize_map()`. The Torch branch, on the other hand, calls `get_centered_sampling()` and passes the result to `compute_multiplicity()` only after the symmetry‐copy step. A subtle difference in the interpretation of the sampling parameters and/or the ordering of the grid may lead to a different (lower) overall amplitude.
 
-2. **Symmetry Expansion and Raveling**  
-   The NP implementation computes symmetry equivalents and then uses ravel indices to “copy” the primary intensity values across symmetry-related groups.  
-   In the Torch branch, we are performing two sequential symmetry-copy loops (even though our debug prints show that the “first element” is identical before and after each copying step).  
-   **Hypothesis:** Although the duplicate symmetry-copy loops do not appear to add intensity when inspected per group, there may be a subtle difference in how the symmetry groups or duplicate contributions are handled between NP and Torch. Our goal is to compare the union of ravel indices and the sum over unique indices in both cases.
+3. **Accumulation and Symmetry Copy Issues:**  
+   The symmetry expansion in the Torch branch uses two sequential “copy loops”. It is possible that these loops are not correctly accumulating contributions from all ASUs in the same way as the NP branch. Although the debug prints show that the copy operations do not change voxel values (i.e. “before” and “after” values match), the overall summing over all symmetry groups might be incomplete compared with the NP procedure.
 
-3. **Multiplicity Correction and Scaling**  
-   In both branches, the computed multiplicity (the number of symmetry-equivalent contributions per voxel) leads to an element‐wise scaling factor computed as `mult.max() / mult`.  
-   In our logs, while the “first 10 elements” of scaling factors look correct (i.e. they are 1), the global statistics differ: the NP branch’s raw diffuse intensity, when scaled, remains within expected values, whereas the Torch branch shows a nearly doubled global sum.  
-   **Hypothesis:** Differences in the distribution of multiplicity values (even subtle differences in the treatment of borderline cases) cause the Torch branch to apply an overly aggressive scaling in regions where multiplicity is lower than the maximum. This results in globally higher intensities in the Torch branch after scaling.
-   
-4. **Downstream Resizing / Interpolation Effects**  
-   Both branches use the `resize_map` function to crop or adjust the computed maps based on the sampling parameters.  
-   **Hypothesis:** There may be differences in the interpretation or ordering of the sampling parameters following the symmetry and scaling steps. Our plan is to compare “resize_map” outputs side by side via equivalent debug prints in both NP and Torch.
+## Proposed Debugging Strategy
 
-## Planned Future Debugging Steps
+a. **Intermediate Comparison of Structure Factor Outputs:**  
+   - Before summing over ASUs, log the structure–factor outputs per ASU (both in NP and via torch conversion) and compare their amplitude histograms.  
+   - Verify that the summed complex structure factors (before taking the square of the modulus) match between the NP branch and the Torch branch over the same q‐points.
 
-To further isolate the root cause of the discrepancy, we will undertake the following steps:
+b. **Examine the Multiplicity Map:**
+   - Insert additional logging to output the full multiplicity map (and its statistical distribution) as computed by `compute_multiplicity` in both NP and Torch routines.  
+   - Compare not only the global statistics but also a voxel–by–voxel comparison (or histograms) for the primary indices (those used to populate I_torch). An inconsistency here would indicate that the scaling factor is not being applied correctly.
 
-1. **Side-by-Side Comparison of Intermediate Outputs:**  
-   - Using the numbered debug prints (DEBUG_HYP_NP-1, -2,…, and DEBUG_HYP_TORCH, AGGRESSIVE_DEBUG_HYP_*), we will directly compare:
-     - The grid shapes and coordinate ranges.
-     - The ravel indices and map shapes after symmetry expansion.
-     - Global and voxel-level multiplicity statistics (min, max, mean, percentiles) from each branch.
+c. **Test the Resize Map Function Separately:**  
+   - Temporarily bypass or isolate the call to `resize_map` in the Torch branch and compare the pre–resize intensity array (i.e. the “I_full” computed on the grid) with the NP result.
+   - Ensure that the sampling parameters passed to `resize_map` in the Torch branch exactly mirror those of the NP branch.
 
-2. **Examine Symmetry-Copying Procedures:**  
-   - Confirm whether the duplicate symmetry-copy loops in the Torch branch behave identically to the NP branch.  
-   - Although our initial test of removing one copy loop did not change the global sum (since the copy is idempotent), further comparison of the “unique” versus “total” indices (the sums over unique indices) will reveal whether intensity contributions are aggregated in an equivalent manner.
+d. **Check Symmetry–Copy Behavior:**
+   - Verify that the list of ravel indices (`ravel_np`) and the corresponding symmetry groups are identical between the NP and Torch implementations.
+   - Consider (temporarily) disabling one of the copy loops in the Torch branch to check if the global sum changes accordingly.
+   - Log the sums per symmetry group in both branches.
 
-3. **Detailed Analysis of Multiplicity Correction:**  
-   - Compare full histograms and percentiles of the multiplicity arrays in both NP and Torch.  
-   - Investigate if there are regions where the Torch branch records multiplicity values lower than expected, thus forcing a larger scaling factor (i.e. when `mult < mult.max()` in many voxels) relative to NP.
-   - We will temporarily disable the multiplicity scaling step in the Torch branch to see if the outlier global sums are eliminated. This would further support that the scaling (and underlying multiplicity distribution) is the main culprit.
+e. **Adjust Multiplicity Scaling Experimentally:**  
+   - Experiment by forcing the multiplicity scaling factor in the Torch branch to mimic the NP branch. For example, manually test multiplying the computed I_full by a constant factor (around 70, as indicated by the ratio of reference to computed values) to see if the final diffuse intensities align with the NP reference.
+   - If so, then the issue is likely that the current multiplicity-based scaling is not capturing the intended correction.
 
-4. **Examine the Resize Map Stage:**  
-   - Ensure that both NP and Torch branches use identical, or at least equivalent, sampling and cropping parameters. Debug prints have been added to log the shape, min, max, and mean values before and after calling `resize_map`.  
-   - We will verify that the final output shapes match and that the intensity distributions (after applying any downstream test scaling) are as expected.
-
-5. **Cross-validate with Reference Data:**  
-   - Finally, we will compare the final diffuse intensity arrays (after all correction steps) from both the NP and Torch branches against established reference datasets (e.g., `diffraction_pattern.npy`) to quantitatively assess the discrepancies.
-
-## Summary
-
-Our debugging investigation so far supports that while grid generation and symmetry expansion (as probed by the early debug statements) are consistent between NP and Torch, the key difference lies in how the multiplicity scaling is applied. The Torch branch appears to be over-correcting intensities (globally nearly doubling the sum) due to differences in the multiplicity distribution and scaling factor application.
-
-The next steps are to compare the full statistical distribution of multiplicity arrays, validate the symmetry-copying by comparing the sums over unique indices, and further verify that downstream map resizing is performed equivalently in both implementations.
-
-By following these steps, we aim to pinpoint exactly which operation (or set of operations) is responsible for the Torch branch producing higher overall intensities, and then plan a corresponding fix.
+By following these steps, you should be able to pinpoint whether the discrepancy is due to the treatment of multiplicity, a mismatch in grid/sampling during the resize, or inaccuracies in symmetry copying. Use the detailed logging present in both NP and Torch routines and compare corresponding intermediate outputs side‐by‐side.
