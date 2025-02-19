@@ -159,33 +159,44 @@ class OnePhononTorch(ModelRunner):
         I_torch = torch.zeros(q_grid_torch.shape[0], device=self.device, dtype=torch.float32)
         if valid.any():
             # Use the torch-based structure_factors function to compute complex structure factors
-            # Select the coordinates of the first asymmetric unit.
-            xyz = atomic_model.xyz[0]
+            # Retrieve all ASU arrays
+            all_xyz = atomic_model.xyz       # shape: (n_asu, n_atoms, 3)
+            all_ff_a = atomic_model.ff_a     # shape: (n_asu, n_atoms, 4)
+            all_ff_b = atomic_model.ff_b     # shape: (n_asu, n_atoms, 4)
+            all_ff_c = atomic_model.ff_c     # shape: (n_asu, n_atoms)
 
             indices = torch.nonzero(valid, as_tuple=True)[0]  # 1D tensor of indices
             q_sel = q_grid_torch[indices].cpu().numpy()
             # Compute the displacement parameter U from data (mirroring NP branch)
             U = atomic_model.adp[0] / (8 * np.pi * np.pi)
-            print("DEBUG: ff_a shape before indexing:", atomic_model.ff_a.shape)
-            ff_a = atomic_model.ff_a[0]
-            ff_b = atomic_model.ff_b[0]
-            ff_c = atomic_model.ff_c[0]
-            print("DEBUG: ff_a shape after indexing:", ff_a.shape)
-            print("DEBUG: ff_b shape after indexing:", ff_b.shape)
-            print("DEBUG: ff_c shape after indexing:", ff_c.shape)
 
-            results_np = structure_factors(q_sel,
-                                           xyz,
-                                           ff_a,
-                                           ff_b,
-                                           ff_c,
-                                           U=U,
-                                           batch_size=self.batch_size,
-                                           n_processes=self.n_processes)
-            logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: raw structure_factors result: min = %s, max = %s, mean = %s", np.nanmin(results_np), np.nanmax(results_np), np.nanmean(np.abs(results_np)))
-            # This step is non-differentiable and breaks the gradient flow intentionally.
-            results_tensor = torch.from_numpy(results_np).to(self.device, dtype=torch.float32).clone().detach()
+            # Loop over all ASUs and compute structure factors for each
+            structure_factors_list = []
+            for asu in range(all_xyz.shape[0]):
+                # For each ASU, select its data
+                xyz_ = all_xyz[asu]
+                ff_a_ = all_ff_a[asu]
+                ff_b_ = all_ff_b[asu]
+                ff_c_ = all_ff_c[asu]
+                # Compute structure factors for the selected ASU.
+                A_np = structure_factors(
+                    q_sel,
+                    xyz_,
+                    ff_a_,
+                    ff_b_,
+                    ff_c_,
+                    U=U,
+                    batch_size=self.batch_size,
+                    n_processes=self.n_processes
+                )
+                # Convert to torch tensor and transfer to device
+                structure_factors_list.append(torch.from_numpy(A_np).to(self.device, dtype=torch.float32))
+            # Sum over all ASUs:
+            results_tensor = torch.stack(structure_factors_list, dim=0)  # shape: (n_asu, n_q)
+            results_tensor = torch.sum(results_tensor, dim=0)
+
             I_torch[indices] = torch.square(torch.abs(results_tensor))
+            logging.debug(f"Computed structure factors for {all_xyz.shape[0]} ASUs with shapes: {[s.shape for s in structure_factors_list]}")
         return I_torch.to(self.device)
 
     def _incoherent_sum_torch(self, transform: torch.Tensor) -> torch.Tensor:
