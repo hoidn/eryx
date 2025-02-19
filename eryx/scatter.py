@@ -105,6 +105,12 @@ def structure_factors(q_grid, xyz, ff_a, ff_b, ff_c, U=None,
     to the number of processors available. If greater than 1,
     multiprocessing will be used.
     """
+    import os
+    DEBUG_MODE = os.environ.get("DEBUG_MODE", "0") == "1"
+    if DEBUG_MODE:
+        logging.debug("Debug mode ON: overriding n_processes to 1 (disabling multithreading).")
+        n_processes = 1
+
     n_batches = q_grid.shape[0] // batch_size
     if n_batches == 0:
         n_batches = 1
