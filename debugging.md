@@ -44,3 +44,8 @@ e. **Adjust Multiplicity Scaling Experimentally:**
    - If so, then the issue is likely that the current multiplicity-based scaling is not capturing the intended correction.
 
 By following these steps, you should be able to pinpoint whether the discrepancy is due to the treatment of multiplicity, a mismatch in grid/sampling during the resize, or inaccuracies in symmetry copying. Use the detailed logging present in both NP and Torch routines and compare corresponding intermediate outputs side‐by‐side.
+
+
+## Notes:
+- when adding new debug statements, statements in the torch impl should include the string "DEBUG_HYP_TORCH_V1" and ones in the np impl should include the string "DEBUG_HYP_NP_V1"
+- use print instead of logging.debug 
