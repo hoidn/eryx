@@ -264,14 +264,15 @@ class OnePhononTorch(ModelRunner):
                 after_copy = I_full[idx_tensor].clone()
                 logging.debug(f"DEBUG_HYP_TORCH: Sym group copy: group={group}, sum(before)={before_copy.sum().item():.6f}, sum(after)={after_copy.sum().item():.6f}")
                 print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full difference for copied indices, before copy (first element):", before_copy[0].item(), "after copy (first element):", after_copy[0].item())
+        # Temporarily disable second copy loop for hypothesis testing:
         # for group in ravel_np[1:]:
-        #     # Duplicate copy loop removed for hypothesis testing
         #     group_np = np.array(group)
         #     primary_np = np.array(ravel_np[0])
         #     intersect, comm1, comm2 = np.intersect1d(primary_np, group_np, return_indices=True)
         #     if intersect.size:
         #         idx_tensor = torch.tensor(group_np[comm2], device='cpu', dtype=torch.long)
         #         I_full[idx_tensor] = I_full[torch.tensor(primary_np[comm1], device='cpu', dtype=torch.long)]
+        logging.debug("DEBUG_HYP_TORCH: Second symmetry-copy loop is temporarily disabled for testing.")
         # This conversion is non-differentiable and breaks the gradient flow intentionally.
         logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: After symmetry copy loop 2, I_full sum = %s", I_full.sum().item())
 
