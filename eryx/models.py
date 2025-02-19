@@ -1426,16 +1426,16 @@ class OnePhonon(ModelRunner):
                     print("DEBUG_HYP_NP: For cell (dh,dk,dl)=({},{},{}):".format(dh, dk, dl))
                     print("DEBUG_HYP_NP:   q_indices shape =", q_indices.shape, 
                           "first 10 indices =", q_indices[:10])
-                    for i_asu in range(self.n_asu):
-                        F_shape = F[:, i_asu, :].shape
-                        F_abs = np.nanmin(np.abs(F[:, i_asu, :])), np.nanmax(np.abs(F[:, i_asu, :])), np.nanmean(np.abs(F[:, i_asu, :]))
-                        print("DEBUG_HYP_NP:   asu {}: F shape = {}, abs stats (min,max,mean) = {}, first 10 =", 
-                              i_asu, F_shape, F_abs, F[:, i_asu, :].flatten()[:10])
 
                     F = np.zeros((q_indices.shape[0],
                                   self.n_asu,
                                   self.n_dof_per_asu),
                                  dtype='complex')
+                    for i_asu in range(self.n_asu):
+                        F_shape = F[:, i_asu, :].shape
+                        F_abs = np.nanmin(np.abs(F[:, i_asu, :])), np.nanmax(np.abs(F[:, i_asu, :])), np.nanmean(np.abs(F[:, i_asu, :]))
+                        print("DEBUG_HYP_NP:   asu {}: F shape = {}, abs stats (min,max,mean) = {}, first 10 =", 
+                              i_asu, F_shape, F_abs, F[:, i_asu, :].flatten()[:10])
                     for i_asu in range(self.n_asu):
                         F[:, i_asu, :] = structure_factors(
                             self.q_grid[q_indices],
