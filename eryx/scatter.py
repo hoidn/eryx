@@ -2,6 +2,8 @@ import numpy as np
 import logging
 import multiprocess as mp
 
+logging.debug("AGGRESSIVE_HELLO_SCATTER_NP")
+
 def setup_logging_worker():
     import logging
     logging.basicConfig(
