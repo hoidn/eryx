@@ -191,6 +191,9 @@ class OnePhononTorch(ModelRunner):
                 )
                 # Convert to torch tensor and transfer to device
                 structure_factors_list.append(torch.from_numpy(A_np).to(self.device, dtype=torch.float32))
+                # After computing A_np for each ASU, add a debug log:
+                sf_abs = np.abs(A_np)
+                logging.debug(f"DEBUG_HYP_TORCH: ASU {asu} structure factors amplitude: min={sf_abs.min():.6f}, max={sf_abs.max():.6f}, mean={sf_abs.mean():.6f}")
             # Sum over all ASUs:
             results_tensor = torch.stack(structure_factors_list, dim=0)  # shape: (n_asu, n_q)
             results_tensor = torch.sum(results_tensor, dim=0)
@@ -259,6 +262,7 @@ class OnePhononTorch(ModelRunner):
                 before_copy = I_full[idx_tensor].clone()
                 I_full[idx_tensor] = I_full[torch.tensor(primary_np[comm1], device='cpu', dtype=torch.long)]
                 after_copy = I_full[idx_tensor].clone()
+                logging.debug(f"DEBUG_HYP_TORCH: Sym group copy: group={group}, sum(before)={before_copy.sum().item():.6f}, sum(after)={after_copy.sum().item():.6f}")
                 print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full difference for copied indices, before copy (first element):", before_copy[0].item(), "after copy (first element):", after_copy[0].item())
         # for group in ravel_np[1:]:
         #     # Duplicate copy loop removed for hypothesis testing
@@ -292,6 +296,9 @@ class OnePhononTorch(ModelRunner):
         # Restore the full symmetry operations.
         self.gnm_torch.atomic_model.sym_ops = original_sym_ops
         mult_tensor = torch.tensor(mult, device=self.device, dtype=torch.float32)
+        logging.debug("DEBUG_HYP_TORCH: Multiplicity map stats: min=%.3f, max=%.3f, mean=%.3f, unique=%s",
+                      mult_tensor.min().item(), mult_tensor.max().item(), mult_tensor.mean().item(),
+                      torch.unique(mult_tensor).cpu().numpy())
         print("DEBUG_HYP_TORCH: multiplicity tensor shape:", mult_tensor.shape)
         print("DEBUG_HYP_TORCH: multiplicity tensor stats: min =", mult_tensor.min().item(), 
               "max =", mult_tensor.max().item(), 
@@ -300,6 +307,12 @@ class OnePhononTorch(ModelRunner):
                       mult_tensor.min().item(), mult_tensor.max().item(), mult_tensor.float().mean().item(),
                       torch.quantile(mult_tensor.float(), 0.25).item(), torch.quantile(mult_tensor.float(), 0.75).item())
         scaling_factor = mult_tensor.max() / mult_tensor
+        # Experimental: force a manual global scaling factor to mimic NP branch (e.g. factor ~70)
+        test_manual_scale = 70.0
+        logging.debug(f"DEBUG_HYP_TORCH: Manual scaling test factor set to {test_manual_scale}")
+        I_full_manual = I_full * test_manual_scale
+        logging.debug("DEBUG_HYP_TORCH: After manual scaling, I_full_manual stats: min=%.6f, max=%.6f, mean=%.6f",
+                      I_full_manual.min().item(), I_full_manual.max().item(), I_full_manual.mean().item())
         # Before scaling:
         print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full BEFORE scaling: min =", I_full.min().item(), 
               "max =", I_full.max().item(), "mean =", I_full.mean().item())
@@ -365,6 +378,8 @@ class OnePhononTorch(ModelRunner):
         
         print("AGGRESSIVE_DEBUG_HYP_TORCH: BEFORE resize_map: I_full shape =", I_full.shape, 
               "min =", I_full.min().item(), "max =", I_full.max().item(), "mean =", I_full.mean().item())
+        logging.debug("DEBUG_HYP_TORCH: After resize_map: I_full_np shape=%s, min=%.6f, max=%.6f, mean=%.6f",
+                      I_full_np.shape, np.nanmin(I_full_np), np.nanmax(I_full_np), np.nanmean(I_full_np))
         I_full_np = resize_map(I_full.cpu().numpy(), sampling_original, sampling_ravel)
         print("AGGRESSIVE_DEBUG_HYP_TORCH: AFTER resize_map: I_full_np shape =", I_full_np.shape, 
               "min =", np.nanmin(I_full_np), "max =", np.nanmax(I_full_np), "mean =", np.nanmean(I_full_np))
