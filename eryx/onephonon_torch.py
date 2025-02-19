@@ -30,6 +30,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         Initialize the torch OnePhonon model.
         Uses the torch GNM for phonon computations while keeping data loading in numpy.
         """
+        super(OnePhononTorch, self).__init__()
         self.pdb_path = pdb_path
         # Use the input sampling parameters directly
         self.hsampling = hsampling
