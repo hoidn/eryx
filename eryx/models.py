@@ -1483,9 +1483,9 @@ class OnePhonon(ModelRunner):
         print("DEBUG_HYP_NP: I_full BEFORE scaling: sum =", np.nansum(Id), 
               ", first 10 elements =", Id.flatten()[:10])
         _, mult = compute_multiplicity(self.crystal.model, 
-                                       self.hsampling[2], 
-                                       self.ksampling[2], 
-                                       self.lsampling[2])
+                                       self.hsampling, 
+                                       self.ksampling, 
+                                       self.lsampling)
         print("DEBUG_HYP_NP: multiplicity stats: shape =", mult.shape, 
               ", min =", np.nanmin(mult), 
               ", max =", np.nanmax(mult), 
