@@ -20,32 +20,11 @@ so that at primary indices 8/8=1 (thus no amplification).
 2. *(Hypotheses 2 and 3 are not currently supported by the evidence.)*  
    Our current evidence now strongly suggests that the main issue is solely with the application of a duplicate scaling factor.
 
-## Proposed Debugging Strategy
+## Next Steps:
 
-a. **Verify Single Application of Manual Scaling:**  
-   - Confirm that the manual scaling factor (e.g. test_manual_scale = 70.0) is applied exactly once to I_full.  
-   - Remove any duplicate multiplications.  
-   - Print out the sum, mean, minimum, and maximum of the intensity array immediately before and after scaling and compare to NP numbers.
-
-b. **Compare NP and Torch Outputs:**  
-   - With the scaling now applied correctly, compare the final diffuse intensity arrays (via np.save files) from the NP and Torch branches.  
-   - Plot the histograms of voxel intensities from each branch to ensure that the amplitude distributions match (i.e. diffused intensities are on the order of tens, not milli‑units).
-
-c. **Review and Confirm Symmetry–Copy Behavior:**  
-   - Check that the sums over the primary group, unique group, and entire grid are consistent.  
-   - The logs showing “Total indices in primary group”, “Unique indices”, and the global sums should now be in agreement with those in the NP branch.
-
-d. **Further Simplify the Torch Pathway:**  
-   - If the NP branch does its own summing (or effective “scaling”) later in the pipeline, compare that routine to the Torch approach and adjust accordingly.
-
-e. **Cleanup Debug Logging:**  
-   - Once the scaling discrepancy is fixed, remove any redundant debug print statements and temporary branches (such as the second symmetry‐copy loop which is intentionally disabled, and any “test_scale” multiplication for final plotting).
-
-By following these steps, you should be able to pinpoint whether the discrepancy is due to the treatment of multiplicity, a mismatch in grid/sampling during the resize, or inaccuracies in symmetry copying. Use the detailed logging present in both NP and Torch routines and compare corresponding intermediate outputs side‐by‐side.
-
-
-## Notes:
-- Use print statements with the tag "DEBUG_HYP_TORCH_V1" for Torch and "DEBUG_HYP_NP_V1" for NP messages.
-- A constant manual scaling factor (currently 70.0) is now used once; ensure that no additional scaling (such as a division by (mult_tensor.max()/mult_tensor) after) is performed.
-- Re-run the unit tests (and examine the debug prints) to verify that the computed diffuse intensity (after resize_map) now has global statistics (min, max, mean) in close agreement with the NP branch.
-- If discrepancies persist, experiment with small variations of the constant factor and check for further mis‐alignment in the symmetry-copy procedure.
+1. Rerun the debug run (e.g. via run_debug.py) and verify that the log messages now show:
+  - I_full BEFORE scaling with a sum and mean that is high (e.g. hundreds or millions),
+  - A single application of the manual scaling factor that brings the intensity down so that the “TEST_HYP: scaled diffuse intensity” has a mean on the order of ~0.1–0.2 (which, after NP post‐processing, matches reference values).
+2. Use the intermediate logging from both `_compute_crystal_transform_torch()` and `_incoherent_sum_torch()` to verify that the structure factors, symmetry copy steps, and multiplicity maps are now consistent with the NP branch.
+3. Once these outputs are aligned, remove the temporary manual override and reintroduce a robust multiplicity‐based scaling if possible.
+4. Update the unit tests accordingly.
