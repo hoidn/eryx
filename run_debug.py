@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import os
+os.environ["DEBUG_MODE"] = "1"
 import logging
 
 import numpy as np
