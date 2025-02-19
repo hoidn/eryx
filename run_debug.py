@@ -2,6 +2,17 @@
 import os
 os.environ["DEBUG_MODE"] = "1"
 import logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)s: %(message)s",
+    filename="debug_output.log",
+    filemode="w"
+)
+# Also set up console logging here if desired:
+console = logging.StreamHandler()
+console.setLevel(logging.DEBUG)
+console.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
+logging.getLogger("").addHandler(console)
 
 import numpy as np
 from eryx.onephonon_torch import OnePhononTorch
