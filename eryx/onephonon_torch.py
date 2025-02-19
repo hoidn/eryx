@@ -248,102 +248,38 @@ class OnePhononTorch(ModelRunner):
         hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops_rot)
         hs_shape = np.array(hkl_sym).shape
         print("DEBUG: hkl_sym shape after symmetry expansion:", hs_shape)
-        print("DEBUG: hkl_sym values after symmetry expansion:", hkl_sym)
-        if hs_shape[1] != self.hkl_grid.shape[0]:
-            print(f"WARNING: Expected second dimension {self.hkl_grid.shape[0]} but got {hs_shape[1]}")
+        # Generate symmetry–equivalent hkl grid indices and corresponding ravel indices.
+        ravel_np, map_shape_ravel = get_ravel_indices(
+            get_symmetry_equivalents(self.hkl_grid, self.gnm_torch.atomic_model.sym_ops[0]),
+            (self.hsampling[2], self.ksampling[2], self.lsampling[2])
+        )
+        logging.debug("DEBUG_HYP_TORCH_V1: ravel_np generated; map_shape_ravel = %s", map_shape_ravel)
         
-        ravel_np, map_shape_ravel = get_ravel_indices(hkl_sym, (self.hsampling[2], self.ksampling[2], self.lsampling[2]))
-        print("DEBUG_HYP4: ravel_np (first few groups):", ravel_np[:2])
-        print("DEBUG_HYP4: map_shape_ravel:", map_shape_ravel)
-        # Optionally, save the NP version of these indices to compare against
-        print("DEBUG: ravel_np (first few groups):", ravel_np[:2])
-        print("DEBUG: ravel_np (all groups):", ravel_np)
-        print("DEBUG: map_shape_ravel:", map_shape_ravel)
-        if transform.numel() == 0:
-            I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
-            return I_full.to(self.device)
-        logging.debug(f"[OnePhononTorch._incoherent_sum_torch] map_shape_ravel: {map_shape_ravel}, np.prod(map_shape_ravel): {np.prod(map_shape_ravel)}")
-        I_full = torch.zeros(np.prod(map_shape_ravel), dtype=torch.float32, device='cpu')
+        # NEW: Create a complete ravel map using the helper method.
         transform_cpu = transform.to('cpu')
-        # Mimic the NP routine: use the first symmetry group as primary.
-        primary_indices = torch.tensor(ravel_np[0], device='cpu', dtype=torch.long)
-        I_full[primary_indices] = transform_cpu  # assign primary values
-
-        # For each subsequent group, copy the intensities from the primary positions
-        logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: Starting symmetry copy loop 1, I_full sum = %s", I_full.sum().item())
-
-        logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: After symmetry copy loop 1, I_full sum = %s", I_full.sum().item())
-
-        logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: Starting symmetry copy loop 2, I_full sum = %s", I_full.sum().item())
-
-        # For every symmetry-equivalent group, replicate the primary intensities:
-        for group in ravel_np[1:]:
-            group_tensor = torch.tensor(group, device='cpu', dtype=torch.long)
-            I_full[group_tensor] = I_full[primary_indices]
-        # This conversion is non-differentiable and breaks the gradient flow intentionally.
-        logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: After symmetry copy loop 2, I_full sum = %s", I_full.sum().item())
-
-        I_full = I_full.to(self.device).detach()
-        logging.debug(f"I_full values after symmetry correction: {I_full}")
+        ravel_map = self._get_full_ravel_map(list(ravel_np), map_shape_ravel)
+        logging.debug("DEBUG_HYP_TORCH_V1: Ravel map stats – min: %s, max: %s, mean: %s, coverage: %.2f%%",
+                      ravel_map.min().item(), ravel_map.max().item(),
+                      ravel_map.float().mean().item(),
+                      100.0 * (ravel_map != -1).sum().item() / ravel_map.numel())
+        
+        # Use the complete ravel map to index the primary intensity tensor.
+        I_full = transform_cpu[ravel_map]
         I_full = I_full.view(*map_shape_ravel)
-        # Compute centered sampling from the obtained map shape and the original sampling
-        sampling = (self.hsampling[2], self.ksampling[2], self.lsampling[2])
-        sampling_ravel = get_centered_sampling(map_shape_ravel, sampling)
-        atomic_model = self.gnm_torch.atomic_model
-        # Temporarily replace sym_ops with its flattened (first) set.
-        original_sym_ops = self.gnm_torch.atomic_model.sym_ops
-        if isinstance(original_sym_ops, (tuple, list)):
-            self.gnm_torch.atomic_model.sym_ops = original_sym_ops[0]
-        else:
-            # If not a tuple, try copying the flat part from key 0 if it’s a dict.
-            self.gnm_torch.atomic_model.sym_ops = self.gnm_torch.atomic_model.sym_ops.get(0, original_sym_ops)
-        _, mult = compute_multiplicity(self.gnm_torch.atomic_model, 
-                                       sampling_ravel[0], 
-                                       sampling_ravel[1], 
-                                       sampling_ravel[2])
-        # Restore the full symmetry operations.
-        self.gnm_torch.atomic_model.sym_ops = original_sym_ops
-        mult_tensor = torch.tensor(mult, device=self.device, dtype=torch.float32)
-        logging.debug("DEBUG_HYP_TORCH: Multiplicity map stats: min=%.3f, max=%.3f, mean=%.3f, unique=%s",
-                      mult_tensor.min().item(), mult_tensor.max().item(), mult_tensor.mean().item(),
-                      torch.unique(mult_tensor).cpu().numpy())
-        print("DEBUG_HYP_TORCH: multiplicity tensor shape:", mult_tensor.shape)
-        print("DEBUG_HYP_TORCH: multiplicity tensor stats: min =", mult_tensor.min().item(), 
-              "max =", mult_tensor.max().item(), 
-              "unique =", torch.unique(mult_tensor))
-        logging.debug("AGGRESSIVE_DEBUG_HYP_TORCH: multiplicity tensor full stats: min = %s, max = %s, mean = %s, 25th percentile = %s, 75th percentile = %s",
-                      mult_tensor.min().item(), mult_tensor.max().item(), mult_tensor.float().mean().item(),
-                      torch.quantile(mult_tensor.float(), 0.25).item(), torch.quantile(mult_tensor.float(), 0.75).item())
-        # Instead of computing the per-voxel scaling, override with a constant factor.
-        test_manual_scale = 70.0
-        logging.debug(f"DEBUG_HYP_TORCH: Overriding multiplicity scaling factor with manual factor = {test_manual_scale}")
-        I_full = I_full * test_manual_scale
-        logging.debug("DEBUG_HYP_TORCH: After manual scaling, I_full stats: min=%.6f, max=%.6f, mean=%.6f",
-                      I_full.min().item(), I_full.max().item(), I_full.mean().item())
-        # Before scaling:
-        print("AGGRESSIVE_DEBUG_HYP_TORCH: I_full BEFORE scaling: min =", I_full.min().item(), 
-              "max =", I_full.max().item(), "mean =", I_full.mean().item())
-        # The manual scaling factor is applied above, so no additional scaling is needed here.
-        print("DEBUG_HYP1: I_full BEFORE scaling (first 10 elems):", I_full.flatten()[:10])
-        # The manual scaling factor is applied above, so no additional scaling is needed here.
-        print("DEBUG_HYP_TORCH: I_full AFTER scaling (first 10 elems):", I_full.flatten()[:10])
-        if isinstance(original_sym_ops, (tuple, list)):
-            self.gnm_torch.atomic_model.sym_ops = original_sym_ops[0]
-        else:
-            self.gnm_torch.atomic_model.sym_ops = self.gnm_torch.atomic_model.sym_ops.get(0, original_sym_ops)
         
-        _, mult = compute_multiplicity(self.gnm_torch.atomic_model, 
-                                       sampling_ravel[0], 
-                                       sampling_ravel[1], 
-                                       sampling_ravel[2])
-        # Restore the original symmetry operations.
-        self.gnm_torch.atomic_model.sym_ops = original_sym_ops
-        
-        mult_tensor = torch.tensor(mult, device=self.device, dtype=torch.float32)
-        print("DEBUG: multiplicity tensor shape:", mult_tensor.shape)
-        print("DEBUG: multiplicity unique values:", torch.unique(mult_tensor))
-        print("DEBUG: multiplicity max (scalar):", mult_tensor.max().item())
-        print("DEBUG: I_full before scaling (first 10 elems):", I_full.flatten()[:10])
+        # Optionally, adjust the grid using the original and centered sampling information.
+        sampling_original = [
+            (int(self.hkl_grid[:, 0].min()), int(self.hkl_grid[:, 0].max()), self.hsampling[2]),
+            (int(self.hkl_grid[:, 1].min()), int(self.hkl_grid[:, 1].max()), self.ksampling[2]),
+            (int(self.hkl_grid[:, 2].min()), int(self.hkl_grid[:, 2].max()), self.lsampling[2])
+        ]
+        sampling_ravel = get_centered_sampling(map_shape_ravel, (self.hsampling[2], self.ksampling[2], self.lsampling[2]))
+        logging.debug("DEBUG_HYP_TORCH_V1: Original sampling: %s; sampling_ravel: %s", sampling_original, sampling_ravel)
+        I_full_np = resize_map(I_full.cpu().numpy(), sampling_original, sampling_ravel)
+        logging.debug("DEBUG_HYP_TORCH_V1: After resize_map, I_full_np stats – shape: %s, min: %.6f, max: %.6f, mean: %.6f",
+                      I_full_np.shape, np.nanmin(I_full_np), np.nanmax(I_full_np), np.nanmean(I_full_np))
+        I_full = torch.from_numpy(I_full_np).to(self.device, dtype=torch.float32)
+        return I_full.flatten()
         
         # Apply the scaling: in the NP branch they do I /= (mult.max() / mult)
         # Apply the scaling: in the NP branch they do I /= (mult.max() / mult)
