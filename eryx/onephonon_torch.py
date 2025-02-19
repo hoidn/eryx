@@ -126,6 +126,34 @@ class OnePhononTorch(ModelRunner):
         self.gnm_torch.atomic_model.sym_ops = sym_ops
 
 
+    def _get_full_ravel_map(self, ravel_np: list[np.ndarray], map_shape_ravel: tuple) -> torch.Tensor:
+        """
+        Generate a single ravel map that maps every grid point in the expanded grid to
+        the corresponding primary intensity index.
+
+        Args:
+            ravel_np (List[np.ndarray]): List of per-symmetry-group ravel index arrays.
+            map_shape_ravel (tuple): The shape of the full raveled grid.
+
+        Returns:
+            torch.Tensor: 1D tensor (of length np.prod(map_shape_ravel)) where each entry is the primary index.
+        """
+        total_voxels = int(np.prod(map_shape_ravel))
+        # Initialize with -1 so that unassigned positions can be detected.
+        full_ravel = -1 * np.ones(total_voxels, dtype=np.int64)
+        # Iterate over symmetry groups in order (first group is primary)
+        for idx, group in enumerate(ravel_np):
+            group = np.array(group, dtype=np.int64)  # ensure proper type
+            # Determine positions in full_ravel that are still unassigned for these indices.
+            mask = (full_ravel[group] == -1)
+            # For primary group, assign its own values; for others, use the corresponding primary values.
+            source = group if idx == 0 else np.array(ravel_np[0], dtype=np.int64)
+            full_ravel[group[mask]] = source[mask]
+        # Fallback: if any positions remain unassigned, set them to 0.
+        full_ravel[full_ravel == -1] = 0
+        logging.debug("DEBUG_HYP_TORCH_V1: Full ravel map generated with shape %s", full_ravel.shape)
+        return torch.from_numpy(full_ravel).to(self.device, dtype=torch.long)
+
     @log_method_call
     def apply_disorder(self) -> torch.Tensor:
         """
