@@ -3,16 +3,20 @@ import numpy as np
 import logging
 from eryx.pdb import AtomicModel, Crystal
 from scipy.spatial import KDTree
+import torch.nn as nn
 
-class GaussianNetworkModelTorch:
+class GaussianNetworkModelTorch(nn.Module):
     def __init__(self, pdb_path: str, enm_cutoff: float, gamma_intra: float, gamma_inter: float,
                  device: torch.device = torch.device("cpu")) -> None:
         """
         Initialize the torch-based Gaussian Network Model.
         Loads the atomic model (using existing numpy code) and converts key arrays to torch tensors.
         """
-        self.device = device
-        self.device = torch.device(self.device.type)
+        super(GaussianNetworkModelTorch, self).__init__()
+        self.device = torch.device(device.type)
+        # Convert input gamma constants to learnable parameters:
+        self.gamma_intra = nn.Parameter(torch.tensor(gamma_intra, dtype=torch.float64, device=self.device))
+        self.gamma_inter = nn.Parameter(torch.tensor(gamma_inter, dtype=torch.float64, device=self.device))
         # Load and set up the atomic model (using existing numpy routines)
         self.atomic_model = AtomicModel(pdb_path, expand_p1=True)
         self.crystal = Crystal(self.atomic_model)
@@ -23,8 +27,6 @@ class GaussianNetworkModelTorch:
         self.n_atoms_per_asu = self.crystal.get_asu_xyz().shape[0]
         self.n_dof_per_asu_actual = self.n_atoms_per_asu * 3
         self.enm_cutoff = enm_cutoff
-        self.gamma_intra = gamma_intra
-        self.gamma_inter = gamma_inter
 
         self.build_gamma()
         self.build_neighbor_list()

@@ -9,7 +9,7 @@ from eryx.logging_utils import log_method_call
 from eryx.map_utils import generate_grid, get_resolution_mask, get_dq_map, expand_sym_ops, get_symmetry_equivalents, get_ravel_indices, compute_multiplicity, get_centered_sampling, resize_map
 from eryx.scatter import structure_factors
 
-class OnePhononTorch(ModelRunner):
+class OnePhononTorch(nn.Module, ModelRunner):
     @log_method_call
     def __init__(self,
                  pdb_path: str,
@@ -332,3 +332,16 @@ class OnePhononTorch(ModelRunner):
 
         I_full = torch.tensor(I_full_np, device=self.device, dtype=torch.float32)
         return I_full.flatten()
+    def forward(self):
+        # 1. Compute phonon modes via the torch GNM
+        self.gnm_torch.compute_gnm_phonons_torch()
+        # 2. Compute covariance matrix (via a new vectorized method)
+        cov_matrix = self.compute_covariance_matrix_torch()
+        # 3. Compute diffuse scattering intensity (using gradient‐preserving operations)
+        I = self.apply_disorder(use_data_adp=False)
+        return I
+    def compute_covariance_matrix_torch(self):
+        # [NEW] Implement a vectorized computation of the covariance matrix 
+        # from the phonon modes (using self.V, self.Winv, etc.)
+        # Ensure that all operations are differentiable.
+        return torch.tensor(0.0, device=self.device)  # placeholder; replace with actual code

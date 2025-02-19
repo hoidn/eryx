@@ -144,3 +144,11 @@ class TestOnePhononTorch:
     @pytest.mark.skip(reason="GPU tests disabled; running only on CPU")
     def test_cuda_vs_cpu(self, device):
         pass
+def test_gradient_flow(onephonon_torch, device):
+    onephonon_torch.train()
+    I = onephonon_torch.forward()
+    loss = I.sum()
+    loss.backward()
+    # Verify that gradients propagate to the learnable parameters in the torch GNM.
+    assert onephonon_torch.gnm_torch.gamma_intra.grad is not None, "gamma_intra did not receive gradients"
+    assert onephonon_torch.gnm_torch.gamma_inter.grad is not None, "gamma_inter did not receive gradients"
