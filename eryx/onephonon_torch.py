@@ -192,45 +192,33 @@ class OnePhononTorch(nn.Module, ModelRunner):
     def _incoherent_sum_torch(self, transform: torch.Tensor) -> torch.Tensor:
         """
         Compute the diffuse intensity by incoherently summing the contributions
-        from each asymmetric unit in a manner equivalent to NP’s incoherent_sum_real().
+        from all symmetry-equivalent grid points in a fully vectorized manner.
         """
-        # Print debug info about symmetry operations and grid before further processing.
-        
-        hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops_rot)
-        hs_shape = np.array(hkl_sym).shape
-        print("DEBUG: hkl_sym shape after symmetry expansion:", hs_shape)
-        # Generate symmetry–equivalent hkl grid indices and corresponding ravel indices.
-        ravel_np, map_shape_ravel = get_ravel_indices(
-            get_symmetry_equivalents(self.hkl_grid, self.gnm_torch.atomic_model.sym_ops[0]),
-            (self.hsampling[2], self.ksampling[2], self.lsampling[2])
-        )
-        logging.debug("DEBUG_HYP_TORCH_V1: ravel_np generated; map_shape_ravel = %s", map_shape_ravel)
-        
-        # NEW: Create a complete ravel map using the helper method.
-        transform_cpu = transform.to('cpu')
-        ravel_map = self._get_full_ravel_map(list(ravel_np), map_shape_ravel)
-        logging.debug("DEBUG_HYP_TORCH_V1: Ravel map stats – min: %s, max: %s, mean: %s, coverage: %.2f%%",
-                      ravel_map.min().item(), ravel_map.max().item(),
-                      ravel_map.float().mean().item(),
-                      100.0 * (ravel_map != -1).sum().item() / ravel_map.numel())
-        
-        # Use the complete ravel map to index the primary intensity tensor.
-        I_full = transform_cpu[ravel_map]
-        I_full = I_full.view(*map_shape_ravel)
-        
-        # Optionally, adjust the grid using the original and centered sampling information.
-        sampling_original = [
-            (int(self.hkl_grid[:, 0].min()), int(self.hkl_grid[:, 0].max()), self.hsampling[2]),
-            (int(self.hkl_grid[:, 1].min()), int(self.hkl_grid[:, 1].max()), self.ksampling[2]),
-            (int(self.hkl_grid[:, 2].min()), int(self.hkl_grid[:, 2].max()), self.lsampling[2])
-        ]
-        sampling_ravel = get_centered_sampling(map_shape_ravel, (self.hsampling[2], self.ksampling[2], self.lsampling[2]))
-        logging.debug("DEBUG_HYP_TORCH_V1: Original sampling: %s; sampling_ravel: %s", sampling_original, sampling_ravel)
-        I_full_np = resize_map(I_full.cpu().numpy(), sampling_original, sampling_ravel)
-        logging.debug("DEBUG_HYP_TORCH_V1: After resize_map, I_full_np stats – shape: %s, min: %.6f, max: %.6f, mean: %.6f",
-                      I_full_np.shape, np.nanmin(I_full_np), np.nanmax(I_full_np), np.nanmean(I_full_np))
-        I_full = torch.from_numpy(I_full_np).to(self.device, dtype=torch.float32)
-        return I_full.flatten()
+        sym_ops = self.gnm_torch.atomic_model.sym_ops[0]
+        hkl_sym = torch.tensor(get_symmetry_equivalents(self.hkl_grid, sym_ops),
+                                 device=self.device, dtype=torch.long)
+        hkl_grid_tensor = torch.tensor(self.hkl_grid, device=self.device, dtype=torch.long)
+        lbounds = torch.min(hkl_grid_tensor, dim=0)[0]
+        hkl_sym_adj = hkl_sym - lbounds.unsqueeze(0).unsqueeze(0)
+        ubounds = torch.max(hkl_grid_tensor, dim=0)[0]
+        map_shape_ravel = (ubounds - lbounds + 1).tolist()
+        multipliers = torch.tensor([map_shape_ravel[1]*map_shape_ravel[2],
+                                    map_shape_ravel[2], 1],
+                                     device=self.device, dtype=torch.long)
+        ravel_indices = (hkl_sym_adj * multipliers).sum(dim=2)
+        all_indices = ravel_indices.view(-1)
+        all_intensities = transform.repeat(ravel_indices.size(0))
+        unique_indices, inverse = torch.unique(all_indices, return_inverse=True)
+        summed = torch.zeros(unique_indices.size(0), device=self.device, dtype=transform.dtype)
+        summed = summed.index_add(0, inverse, all_intensities)
+        counts = torch.zeros(unique_indices.size(0), device=self.device, dtype=transform.dtype)
+        ones = torch.ones(all_intensities.size(0), device=self.device, dtype=transform.dtype)
+        counts = counts.index_add(0, inverse, ones)
+        averaged = summed / counts
+        total_voxels = multipliers[0] * multipliers[1] * multipliers[2]
+        I_full = torch.zeros(total_voxels, device=self.device, dtype=transform.dtype)
+        I_full[unique_indices] = averaged
+        return I_full.view(map_shape_ravel[0], map_shape_ravel[1], map_shape_ravel[2]).flatten()
         
         # Apply the scaling: in the NP branch they do I /= (mult.max() / mult)
         # Apply the scaling: in the NP branch they do I /= (mult.max() / mult)
