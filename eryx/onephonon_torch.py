@@ -483,25 +483,23 @@ class OnePhononTorch(nn.Module, ModelRunner):
         """
         Compute the physically correct ADP scale factor.
         The scale factor is defined as:
-            scale = mean(exp_adps) / (8 * π² * mean(kinv_diag))
+            scale = mean(exp_adps) / (8 * π² * mean(diag(cov)))
         where exp_adps are the experimental ADP values (from the atomic model)
-        and kinv_diag are the diagonal elements of the model’s K⁻¹.
+        and diag(cov) is the diagonal of the covariance matrix computed via compute_covariance_matrix_torch().
         """
-        kinv_diag = self._compute_kinv_diagonal()
-        if kinv_diag.is_complex():
-            kinv_diag = kinv_diag.real
+        cov_torch = self.compute_covariance_matrix_torch()
+        diag_var = torch.diag(cov_torch)
         exp_adps = torch.tensor(self.atomic_model.adp[0],
                                   device=self.device,
                                   dtype=torch.float64)
         logging.debug(f"[DEBUG] Experimental ADPs: mean={torch.mean(exp_adps).item()}, std={torch.std(exp_adps).item()}")
-        logging.debug(f"[DEBUG] Model variance (kinv_diag): mean={torch.mean(kinv_diag).item()}, std={torch.std(kinv_diag).item()}")
-        scale = torch.mean(exp_adps) / (8 * torch.pi * torch.pi * torch.mean(kinv_diag))
-        np_scale = torch.mean(exp_adps).item() / (8 * np.pi * np.pi * torch.mean(kinv_diag).item())
-        logging.debug(f"[DEBUG] Torch ADP scale factor: {scale.item():.8f} | Numpy reference ADP scale factor: {np_scale:.8f}")
+        logging.debug(f"Computed Torch diag variance (from covariance): mean={torch.mean(diag_var).item():.8f}")
+        scale = torch.mean(exp_adps) / (8 * torch.pi * torch.pi * torch.mean(diag_var))
+        np_scale = torch.mean(exp_adps).item() / (8 * np.pi * np.pi * torch.mean(diag_var).item())
+        logging.debug(f"[DEBUG] New Torch ADP scale factor: {scale.item():.8f} | Numpy reference ADP scale factor: {np_scale:.8f}")
         if scale.is_complex():
             logging.error("Computed ADP scale factor is complex; converting to real.")
             scale = scale.real
-        # TEMP: Ensure gradient flow through scale factor computation; remove assert in production.
         assert scale.requires_grad, "Scale factor tensor does not require grad."
         return scale
 
