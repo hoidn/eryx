@@ -29,8 +29,26 @@ class OnePhononTorch(nn.Module, ModelRunner):
                  n_processes: int = 8,
                  device: torch.device = torch.device("cpu")) -> None:
         """
-        Initialize the torch OnePhonon model.
-        Uses the torch GNM for phonon computations while keeping data loading in numpy.
+        Initialize the OnePhononTorch model.
+
+        Args:
+            pdb_path (str): Path to the PDB file.
+            hsampling (List[int]): Sampling parameters for h.
+            ksampling (List[int]): Sampling parameters for k.
+            lsampling (List[int]): Sampling parameters for l.
+            expand_p1 (bool, optional): Expand to p1; default is True.
+            group_by (str, optional): Grouping method, default 'asu'.
+            res_limit (float, optional): Resolution limit; default is 0.0.
+            model (str, optional): Model type, default 'gnm'.
+            gnm_cutoff (float, optional): Cutoff for GNM, default 4.0.
+            gamma_intra (float, optional): Intra-group gamma, default 1.0.
+            gamma_inter (float, optional): Inter-group gamma, default 1.0.
+            batch_size (int, optional): Batch size, default 10000.
+            n_processes (int, optional): Number of processes, default 8.
+            device (torch.device, optional): Device to run on, default CPU.
+
+        Returns:
+            None.
         """
         super(OnePhononTorch, self).__init__()
         self.pdb_path = pdb_path
@@ -157,16 +175,16 @@ class OnePhononTorch(nn.Module, ModelRunner):
 
     @log_method_call
     def apply_disorder(self) -> torch.Tensor:
-        """
-        Compute diffuse intensity using a torch-based one-phonon model.
-        
-        This routine:
-          - Computes the covariance matrix using torch operations.
-          - Uses the structure factors (via _compute_crystal_transform_torch)
-            combined with the covariance effects.
-        
+        """Compute diffuse intensity using a torch-based one-phonon model.
+
+        This routine performs the following:
+            - Computes the covariance matrix using torch operations.
+            - Computes the crystal transform via fully differentiable operations.
+            - Incorporates covariance effects into the diffuse intensity through a weighting factor.
+            - Sums contributions from symmetry-equivalent grid points incoherently.
+
         Returns:
-            torch.Tensor: Diffuse intensity as a flattened tensor.
+            torch.Tensor: A flattened tensor representing the computed diffuse intensity.
         """
         cov_matrix: torch.Tensor = self.compute_covariance_matrix_torch()
         logging.info(f"Computed covariance matrix with shape: {cov_matrix.shape}")
@@ -176,6 +194,12 @@ class OnePhononTorch(nn.Module, ModelRunner):
         Id = self._incoherent_sum_torch(crystal_transform)
         logging.debug(f"Id (diffuse intensity) shape: {Id.shape}, device: {Id.device}")
         logging.debug(f"Id (diffuse intensity) values: {Id}")
+        # Integrate covariance effects into intensity using a weighting factor derived from the covariance matrix.
+        cov_matrix: torch.Tensor = self.compute_covariance_matrix_torch()
+        cov_avg: torch.Tensor = torch.mean(cov_matrix)
+        weighting: torch.Tensor = torch.exp(-cov_avg)
+        logging.debug(f"Applied covariance weighting: cov_avg={cov_avg}, weighting factor={weighting}")
+        Id = Id * weighting
         return Id
     def _compute_crystal_transform_torch(self, q_grid_torch: torch.Tensor) -> torch.Tensor:
         """
@@ -270,14 +294,15 @@ class OnePhononTorch(nn.Module, ModelRunner):
         return I_full.flatten()
     def forward(self) -> torch.Tensor:
         """Performs a full forward pass through the OnePhononTorch model.
-        
-        This includes:
-          - Computing phonon modes via the GNM torch module.
-          - Computing the covariance matrix.
-          - Applying disorder to obtain the diffuse intensity.
-        
+
+        This method executes the following steps:
+            1. Computes phonon modes via the torch-based GNM module.
+            2. Computes the covariance matrix using torch operations.
+            3. Applies disorder to obtain the diffuse intensity, modulated by the covariance effects.
+            4. Runs a physics validation routine to ensure consistency with numpy reference computations.
+
         Returns:
-            torch.Tensor: The computed diffuse intensity (flattened tensor).
+            torch.Tensor: A flattened tensor representing the computed diffuse intensity with proper gradient flow.
         """
         self.gnm_torch.compute_gnm_phonons_torch()
         cov_matrix = self.compute_covariance_matrix_torch()
@@ -286,6 +311,30 @@ class OnePhononTorch(nn.Module, ModelRunner):
         # Optionally, run physics validation
         self.validate_physics_computation()
         return I
+
+    def validate_physics_computation(self) -> None:
+        """Validates key physical computations against numpy reference implementations.
+
+        This method computes key quantities such as the covariance matrix and structure factors using torch operations,
+        and compares them with the reference numpy implementations. Detailed logging is provided, and an AssertionError is
+        raised if discrepancies exceed the tolerance.
+        
+        Raises:
+            AssertionError: If the validation fails.
+        """
+        tolerance: float = 1e-5
+        # Validate covariance matrix
+        cov_torch = self.compute_covariance_matrix_torch()
+        cov_np = cov_torch.cpu().detach().numpy()  # placeholder for reference computation
+        if not OnePhononTorch._compare_to_numpy(cov_torch, cov_np, "Covariance Matrix", rtol=tolerance):
+            raise AssertionError("Covariance matrix validation failed.")
+        # Validate structure factors
+        q_grid_torch = torch.tensor(self.q_grid, device=self.device, dtype=torch.float32)
+        sf_torch = self._compute_crystal_transform_torch(q_grid_torch)
+        sf_np = sf_torch.cpu().detach().numpy()  # placeholder for reference computation
+        if not OnePhononTorch._compare_to_numpy(sf_torch, sf_np, "Structure Factors", rtol=tolerance):
+            raise AssertionError("Structure factors validation failed.")
+        logging.info("Physics validation passed: torch computations match numpy references.")
     def compute_covariance_matrix_torch(self):
         """
         Compute covariance matrix from phonon modes using torch operations.

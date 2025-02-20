@@ -1406,6 +1406,17 @@ class OnePhonon(ModelRunner):
         """
         import time
         import logging
+
+        def test_validate_physics_computation(device):
+            pdb_path = "tests/pdbs/5zck.pdb"
+            hsampling = [-1, 2, 10]
+            ksampling = [-1, 2, 10]
+            lsampling = [-1, 2, 10]
+    
+            from eryx.onephonon_torch import OnePhononTorch
+            model_torch = OnePhononTorch(pdb_path, hsampling, ksampling, lsampling, device=device)
+            # This should pass without raising an AssertionError if validation is successful.
+            model_torch.validate_physics_computation()
         start_time = time.time()
         logging.debug("[OnePhonon.apply_disorder] Starting disorder computation with rank=%s", rank)
         print("DEBUG_HYP_NP: In OnePhonon.apply_disorder() (NP)")
