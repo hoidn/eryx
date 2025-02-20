@@ -247,6 +247,11 @@ class OnePhononTorch(nn.Module, ModelRunner):
         hkl_sym_adj = hkl_sym - lbounds.unsqueeze(0).unsqueeze(0)
         ubounds = torch.max(hkl_grid_tensor, dim=0)[0]
         map_shape_ravel = (ubounds - lbounds + 1).tolist()
+        print("\n=== Shape Debug ===")
+        print(f"map_shape_ravel: {map_shape_ravel}")
+        print(f"multipliers: {multipliers}")
+        print(f"Old total_voxels (from multipliers): {multipliers[0] * multipliers[1] * multipliers[2]}")
+        print(f"New total_voxels (from map shape): {np.prod(map_shape_ravel)}")
         multipliers = torch.tensor([map_shape_ravel[1]*map_shape_ravel[2],
                                     map_shape_ravel[2], 1],
                                      device=self.device, dtype=torch.long)
@@ -273,9 +278,19 @@ class OnePhononTorch(nn.Module, ModelRunner):
         ones = torch.ones(all_intensities.size(0), device=self.device, dtype=transform.dtype)
         counts = counts.index_add(0, inverse, ones)
         averaged = summed / counts
-        total_voxels = multipliers[0] * multipliers[1] * multipliers[2]
+        total_voxels = np.prod(map_shape_ravel)
+        assert total_voxels == np.prod(map_shape_ravel), \
+            f"Size mismatch: total_voxels={total_voxels} vs reshape_size={np.prod(map_shape_ravel)}"
         I_full = torch.zeros(total_voxels, device=self.device, dtype=transform.dtype)
+        print("\n=== Index Debug ===")
+        print(f"Number of unique indices: {len(unique_indices)}")
+        print(f"Max index value: {unique_indices.max()}")
+        print(f"Comparing to total_voxels: {total_voxels}")
         I_full[unique_indices] = averaged
+        print("\n=== Final Reshape Debug ===")
+        print(f"I_full shape: {I_full.shape}")
+        print(f"Target shape: {map_shape_ravel}")
+        print(f"Products match: {I_full.shape[0] == np.prod(map_shape_ravel)}")
         return I_full.view(map_shape_ravel[0], map_shape_ravel[1], map_shape_ravel[2]).flatten()
         
         # Apply the scaling: in the NP branch they do I /= (mult.max() / mult)
