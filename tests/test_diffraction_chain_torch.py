@@ -40,9 +40,10 @@ class TestDiffractionChainTorch:
                                    ff_a.cpu().numpy(),
                                    ff_b.cpu().numpy(),
                                    ff_c.cpu().numpy())
-        # Verify the computed shape and absence of NaNs
+        # Verify the computed shape and absence of NaNs.
         assert ff.shape == (10, ff_a.shape[0])
-        assert not torch.any(torch.isnan(ff))
+        ff_tensor = torch.from_numpy(ff)  # convert numpy array to tensor
+        assert not torch.any(torch.isnan(ff_tensor))
         expected_ff_mean = 3.975718
         torch.testing.assert_close(torch.mean(ff).cpu(), torch.tensor(expected_ff_mean, dtype=torch.float32), rtol=1e-5)
 
@@ -70,7 +71,7 @@ class TestDiffractionChainTorch:
         assert F.shape[0] == q_test.shape[0]
         assert not torch.any(torch.isnan(torch.real(F)))
         expected_F_first = -941.71642
-        torch.testing.assert_close(torch.real(F[0]).cpu(), torch.tensor(expected_F_first, dtype=torch.float32), rtol=1e-5)
+        torch.testing.assert_close(torch.real(F[0]).cpu(), torch.tensor(expected_F_first, dtype=torch.float32), rtol=1e-5, atol=1e-8)
 
     def test_symmetries_and_hessian_torch(self, onephonon_torch, device):
         """
