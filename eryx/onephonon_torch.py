@@ -406,7 +406,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         post_scale_eigvals = torch.linalg.eigvalsh(cov.real)
         logging.debug(f"[DEBUG] Post-scaling covariance eigenvalues (real part): min={post_scale_eigvals.min().item()}, max={post_scale_eigvals.max().item()}, mean={post_scale_eigvals.mean().item()}")
         
-        logging.debug(f"[DEBUG] ADP Scale Factor in Covariance: {scale.item()}")
+        # logging.debug(f"[DEBUG] ADP Scale Factor in Covariance: {scale.item()}")
         # Log real and imaginary statistics using the updated validation method.
         self._validate_intermediate_values("Covariance matrix", cov)
         return cov

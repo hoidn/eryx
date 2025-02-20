@@ -49,7 +49,7 @@ def test_structure_factors_match(device):
                               atomic_model.ff_b[0],
                               atomic_model.ff_c[0],
                               U=atomic_model.adp[0]/(8*np.pi*np.pi))
-    assert np.allclose(torch.abs(torch_sf), np.abs(np_sf), rtol=1e-5), "Structure factors differ between torch and numpy."
+    assert np.allclose(np.abs(torch_sf), np.abs(np_sf), rtol=1e-5), "Structure factors differ between torch and numpy."
 def test_adp_scale_factor(device):
     """
     Test that the ADP scale factor computed by OnePhononTorch matches
