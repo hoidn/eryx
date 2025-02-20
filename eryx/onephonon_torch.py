@@ -354,7 +354,8 @@ class OnePhononTorch(nn.Module, ModelRunner):
         logging.debug("[OnePhononTorch.forward] Starting forward pass")
         self.gnm_torch.compute_gnm_phonons_torch()
         cov_matrix = self.compute_covariance_matrix_torch()
-        logging.debug(f"[OnePhononTorch.forward] Covariance matrix: shape={cov_matrix.shape}, min={cov_matrix.min().item()}, max={cov_matrix.max().item()}, mean={cov_matrix.mean().item()}")
+        logging.debug(f"[OnePhononTorch.forward] Covariance matrix (abs stats): min={cov_matrix.abs().min().item()}, max={cov_matrix.abs().max().item()}, mean={cov_matrix.abs().mean().item()}")
+        logging.debug(f"[OnePhononTorch.forward] Covariance matrix (real stats): min={cov_matrix.real.min().item()}, max={cov_matrix.real.max().item()}, mean={cov_matrix.real.mean().item()} | (imag stats): min={cov_matrix.imag.min().item()}, max={cov_matrix.imag.max().item()}, mean={cov_matrix.imag.mean().item()}")
         q_grid_torch = torch.tensor(self.q_grid, device=self.device, dtype=torch.float32)
         crystal_transform = self._compute_crystal_transform_torch(q_grid_torch)
         logging.debug(f"[OnePhononTorch.forward] Crystal transform: shape={crystal_transform.shape}, min={crystal_transform.min().item()}, max={crystal_transform.max().item()}, mean={crystal_transform.mean().item()}")
@@ -398,13 +399,14 @@ class OnePhononTorch(nn.Module, ModelRunner):
         
         # Compute the model covariance (V @ diag(Winv) @ Vᵀ)
         cov = torch.matmul(V * Winv.unsqueeze(-2), V.transpose(-2, -1))
+        pre_scale_eigvals = torch.linalg.eigvalsh(cov.real)
+        logging.debug(f"[DEBUG] Pre-scaling covariance eigenvalues (real part): min={pre_scale_eigvals.min().item()}, max={pre_scale_eigvals.max().item()}, mean={pre_scale_eigvals.mean().item()}")
         
         # Retrieve the physically correct scale factor (real)
         scale = self._compute_adp_scale_factor()
         cov = cov * scale
-        # [DEBUG] Compute eigenvalue statistics of the (real part of the) covariance matrix
-        eigvals = torch.linalg.eigvalsh(cov.real)
-        logging.debug(f"[DEBUG] Covariance eigenvalues: min={eigvals.min().item()}, max={eigvals.max().item()}, mean={eigvals.mean().item()}")
+        post_scale_eigvals = torch.linalg.eigvalsh(cov.real)
+        logging.debug(f"[DEBUG] Post-scaling covariance eigenvalues (real part): min={post_scale_eigvals.min().item()}, max={post_scale_eigvals.max().item()}, mean={post_scale_eigvals.mean().item()}")
         
         logging.debug(f"[DEBUG] ADP Scale Factor in Covariance: {scale.item()}")
         # Log real and imaginary statistics using the updated validation method.
@@ -494,7 +496,8 @@ class OnePhononTorch(nn.Module, ModelRunner):
         logging.debug(f"[DEBUG] Experimental ADPs: mean={torch.mean(exp_adps).item()}, std={torch.std(exp_adps).item()}")
         logging.debug(f"[DEBUG] Model variance (kinv_diag): mean={torch.mean(kinv_diag).item()}, std={torch.std(kinv_diag).item()}")
         scale = torch.mean(exp_adps) / (8 * torch.pi * torch.pi * torch.mean(kinv_diag))
-        logging.debug(f"[DEBUG] ADP scale factor computed: {scale.item()}")
+        np_scale = torch.mean(exp_adps).item() / (8 * np.pi * np.pi * torch.mean(kinv_diag).item())
+        logging.debug(f"[DEBUG] Torch ADP scale factor: {scale.item():.8f} | Numpy reference ADP scale factor: {np_scale:.8f}")
         if scale.is_complex():
             logging.error("Computed ADP scale factor is complex; converting to real.")
             scale = scale.real
@@ -532,10 +535,10 @@ class OnePhononTorch(nn.Module, ModelRunner):
         This matches the numpy implementation scaling while preserving gradient flow.
         """
         scale = self._compute_adp_scale_factor()
-        logging.debug(f"[DEBUG] Pre-scaling intensities: abs min={intensity.abs().min().item()}, abs max={intensity.abs().max().item()}, mean={intensity.mean().item()}")
-        logging.debug(f"[DEBUG] Applying scaling factor: {scale.item()}")
+        logging.debug(f"[DEBUG] Pre-scaling intensities: abs min={intensity.abs().min().item()}, abs max={intensity.abs().max().item()}, abs mean={intensity.abs().mean().item()}")
+        logging.debug(f"[DEBUG] Computed scale factor: {scale:.8f}")
         intensity_scaled = intensity * scale
-        logging.debug(f"[DEBUG] Post-scaling intensities: abs min={intensity_scaled.abs().min().item()}, abs max={intensity_scaled.abs().max().item()}, mean={intensity_scaled.mean().item()}")
+        logging.debug(f"[DEBUG] Post-scaling intensities: abs min={intensity_scaled.abs().min().item()}, abs max={intensity_scaled.abs().max().item()}, abs mean={intensity_scaled.abs().mean().item()}")
         return intensity_scaled
 
     def _validate_intermediate_values(self, tag: str, tensor: torch.Tensor) -> None:
