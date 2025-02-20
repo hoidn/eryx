@@ -503,7 +503,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         assert scale.requires_grad, "Scale factor tensor does not require grad."
         return scale
 
-    def _validate_adp_scaling(self) -> None:
+    def _validate_adp_scaling(self, use_exp_adp: bool) -> None:
         """
         Validate that the ADP scale factor correctly maps model variances
         to experimental values.
