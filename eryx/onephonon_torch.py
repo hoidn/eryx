@@ -359,7 +359,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         crystal_transform = self._compute_crystal_transform_torch(q_grid_torch)
         logging.debug(f"[OnePhononTorch.forward] Crystal transform: shape={crystal_transform.shape}, min={crystal_transform.min().item()}, max={crystal_transform.max().item()}, mean={crystal_transform.mean().item()}")
         I = self._incoherent_sum_torch(crystal_transform)
-        logging.debug(f"[OnePhononTorch.forward] After incoherent sum: shape={I.shape}, min={I.min().item()}, max={I.max().item()}, mean={I.mean().item()}")
+        logging.debug(f"[OnePhononTorch.forward] After incoherent sum: shape={I.shape}, abs stats: min={I.abs().min().item()}, max={I.abs().max().item()}, mean={I.abs().mean().item()}")
         self.validate_physics_computation()
         elapsed = time.time() - start_time
         logging.debug(f"[OnePhononTorch.forward] Forward pass completed in {elapsed:.4f} seconds")
@@ -488,6 +488,8 @@ class OnePhononTorch(nn.Module, ModelRunner):
         exp_adps = torch.tensor(self.atomic_model.adp[0],
                                   device=self.device,
                                   dtype=torch.float64)
+        logging.debug(f"[DEBUG] Experimental ADPs: mean={torch.mean(exp_adps).item()}, std={torch.std(exp_adps).item()}")
+        logging.debug(f"[DEBUG] Model variance (kinv_diag): mean={torch.mean(kinv_diag).item()}, std={torch.std(kinv_diag).item()}")
         scale = torch.mean(exp_adps) / (8 * torch.pi * torch.pi * torch.mean(kinv_diag))
         logging.debug(f"[DEBUG] ADP scale factor computed: {scale.item()}")
         if scale.is_complex():
@@ -527,9 +529,10 @@ class OnePhononTorch(nn.Module, ModelRunner):
         This matches the numpy implementation scaling while preserving gradient flow.
         """
         scale = self._compute_adp_scale_factor()
-        logging.debug(f"[DEBUG] Pre-scaling intensities: min={intensity.min().item()}, max={intensity.max().item()}, mean={intensity.mean().item()}")
+        logging.debug(f"[DEBUG] Pre-scaling intensities: abs min={intensity.abs().min().item()}, abs max={intensity.abs().max().item()}, mean={intensity.mean().item()}")
         logging.debug(f"[DEBUG] Applying scaling factor: {scale.item()}")
         intensity_scaled = intensity * scale
+        logging.debug(f"[DEBUG] Post-scaling intensities: abs min={intensity_scaled.abs().min().item()}, abs max={intensity_scaled.abs().max().item()}, mean={intensity_scaled.mean().item()}")
         return intensity_scaled
 
     def _validate_intermediate_values(self, tag: str, tensor: torch.Tensor) -> None:
