@@ -337,26 +337,31 @@ class OnePhononTorch(nn.Module, ModelRunner):
         
         # Test the hypothesis: apply the tentative normalization factor
 
-        I_full = torch.tensor(I_full_np, device=self.device, dtype=torch.float32)
-        return I_full.flatten()
     def forward(self) -> torch.Tensor:
         """Performs a full forward pass through the OnePhononTorch model.
-
+    
         This method executes the following steps:
             1. Computes phonon modes via the torch-based GNM module.
             2. Computes the covariance matrix using torch operations.
             3. Applies disorder to obtain the diffuse intensity, modulated by the covariance effects.
             4. Runs a physics validation routine to ensure consistency with numpy reference computations.
-
+    
         Returns:
             torch.Tensor: A flattened tensor representing the computed diffuse intensity with proper gradient flow.
         """
+        start_time = time.time()
+        logging.debug("[OnePhononTorch.forward] Starting forward pass")
         self.gnm_torch.compute_gnm_phonons_torch()
         cov_matrix = self.compute_covariance_matrix_torch()
-        logging.info(f"Covariance matrix computed with shape: {cov_matrix.shape}")
-        I = self.apply_disorder()
-        # Optionally, run physics validation
+        logging.debug(f"[OnePhononTorch.forward] Covariance matrix: shape={cov_matrix.shape}, min={cov_matrix.min().item()}, max={cov_matrix.max().item()}, mean={cov_matrix.mean().item()}")
+        q_grid_torch = torch.tensor(self.q_grid, device=self.device, dtype=torch.float32)
+        crystal_transform = self._compute_crystal_transform_torch(q_grid_torch)
+        logging.debug(f"[OnePhononTorch.forward] Crystal transform: shape={crystal_transform.shape}, min={crystal_transform.min().item()}, max={crystal_transform.max().item()}, mean={crystal_transform.mean().item()}")
+        I = self._incoherent_sum_torch(crystal_transform)
+        logging.debug(f"[OnePhononTorch.forward] After incoherent sum: shape={I.shape}, min={I.min().item()}, max={I.max().item()}, mean={I.mean().item()}")
         self.validate_physics_computation()
+        elapsed = time.time() - start_time
+        logging.debug(f"[OnePhononTorch.forward] Forward pass completed in {elapsed:.4f} seconds")
         return I
 
     def validate_physics_computation(self) -> None:

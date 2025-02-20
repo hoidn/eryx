@@ -1502,9 +1502,9 @@ class OnePhonon(ModelRunner):
               ", min =", np.nanmin(mult), 
               ", max =", np.nanmax(mult), 
               ", first 10 elements =", mult.flatten()[:10])
-        Id = np.real(Id)
-        if outdir is not None:
-            np.save(os.path.join(outdir, f"rank_{rank:05}.npy"), Id)
+        logging.debug(f"[OnePhonon.apply_disorder] Final diffuse intensity: shape={Id.shape}, min={np.nanmin(Id)}, max={np.nanmax(Id)}, mean={np.nanmean(Id)}")
+        elapsed = time.time() - start_time
+        logging.debug(f"[OnePhonon.apply_disorder] Completed disorder computation in {elapsed:.2f} s")
         return Id
 
 class OnePhononBrillouin:
