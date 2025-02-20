@@ -33,14 +33,17 @@ class GaussianNetworkModelTorch(nn.Module):
 
     def build_gamma(self) -> None:
         """
-        Build the spring constant tensor.
+        Build the spring constant tensor using vectorized operations.
+        Enforce parameter constraints by clamping gamma values.
         """
+        gamma_inter = torch.clamp(self.gamma_inter, min=1e-6)
+        gamma_intra = torch.clamp(self.gamma_intra, min=1e-6)
         # Create a gamma tensor from the learnable gamma_inter scalar:
-        gamma_tensor = self.gamma_inter * torch.ones((self.n_cell, self.n_asu, self.n_asu),
-                                                     device=self.device, dtype=torch.float64)
-        # In the reference cell and on the diagonal, use gamma_intra:
+        gamma_tensor = gamma_inter * torch.ones((self.n_cell, self.n_asu, self.n_asu),
+                                                device=self.device, dtype=torch.float64)
+        # In the reference cell, assign intra-spring constants on the diagonal using vectorized indexing:
         idx = torch.arange(self.n_asu, device=self.device)
-        gamma_tensor[self.id_cell_ref, idx, idx] = self.gamma_intra
+        gamma_tensor[self.id_cell_ref, idx, idx] = gamma_intra
         self.gamma = gamma_tensor
 
     def build_neighbor_list(self) -> None:

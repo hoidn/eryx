@@ -184,3 +184,19 @@ def test_gradient_flow(gnm_model_torch):
     loss = sum([winv.sum() for winv in gnm_model_torch.Winv])
     loss.backward()
     assert gnm_model_torch.gamma.grad is not None, "Gradients did not propagate to the gamma parameter"
+def test_gradient_flow_torch_parameters(gnm_model_torch):
+    """
+    Test that gradients propagate through learnable gamma parameters in the Torch GNM.
+    """
+    # Zero out any existing gradients.
+    if gnm_model_torch.gamma_intra.grad is not None:
+        gnm_model_torch.gamma_intra.grad.zero_()
+    if gnm_model_torch.gamma_inter.grad is not None:
+        gnm_model_torch.gamma_inter.grad.zero_()
+    # Perform a forward pass.
+    V, Winv = gnm_model_torch.forward()
+    # Define a dummy loss that sums outputs.
+    loss = torch.sum(V) + torch.sum(Winv)
+    loss.backward()
+    assert gnm_model_torch.gamma_intra.grad is not None, "gamma_intra did not receive gradients"
+    assert gnm_model_torch.gamma_inter.grad is not None, "gamma_inter did not receive gradients"
