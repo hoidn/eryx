@@ -262,7 +262,7 @@ class GaussianNetworkModelTorch(nn.Module):
         print("\n=== Mass Weighting ===")
         print(f"Input Kmat shape: {Kmat.shape}")
         print(f"Input Kmat ndim: {Kmat.ndim}")
-            print(f"Non-zero elements in first dim: {Kmat[0].nonzero().shape}")
+        print(f"Non-zero elements in first dim: {Kmat[0].nonzero().shape}")
         # Compute the total number of degrees of freedom (n_asu * n_atoms_per_asu)
         n_total = self.n_asu * self.n_atoms_per_asu
         print(f"Reshaping Kmat from {Kmat.shape} to ({n_total}, {n_total})")
