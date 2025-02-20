@@ -90,7 +90,7 @@ class GaussianNetworkModelTorch(nn.Module):
                             val_to_assign = -gamma_val.to(torch.complex128)
                             # logging.debug(f"[DEBUG - compute_hessian] Attempting assignment: hessian[{i_asu}, {i_at}, {i_cell}, {j_asu}, {idxs.tolist()}] = {val_to_assign}")
                             try:
-                                hessian[i_asu, i_at, i_cell, j_asu, idxs] = val_to_assign
+                                hessian[i_asu, i_at, i_cell, j_asu].scatter_(0, idxs, val_to_assign.expand_as(idxs))
                             except Exception as e:
                                 logging.error(
                                     f"[ERROR - compute_hessian] Failed assignment at i_asu={i_asu}, i_cell={i_cell}, j_asu={j_asu}, "
@@ -205,6 +205,9 @@ class GaussianNetworkModelTorch(nn.Module):
         # Apply mass weighting (this helper already uses torch operations)
         Dmat = self._mass_weight_dynamical_matrix(Kmat)
         # Compute the SVD for eigendecomposition with gradient flow
+        # Optional: apply checkpointing for memory efficiency if necessary.
+        # from torch.utils.checkpoint import checkpoint
+        # Dmat = checkpoint(lambda x: x, Dmat)
         U, S, Vh = torch.linalg.svd(Dmat)
         self.V = U  # store eigenvectors
         self.Winv = 1.0 / S  # inverse singular values (ensure no detach)
