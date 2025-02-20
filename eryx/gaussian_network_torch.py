@@ -297,9 +297,9 @@ class GaussianNetworkModelTorch(nn.Module):
         self.gamma_intra.data.clamp_(min=1e-6)
         self.gamma_inter.data.clamp_(min=1e-6)
         # Compute the full physics chain in a differentiable manner.
-        hessian = self.compute_hessian().detach()
+        hessian = self.compute_hessian_torch()
         kvec = torch.zeros(3, device=self.device, dtype=torch.float64)
-        Kmat = self.compute_K(hessian, kvec).detach()
+        Kmat = self.compute_K_torch(hessian, kvec=kvec)
         Dmat = self._mass_weight_dynamical_matrix(Kmat)
         # Optional: apply checkpointing for memory efficiency if needed.
         # from torch.utils.checkpoint import checkpoint
