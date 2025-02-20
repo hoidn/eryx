@@ -268,13 +268,23 @@ class OnePhononTorch(nn.Module, ModelRunner):
 
         I_full = torch.tensor(I_full_np, device=self.device, dtype=torch.float32)
         return I_full.flatten()
-    def forward(self):
-        # 1. Compute phonon modes via the torch GNM
+    def forward(self) -> torch.Tensor:
+        """Performs a full forward pass through the OnePhononTorch model.
+        
+        This includes:
+          - Computing phonon modes via the GNM torch module.
+          - Computing the covariance matrix.
+          - Applying disorder to obtain the diffuse intensity.
+        
+        Returns:
+            torch.Tensor: The computed diffuse intensity (flattened tensor).
+        """
         self.gnm_torch.compute_gnm_phonons_torch()
-        # 2. Compute covariance matrix (via a new vectorized method)
         cov_matrix = self.compute_covariance_matrix_torch()
-        # 3. Compute diffuse scattering intensity (using gradient‐preserving operations)
-        I = self.apply_disorder(use_data_adp=False)
+        logging.info(f"Covariance matrix computed with shape: {cov_matrix.shape}")
+        I = self.apply_disorder()
+        # Optionally, run physics validation
+        self.validate_physics_computation()
         return I
     def compute_covariance_matrix_torch(self):
         """
