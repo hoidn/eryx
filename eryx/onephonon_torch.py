@@ -184,7 +184,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         return torch.from_numpy(full_ravel).to(self.device, dtype=torch.long)
 
     @log_method_call
-    def apply_disorder(self) -> torch.Tensor:
+    def apply_disorder(self, use_exp_adp: bool = True) -> torch.Tensor:
         """Compute diffuse intensity using a torch-based one-phonon model.
 
         This routine performs the following:
@@ -215,7 +215,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         logging.debug(f"Id (diffuse intensity) values: {Id}")
         # Remove the problematic exponential weighting.
         # Instead, apply the correct intensity normalization matching the numpy reference.
-        Id = self._apply_correct_scaling(Id)
+        Id = self._apply_correct_scaling(Id, use_exp_adp)
         self._validate_final_output(Id)
         return Id
     def _compute_crystal_transform_torch(self, q_grid_torch: torch.Tensor) -> torch.Tensor:
@@ -508,7 +508,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         Validate that the ADP scale factor correctly maps model variances
         to experimental values.
         """
-        scale = self._compute_adp_scale_factor()
+        scale = self._compute_adp_scale_factor() if use_exp_adp else 1.0
         kinv_diag = self._compute_kinv_diagonal()
         model_vars = scale * kinv_diag
         exp_vars = torch.tensor(self.atomic_model.adp[0],
@@ -527,7 +527,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         logging.debug(f"  Covariance eigenvalues: min {eigenvalues.min().item()}, max {eigenvalues.max().item()}")
         logging.debug(f"  Covariance condition number: {condition_number.item()}")
 
-    def _apply_correct_scaling(self, intensity: torch.Tensor) -> torch.Tensor:
+    def _apply_correct_scaling(self, intensity: torch.Tensor, use_exp_adp: bool) -> torch.Tensor:
         """
         Apply correct normalization to diffuse intensities.
         This matches the numpy implementation scaling while preserving gradient flow.
