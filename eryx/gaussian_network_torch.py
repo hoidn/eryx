@@ -221,11 +221,11 @@ class GaussianNetworkModelTorch(nn.Module):
             eikr = torch.exp(1j * phase)
             Kmat += hessian[:, :, i_cell, :, :] * eikr
         n_total = shape[0] * shape[1]
-        return Kmat.reshape(n_total, n_total).detach()
+        return Kmat.reshape(n_total, n_total)
 
     def compute_gnm_phonons_torch(self):
         # Compute the Hessian and corresponding K matrix at k=0 (or other chosen k-vector)
-        hessian = self.compute_hessian()
+        hessian = self.compute_hessian_torch()
         kvec = torch.zeros(3, device=self.device, dtype=torch.float64)
         Kmat = self.compute_K(hessian, kvec)
         # Apply mass weighting (this helper already uses torch operations)

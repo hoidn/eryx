@@ -160,7 +160,7 @@ def test_k_matrix_torch(gnm_model_torch):
     hessian_torch = gnm_model_torch.compute_hessian_torch()
     kvec = torch.tensor([1.0, 0.0, 0.0], device=gnm_model_torch.device, dtype=torch.float64)
     Kmat_torch = gnm_model_torch.compute_K_torch(hessian_torch, kvec=kvec)
-    Kmat_np = gnm_model_torch.compute_K(hessian_torch, kvec=kvec).cpu().numpy()
+    Kmat_np = gnm_model_torch.compute_K(hessian_torch, kvec=kvec).detach().cpu().numpy()
     # TODO convert back and forth from block structured to 2d
     np.testing.assert_allclose(Kmat_torch.detach().cpu().numpy(), 
                                Kmat_np.reshape(Kmat_torch.detach().cpu().numpy().shape), rtol=1e-5,
