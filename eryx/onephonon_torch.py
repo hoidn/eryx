@@ -202,6 +202,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         print("Computing hessian...")
         cov_matrix: torch.Tensor = self.compute_covariance_matrix_torch()
         logging.info(f"Computed covariance matrix with shape: {cov_matrix.shape}")
+        self._validate_complex_matrix(cov_matrix)
         hessian_torch = self.gnm_torch.compute_hessian()  # already on device
         q_grid_torch = torch.tensor(self.q_grid, device=self.device, dtype=torch.float32)
         crystal_transform = self._compute_crystal_transform_torch(q_grid_torch)
@@ -398,12 +399,12 @@ class OnePhononTorch(nn.Module, ModelRunner):
         # Compute the model covariance (V @ diag(Winv) @ Vᵀ)
         cov = torch.matmul(V * Winv.unsqueeze(-2), V.transpose(-2, -1))
         
-        # Retrieve the physically correct scale factor
+        # Retrieve the physically correct scale factor (real)
         scale = self._compute_adp_scale_factor()
-        cov = cov.real * scale
+        cov = cov * scale
 
         logging.debug(f"[DEBUG] ADP Scale Factor in Covariance: {scale.item()}")
-        logging.debug(f"[DEBUG] Covariance diagonal mean after scaling: {torch.mean(torch.diag(cov)).item()}")
+        # Log real and imaginary statistics using the updated validation method.
         self._validate_intermediate_values("Covariance matrix", cov)
         return cov
     @staticmethod
@@ -482,6 +483,8 @@ class OnePhononTorch(nn.Module, ModelRunner):
         and kinv_diag are the diagonal elements of the model’s K⁻¹.
         """
         kinv_diag = self._compute_kinv_diagonal()
+        if kinv_diag.is_complex():
+            kinv_diag = kinv_diag.real
         exp_adps = torch.tensor(self.atomic_model.adp[0],
                                   device=self.device,
                                   dtype=torch.float64)
@@ -529,8 +532,13 @@ class OnePhononTorch(nn.Module, ModelRunner):
     def _validate_intermediate_values(self, tag: str, tensor: torch.Tensor) -> None:
         """
         Log the minimum, maximum, and mean values of an intermediate tensor.
+        For complex tensors, logs separate statistics for real and imaginary parts.
         """
-        logging.debug(f"[DEBUG] {tag} stats: min={tensor.min().item()}, max={tensor.max().item()}, mean={tensor.mean().item()}")
+        if tensor.is_complex():
+            logging.debug(f"[DEBUG] {tag} real stats: min={tensor.real.min().item()}, max={tensor.real.max().item()}, mean={tensor.real.mean().item()}")
+            logging.debug(f"[DEBUG] {tag} imag stats: min={tensor.imag.min().item()}, max={tensor.imag.max().item()}, mean={tensor.imag.mean().item()}")
+        else:
+            logging.debug(f"[DEBUG] {tag} stats: min={tensor.min().item()}, max={tensor.max().item()}, mean={tensor.mean().item()}")
 
     def _validate_final_output(self, tensor: torch.Tensor) -> None:
         """
@@ -548,3 +556,17 @@ class OnePhononTorch(nn.Module, ModelRunner):
         """
         diag = torch.sum(torch.square(self.gnm_torch.V) * self.gnm_torch.Winv.unsqueeze(-2), dim=-1)
         return diag
+
+    def _validate_complex_matrix(self, mat: torch.Tensor, tol: float = 1e-5) -> None:
+        """
+        Validate properties of a complex matrix.
+        Checks the Hermitian property and logs detailed statistics.
+        """
+        if not mat.is_complex():
+            logging.debug("Matrix is not complex.")
+            return
+        hermitian_diff = torch.norm(mat - mat.transpose(-2, -1).conj(), p='fro')
+        is_hermitian = hermitian_diff < tol
+        logging.debug(f"[DEBUG] Complex matrix Hermitian check: {is_hermitian}, Frobenius norm difference: {hermitian_diff.item()}")
+        logging.debug(f"[DEBUG] Real part stats: min={mat.real.min().item()}, max={mat.real.max().item()}, mean={mat.real.mean().item()}")
+        logging.debug(f"[DEBUG] Imag part stats: min={mat.imag.min().item()}, max={mat.imag.max().item()}, mean={mat.imag.mean().item()}")
