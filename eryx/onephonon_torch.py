@@ -262,7 +262,9 @@ class OnePhononTorch(nn.Module, ModelRunner):
         # Repeat intensities for each symmetry group row
         all_intensities = transform_intensities.repeat(ravel_indices.size(0))  # Shape becomes [1802500]
         print(f"Debug: transform_intensities shape: {transform_intensities.shape}")
+        unique_indices, inverse = torch.unique(all_indices, return_inverse=True)
         print(f"Debug: unique_indices shape: {unique_indices.shape}")
+        summed = torch.zeros(unique_indices.size(0), device=self.device, dtype=transform.dtype)
         print(f"Debug: summed shape: {summed.shape}")
         unique_indices, inverse = torch.unique(all_indices, return_inverse=True)
         summed = torch.zeros(unique_indices.size(0), device=self.device, dtype=transform.dtype)
