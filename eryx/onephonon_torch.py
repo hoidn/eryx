@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from typing import List
+import time
 import logging
 from eryx.models import ModelRunner
 from eryx.gaussian_network_torch import GaussianNetworkModelTorch
