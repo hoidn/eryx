@@ -402,9 +402,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         pre_scale_eigvals = torch.linalg.eigvalsh(cov.real)
         logging.debug(f"[DEBUG] Pre-scaling covariance eigenvalues (real part): min={pre_scale_eigvals.min().item()}, max={pre_scale_eigvals.max().item()}, mean={pre_scale_eigvals.mean().item()}")
         
-        # Retrieve the physically correct scale factor (real)
-        scale = self._compute_adp_scale_factor()
-        cov = cov * scale
+        self._cov_torch = cov  # Store unscaled covariance
         post_scale_eigvals = torch.linalg.eigvalsh(cov.real)
         logging.debug(f"[DEBUG] Post-scaling covariance eigenvalues (real part): min={post_scale_eigvals.min().item()}, max={post_scale_eigvals.max().item()}, mean={post_scale_eigvals.mean().item()}")
         
