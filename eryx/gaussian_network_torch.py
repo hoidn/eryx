@@ -115,27 +115,21 @@ class GaussianNetworkModelTorch(nn.Module):
         return hessian
 
     def compute_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
-        """
-        Compute the dynamical matrix K(k) using torch.
-        """
         if kvec is None:
             kvec = torch.zeros(3, device=self.device, dtype=torch.float64)
-        else:
-            kvec = kvec.to(torch.float64)
-        # Start with the reference cell term
-        Kmat = hessian[:, :, self.id_cell_ref, :, :].clone()
-        # Sum contributions from other cells (using explicit loops over ASU indices)
-        for j_cell in range(self.n_cell):
-            if j_cell == self.id_cell_ref:
-                continue
-            # Get cell origin and compute phase factor
-            r_cell_np = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
-            r_cell = torch.tensor(r_cell_np, device=self.device, dtype=torch.float64)
-            phase = torch.dot(kvec, r_cell)
-            eikr = torch.exp(1j * phase)
-            # Add contribution from cell j_cell (batch over asu indices)
-            Kmat += hessian[:, :, j_cell, :, :] * eikr
-        # logging.debug(f"Kmat shape: {Kmat.shape}")
+        # Gather unit cell origins for all cells in a vectorized manner.
+        all_r = torch.stack([torch.tensor(self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j)),
+                                            device=self.device, dtype=torch.float64)
+                             for j in range(self.n_cell)], dim=0)  # shape: (n_cell, 3)
+        phases = torch.matmul(all_r, kvec)  # shape: (n_cell,)
+        eikr = torch.exp(1j * phases)       # shape: (n_cell,)
+        # Expand eikr for broadcasting: shape (1,1,n_cell,1,1)
+        eikr_exp = eikr.view(1, 1, self.n_cell, 1, 1)
+        # Exclude the reference cell from the summation.
+        mask = torch.ones(self.n_cell, dtype=torch.bool, device=self.device)
+        mask[self.id_cell_ref] = False
+        weighted_sum = (hessian[:, :, mask, :, :] * eikr_exp[:, :, mask, :, :]).sum(dim=2)
+        Kmat = hessian[:, :, self.id_cell_ref, :, :] + weighted_sum
         return Kmat
 
     def compute_Kinv(self, hessian: torch.Tensor, kvec: torch.Tensor = None, reshape: bool = True) -> torch.Tensor:
@@ -246,14 +240,18 @@ class GaussianNetworkModelTorch(nn.Module):
         w_processed = torch.where(w < epsilon, torch.tensor(epsilon, device=self.device, dtype=w.dtype), w)
         return v, w_processed
     def forward(self):
-        # Compute hessian → K matrix → mass–weighted dynamical matrix → SVD
+        # Enforce parameter constraints: ensure gamma parameters remain positive.
+        self.gamma_intra.data.clamp_(min=1e-6)
+        self.gamma_inter.data.clamp_(min=1e-6)
+        # Compute the full physics chain in a differentiable manner.
         hessian = self.compute_hessian()
-        # For demonstration, use kvec=0; you may later parameterize kvec if needed
         kvec = torch.zeros(3, device=self.device, dtype=torch.float64)
         Kmat = self.compute_K(hessian, kvec)
         Dmat = self._mass_weight_dynamical_matrix(Kmat)
+        # Optional: apply checkpointing for memory efficiency if needed.
+        # from torch.utils.checkpoint import checkpoint
+        # Dmat = checkpoint(lambda x: x, Dmat)
         U, S, Vh = torch.linalg.svd(Dmat)
         self.V = U
         self.Winv = 1.0 / S
-        # Return computed modes (or any quantities needed for the loss)
         return self.V, self.Winv
