@@ -347,3 +347,22 @@ class OnePhononTorch(nn.Module, ModelRunner):
         # from the phonon modes (using self.V, self.Winv, etc.)
         # Ensure that all operations are differentiable.
         return torch.tensor(0.0, device=self.device)  # placeholder; replace with actual code
+    @staticmethod
+    def structure_factors_torch(q_grid: torch.Tensor,
+                                xyz: torch.Tensor,
+                                ff_a: torch.Tensor,
+                                ff_b: torch.Tensor,
+                                ff_c: torch.Tensor,
+                                U: torch.Tensor = None) -> torch.Tensor:
+        # q_grid: (n_points, 3), xyz: (n_atoms, 3), ff_a: (n_atoms,4), etc.
+        qmags = torch.norm(q_grid, dim=1)
+        Q = (qmags / (4 * np.pi))**2  # shape (n_points,)
+        Q_exp = Q.view(-1, 1, 1)  # expand for broadcasting
+        exp_term = torch.exp(-ff_b.unsqueeze(0) * Q_exp)
+        ff = (ff_a.unsqueeze(0) * exp_term).sum(dim=2) + ff_c.unsqueeze(0)  # (n_points, n_atoms)
+        phases = torch.matmul(q_grid, xyz.transpose(0, 1))  # (n_points, n_atoms)
+        A = 1j * ff * torch.sin(phases) + ff * torch.cos(phases)
+        if U is not None:
+            qUq = (qmags**2).view(-1, 1) * U.view(1, -1)
+            A = A * torch.exp(-0.5 * qUq)
+        return A
