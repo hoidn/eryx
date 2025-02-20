@@ -485,13 +485,15 @@ class OnePhononTorch(nn.Module, ModelRunner):
         where exp_adps are the experimental ADP values (from the atomic model)
         and diag(cov) is the diagonal of the covariance matrix computed via compute_covariance_matrix_torch().
         """
-        cov_torch = self.compute_covariance_matrix_torch()
+        if not hasattr(self, "_cov_torch"):
+            self._cov_torch = self.compute_covariance_matrix_torch()
+        cov_torch = self._cov_torch
         diag_var = torch.diag(cov_torch)
         exp_adps = torch.tensor(self.atomic_model.adp[0],
                                   device=self.device,
                                   dtype=torch.float64)
         logging.debug(f"[DEBUG] Experimental ADPs: mean={torch.mean(exp_adps).item()}, std={torch.std(exp_adps).item()}")
-        logging.debug(f"Computed Torch diag variance (from covariance): mean={torch.mean(diag_var).item():.8f}")
+        logging.debug(f"Computed Torch diag variance (from covariance): mean={torch.mean(diag_var).item():.8f} and new ADP scale factor: {(torch.mean(exp_adps) / (8 * torch.pi * torch.pi * torch.mean(diag_var))).item():.8f}")
         scale = torch.mean(exp_adps) / (8 * torch.pi * torch.pi * torch.mean(diag_var))
         np_scale = torch.mean(exp_adps).item() / (8 * np.pi * np.pi * torch.mean(diag_var).item())
         logging.debug(f"[DEBUG] New Torch ADP scale factor: {scale.item():.8f} | Numpy reference ADP scale factor: {np_scale:.8f}")
