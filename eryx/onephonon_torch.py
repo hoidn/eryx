@@ -318,8 +318,8 @@ class OnePhononTorch(nn.Module, ModelRunner):
             qUq = (qmags**2).view(-1, 1) * U.view(1, -1)
             A = A * torch.exp(-0.5 * qUq)
         return A
-  @staticmethod
-  def _compare_to_numpy(torch_val: torch.Tensor, numpy_val: np.ndarray, name: str, rtol: float = 1e-5) -> bool:
+    @staticmethod
+    def _compare_to_numpy(torch_val: torch.Tensor, numpy_val: np.ndarray, name: str, rtol: float = 1e-5) -> bool:
       """Compares a torch tensor to a numpy array within a specified relative tolerance.
       
       Args:
