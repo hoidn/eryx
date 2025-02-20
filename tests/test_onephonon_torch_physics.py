@@ -50,3 +50,36 @@ def test_structure_factors_match(device):
                               atomic_model.ff_c[0],
                               U=atomic_model.adp[0]/(8*np.pi*np.pi))
     assert np.allclose(torch.abs(torch_sf), np.abs(np_sf), rtol=1e-5), "Structure factors differ between torch and numpy."
+def test_adp_scale_factor(device):
+    """
+    Test that the ADP scale factor computed by OnePhononTorch matches
+    the reference (numpy) implementation.
+    """
+    pdb_path = "tests/pdbs/5zck.pdb"
+    hsampling = [-1, 2, 10]
+    ksampling = [-1, 2, 10]
+    lsampling = [-1, 2, 10]
+    model_torch = OnePhononTorch(pdb_path, hsampling, ksampling, lsampling, device=device)
+    model_np = OnePhonon(pdb_path, hsampling, ksampling, lsampling)  # assuming _compute_adp_scale() exists in OnePhonon
+    scale_torch = model_torch._compute_adp_scale_factor()
+    scale_np = model_np._compute_adp_scale()
+    assert torch.allclose(scale_torch.cpu(), torch.tensor(scale_np, dtype=scale_torch.dtype), rtol=1e-5)
+
+
+def test_scaled_variances(device):
+    """
+    Test that the variances from the GNM (after scaling) approximately
+    match the experimental variances.
+    """
+    pdb_path = "tests/pdbs/5zck.pdb"
+    hsampling = [-1, 2, 10]
+    ksampling = [-1, 2, 10]
+    lsampling = [-1, 2, 10]
+    model = OnePhononTorch(pdb_path, hsampling, ksampling, lsampling, device=device)
+    scale = model._compute_adp_scale_factor()
+    kinv_diag = model._compute_adp_diagonal()
+    model_vars = scale * kinv_diag
+    exp_vars = torch.tensor(model.gnm_torch.atomic_model.adp[0],
+                            device=model.device,
+                            dtype=model_vars.dtype) / (8 * torch.pi * torch.pi)
+    assert torch.allclose(model_vars.cpu(), exp_vars.cpu(), rtol=1e-4)

@@ -391,19 +391,18 @@ class OnePhononTorch(nn.Module, ModelRunner):
             raise AssertionError("Structure factors validation failed.")
         logging.info("Physics validation passed: torch computations match numpy references.")
     def compute_covariance_matrix_torch(self):
-        """
-        Compute covariance matrix from phonon modes using torch operations.
-        Uses V (eigenvectors) and Winv (inverse eigenvalues) from GNM.
-        """
-        # Get phonon modes from GNM
         V = self.gnm_torch.V  # shape: (..., n_modes, n_modes)
         Winv = self.gnm_torch.Winv  # shape: (..., n_modes)
         
-        # Compute covariance as V @ diag(Winv) @ V.T
+        # Compute the model covariance (V @ diag(Winv) @ Vᵀ)
         cov = torch.matmul(V * Winv.unsqueeze(-2), V.transpose(-2, -1))
-        # Compute ADP scale factor (see helper below) and apply scaling:
-        adp_scale = self._compute_adp_scale_factor()
-        cov = cov.real * adp_scale
+        
+        # Retrieve the physically correct scale factor
+        scale = self._compute_adp_scale_factor()
+        cov = cov.real * scale
+
+        logging.debug(f"[DEBUG] ADP Scale Factor in Covariance: {scale.item()}")
+        logging.debug(f"[DEBUG] Covariance diagonal mean after scaling: {torch.mean(torch.diag(cov)).item()}")
         self._validate_intermediate_values("Covariance matrix", cov)
         return cov
     @staticmethod
@@ -475,15 +474,38 @@ class OnePhononTorch(nn.Module, ModelRunner):
 
     def _compute_adp_scale_factor(self) -> torch.Tensor:
         """
-        Compute the ADP normalization factor from the atomic model.
-        This factor is computed to bring the covariance matrix magnitude
-        to O(1) and to match the numpy implementation scaling.
+        Compute the physically correct ADP scale factor.
+        The scale factor is defined as:
+            scale = mean(exp_adps) / (8 * π² * mean(kinv_diag))
+        where exp_adps are the experimental ADP values (from the atomic model)
+        and kinv_diag are the diagonal elements of the model’s K⁻¹.
         """
-        adp = torch.tensor(self.gnm_torch.atomic_model.adp[0], dtype=torch.float32, device=self.device)
-        # Example: factor = mean(adp) / (8*pi*pi)
-        scale = torch.mean(adp) / (8 * torch.pi * torch.pi)
+        kinv_diag = self._compute_kinv_diagonal()
+        exp_adps = torch.tensor(self.gnm_torch.atomic_model.adp[0],
+                                  device=self.device,
+                                  dtype=torch.float64)
+        scale = torch.mean(exp_adps) / (8 * torch.pi * torch.pi * torch.mean(kinv_diag))
         logging.debug(f"[DEBUG] ADP scale factor computed: {scale.item()}")
         return scale
+
+    def _validate_adp_scaling(self) -> None:
+        """
+        Validate that the ADP scale factor correctly maps model variances
+        to experimental values.
+        """
+        scale = self._compute_adp_scale_factor()
+        kinv_diag = self._compute_kinv_diagonal()
+        model_vars = scale * kinv_diag
+        exp_vars = torch.tensor(self.gnm_torch.atomic_model.adp[0],
+                                device=self.device,
+                                dtype=model_vars.dtype) / (8 * torch.pi * torch.pi)
+    
+        logging.debug("[DEBUG] ADP Scale Validation:")
+        logging.debug(f"  Scale factor: {scale.item()}")
+        logging.debug(f"  Mean model variance: {torch.mean(model_vars).item()}")
+        logging.debug(f"  Mean experimental variance: {torch.mean(exp_vars).item()}")
+        rel_diff = torch.max(torch.abs(model_vars - exp_vars) / exp_vars)
+        logging.debug(f"  Max relative difference: {rel_diff.item()}")
 
     def _apply_correct_scaling(self, intensity: torch.Tensor) -> torch.Tensor:
         """
@@ -509,3 +531,12 @@ class OnePhononTorch(nn.Module, ModelRunner):
         """
         self._validate_intermediate_values("Final diffuse intensities", tensor)
         # (Optionally add additional symmetry invariant checks here.)
+
+    def _compute_kinv_diagonal(self) -> torch.Tensor:
+        """
+        Compute the diagonal elements of K⁻¹ from the GNM eigendecomposition.
+        Returns a 1D tensor whose entries are the summed squared contributions 
+        from the eigenmodes.
+        """
+        diag = torch.sum(torch.square(self.gnm_torch.V) * self.gnm_torch.Winv.unsqueeze(-2), dim=-1)
+        return diag
