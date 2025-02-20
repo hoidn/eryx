@@ -83,3 +83,58 @@ def test_scaled_variances(device):
                             device=model.device,
                             dtype=model_vars.dtype) / (8 * torch.pi * torch.pi)
     assert torch.allclose(model_vars.cpu(), exp_vars.cpu(), rtol=1e-4)
+import torch
+import pytest
+from eryx.onephonon_torch import OnePhononTorch
+from eryx.models import OnePhonon
+
+def test_adp_scale_factor():
+    """
+    Test that the ADP scale factor computed by OnePhononTorch matches the numpy reference.
+    """
+    # Create a OnePhononTorch instance with test parameters
+    model_torch = OnePhononTorch(
+        pdb_path="tests/pdbs/5zck.pdb",
+        hsampling=[-1, 2, 10],
+        ksampling=[-1, 2, 10],
+        lsampling=[-1, 2, 10],
+        device=torch.device("cpu")
+    )
+    # Create a numpy-based OnePhonon instance serving as the reference
+    model_np = OnePhonon(
+        pdb_path="tests/pdbs/5zck.pdb",
+        hsampling=[-1, 2, 10],
+        ksampling=[-1, 2, 10],
+        lsampling=[-1, 2, 10]
+    )
+    scale_torch = model_torch._compute_adp_scale_factor()
+    scale_np = model_np._compute_adp_scale()   # Assuming _compute_adp_scale() is defined in OnePhonon
+    assert torch.allclose(
+        scale_torch.cpu(), 
+        torch.tensor(scale_np, dtype=scale_torch.dtype),
+        rtol=1e-5
+    ), f"Scale factors differ: torch={scale_torch.item()}, numpy={scale_np}"
+
+def test_scaled_variances():
+    """
+    Test that the scaled model variances match the experimental ADPs.
+    """
+    model = OnePhononTorch(
+        pdb_path="tests/pdbs/5zck.pdb",
+        hsampling=[-1, 2, 10],
+        ksampling=[-1, 2, 10],
+        lsampling=[-1, 2, 10],
+        device=torch.device("cpu")
+    )
+    scale = model._compute_adp_scale_factor()
+    kinv_diag = model._compute_kinv_diagonal()
+    model_vars = scale * kinv_diag
+    exp_vars_tensor = torch.tensor(
+        model.gnm_torch.atomic_model.adp[0],
+        dtype=model_vars.dtype
+    ) / (8 * torch.pi * torch.pi)
+    assert torch.allclose(
+        model_vars.cpu(),
+        exp_vars_tensor,
+        rtol=1e-4
+    ), f"Scaled variances differ: model_vars={model_vars.cpu()}, experimental={exp_vars_tensor}"
