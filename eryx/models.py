@@ -1395,6 +1395,16 @@ class OnePhonon(ModelRunner):
                     u, s, _ = np.linalg.svd(Kmat)
                     self.Winv[dh, dk, dl] = s
                     self.V[dh, dk, dl] = u
+    def _compute_adp_scale(self):
+        """
+        Compute the ADP scale factor for the numpy implementation.
+        Returns:
+            scale (float): scale factor computed as mean(exp_adps)/(8 * pi^2 * mean(kinv_diag))
+        """
+        exp_adps = self.model.adp[0]
+        kinv_diag = np.diag(self.covar[0]) if hasattr(self, 'covar') else np.ones_like(exp_adps)
+        scale = np.mean(exp_adps) / (8 * np.pi * np.pi * np.mean(kinv_diag))
+        return scale
 
     @log_method_call
     def apply_disorder(self, rank=-1, outdir=None, use_data_adp=False):

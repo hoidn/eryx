@@ -73,6 +73,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
                                                       self.lsampling,
                                                       return_hkl=True)
         self.q_grid = torch.tensor(2 * np.pi * np.inner(atomic_model.A_inv.T, self.hkl_grid).T, device=self.device, dtype=torch.float32)
+        self.atomic_model = atomic_model
         # Compare with NP version for consistency
         _np_q_grid = 2 * np.pi * np.inner(atomic_model.A_inv.T, self.hkl_grid).T
         _diff = np.abs(_np_q_grid - self.q_grid.cpu().numpy())
@@ -481,11 +482,13 @@ class OnePhononTorch(nn.Module, ModelRunner):
         and kinv_diag are the diagonal elements of the model’s K⁻¹.
         """
         kinv_diag = self._compute_kinv_diagonal()
-        exp_adps = torch.tensor(self.gnm_torch.atomic_model.adp[0],
+        exp_adps = torch.tensor(self.atomic_model.adp[0],
                                   device=self.device,
                                   dtype=torch.float64)
         scale = torch.mean(exp_adps) / (8 * torch.pi * torch.pi * torch.mean(kinv_diag))
         logging.debug(f"[DEBUG] ADP scale factor computed: {scale.item()}")
+        # TEMP: Ensure gradient flow through scale factor computation; remove assert in production.
+        assert scale.requires_grad, "Scale factor tensor does not require grad."
         return scale
 
     def _validate_adp_scaling(self) -> None:
@@ -496,7 +499,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         scale = self._compute_adp_scale_factor()
         kinv_diag = self._compute_kinv_diagonal()
         model_vars = scale * kinv_diag
-        exp_vars = torch.tensor(self.gnm_torch.atomic_model.adp[0],
+        exp_vars = torch.tensor(self.atomic_model.adp[0],
                                 device=self.device,
                                 dtype=model_vars.dtype) / (8 * torch.pi * torch.pi)
     
@@ -506,6 +509,11 @@ class OnePhononTorch(nn.Module, ModelRunner):
         logging.debug(f"  Mean experimental variance: {torch.mean(exp_vars).item()}")
         rel_diff = torch.max(torch.abs(model_vars - exp_vars) / exp_vars)
         logging.debug(f"  Max relative difference: {rel_diff.item()}")
+        cov = self.compute_covariance_matrix_torch()
+        eigenvalues = torch.linalg.eigvalsh(cov)
+        condition_number = eigenvalues.max() / eigenvalues.min()
+        logging.debug(f"  Covariance eigenvalues: min {eigenvalues.min().item()}, max {eigenvalues.max().item()}")
+        logging.debug(f"  Covariance condition number: {condition_number.item()}")
 
     def _apply_correct_scaling(self, intensity: torch.Tensor) -> torch.Tensor:
         """
