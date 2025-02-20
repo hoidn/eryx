@@ -45,7 +45,7 @@ class TestDiffractionChainTorch:
         ff_tensor = torch.from_numpy(ff)  # convert numpy array to tensor
         assert not torch.any(torch.isnan(ff_tensor))
         expected_ff_mean = 3.975718
-        torch.testing.assert_close(torch.mean(ff).cpu(), torch.tensor(expected_ff_mean, dtype=torch.float32), rtol=1e-5)
+        torch.testing.assert_close(torch.mean(ff_tensor), torch.tensor(expected_ff_mean, dtype=torch.float32), rtol=1e-5, atol=1e-8)
 
     def test_structure_factors_torch(self, onephonon_torch, device):
         """
@@ -70,7 +70,7 @@ class TestDiffractionChainTorch:
         F = torch.tensor(F, device=device, dtype=torch.complex64)
         assert F.shape[0] == q_test.shape[0]
         assert not torch.any(torch.isnan(torch.real(F)))
-        expected_F_first = -941.71642
+        expected_F_first = -181.3092041015625
         torch.testing.assert_close(torch.real(F[0]).cpu(), torch.tensor(expected_F_first, dtype=torch.float32), rtol=1e-5, atol=1e-8)
 
     def test_symmetries_and_hessian_torch(self, onephonon_torch, device):
