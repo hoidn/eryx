@@ -150,7 +150,7 @@ def test_hessian_torch(gnm_model_torch):
     """
     hessian_torch = gnm_model_torch.compute_hessian_torch()
     hessian_np = gnm_model_torch.compute_hessian().cpu().numpy()
-    np.testing.assert_allclose(hessian_torch.cpu().numpy(), hessian_np, rtol=1e-5,
+    np.testing.assert_allclose(hessian_torch.detach().cpu().numpy(), hessian_np, rtol=1e-5,
                                err_msg="Hessian mismatch between Torch and NP methods")
 
 def test_k_matrix_torch(gnm_model_torch):
@@ -162,7 +162,8 @@ def test_k_matrix_torch(gnm_model_torch):
     Kmat_torch = gnm_model_torch.compute_K_torch(hessian_torch, kvec=kvec)
     Kmat_np = gnm_model_torch.compute_K(hessian_torch, kvec=kvec).cpu().numpy()
     # TODO convert back and forth from block structured to 2d
-    np.testing.assert_allclose(Kmat_torch.cpu().numpy(), Kmat_np.reshape(Kmat_torch.cpu().numpy().shape), rtol=1e-5,
+    np.testing.assert_allclose(Kmat_torch.detach().cpu().numpy(), 
+                               Kmat_np.reshape(Kmat_torch.detach().cpu().numpy().shape), rtol=1e-5,
                                err_msg="K-matrix mismatch between Torch and NP methods")
 
 def test_phonon_modes_torch(gnm_model_torch):
