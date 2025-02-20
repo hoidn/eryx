@@ -27,6 +27,10 @@ class GaussianNetworkModelTorch(nn.Module):
         self.n_asu = self.crystal.model.n_asu
         self.n_atoms_per_asu = self.crystal.get_asu_xyz().shape[0]
         self.n_dof_per_asu_actual = self.n_atoms_per_asu * 3
+        print("\n=== GNM Init ===")
+        print(f"n_asu = {self.n_asu}")
+        print(f"n_atoms_per_asu = {self.n_atoms_per_asu}")
+        print(f"n_cell = {self.n_cell}")
 
         self.build_gamma()
         self.build_neighbor_list()
@@ -69,6 +73,8 @@ class GaussianNetworkModelTorch(nn.Module):
         Returns a tensor with shape:
            (n_asu, n_atoms_per_asu, n_cell, n_asu, n_atoms_per_asu) of dtype complex.
         """
+        print("\n=== Computing Hessian ===")
+        print(f"Expected shape: (n_asu={self.n_asu}, n_atoms={self.n_atoms_per_asu}, n_cell={self.n_cell}, n_asu={self.n_asu}, n_atoms={self.n_atoms_per_asu})")
         shape = (self.n_asu, self.n_atoms_per_asu, self.n_cell, self.n_asu, self.n_atoms_per_asu)
         hessian = torch.zeros(shape, dtype=torch.complex128, device=self.device)
         hessian_diag = torch.zeros((self.n_asu, self.n_atoms_per_asu),
@@ -112,9 +118,14 @@ class GaussianNetworkModelTorch(nn.Module):
             # )
         # logging.debug(hessian[0, :, :, 0, :])
         # logging.debug(f"Hessian shape: {hessian.shape}")
+        print("Actual hessian shape: ", hessian.shape)
+        print("Hessian dtype: ", hessian.dtype)
         return hessian
 
     def compute_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
+        print("\n=== Computing K Matrix ===")
+        print(f"Input hessian shape: {hessian.shape}")
+        print(f"kvec: {kvec}")
         if kvec is None:
             kvec = torch.zeros(3, device=self.device, dtype=torch.float64)
         # Gather unit cell origins for all cells in a vectorized manner.
@@ -130,6 +141,8 @@ class GaussianNetworkModelTorch(nn.Module):
         mask[self.id_cell_ref] = False
         weighted_sum = (hessian[:, :, mask, :, :] * eikr_exp[:, :, mask, :, :]).sum(dim=2)
         Kmat = hessian[:, :, self.id_cell_ref, :, :] + weighted_sum
+        print("K matrix shape: ", Kmat.shape)
+        print("K matrix dtype: ", Kmat.dtype)
         return Kmat
 
     def compute_Kinv(self, hessian: torch.Tensor, kvec: torch.Tensor = None, reshape: bool = True) -> torch.Tensor:
@@ -209,6 +222,10 @@ class GaussianNetworkModelTorch(nn.Module):
         # from torch.utils.checkpoint import checkpoint
         # Dmat = checkpoint(lambda x: x, Dmat)
         U, S, Vh = torch.linalg.svd(Dmat)
+        print("\n=== Phonon Computation ===")
+        print(f"Eigenvector shape (V): {U.shape}")
+        print(f"Eigenvalue shape (Winv): {S.shape}")
+        print(f"First few eigenvalues: {S[:5]}")
         self.V = U  # store eigenvectors
         self.Winv = 1.0 / S  # inverse singular values (ensure no detach)
 
@@ -222,6 +239,13 @@ class GaussianNetworkModelTorch(nn.Module):
         Returns:
             torch.Tensor: Mass–weighted matrix D = L⁻¹ · Kmat · L⁻ᵀ.
         """
+        print("\n=== Mass Weighting ===")
+        print(f"Input Kmat shape: {Kmat.shape}")
+        print(f"Input Kmat ndim: {Kmat.ndim}")
+        if Kmat.ndim > 2:
+            print(f"Non-zero elements in first dim: {Kmat[0].nonzero().shape}")
+        print(f"L_inv shape: {L_inv.shape}")
+        print("About to compute: L_inv @ Kmat @ L_inv.T")
         n = Kmat.shape[0]
         L_inv = torch.eye(n, device=self.device, dtype=Kmat.dtype)
         return L_inv @ Kmat @ L_inv.T
