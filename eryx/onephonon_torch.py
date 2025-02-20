@@ -84,6 +84,10 @@ class OnePhononTorch(nn.Module, ModelRunner):
 
         # Initialize the torch-based GNM
         self.gnm_torch = GaussianNetworkModelTorch(pdb_path, gnm_cutoff, gamma_intra, gamma_inter, device=device)
+        print("\n=== OnePhononTorch Init ===")
+        print(f"q_grid shape: {self.q_grid.shape}")
+        print(f"map_shape: {self.map_shape}")
+        print(f"atomic_model.n_asu: {self.gnm_torch.atomic_model.n_asu}")
         self.gnm_torch.compute_gnm_phonons_torch()
         logging.info("Initialized phonon modes via gnm_torch.compute_gnm_phonons_torch()")
         print("\n=== OnePhononTorch Init ===")
@@ -192,13 +196,17 @@ class OnePhononTorch(nn.Module, ModelRunner):
         """
         print("\n=== Apply Disorder ===")
         print("Computing hessian...")
+        print("\n=== Apply Disorder ===")
+        print("Computing hessian...")
         cov_matrix: torch.Tensor = self.compute_covariance_matrix_torch()
         logging.info(f"Computed covariance matrix with shape: {cov_matrix.shape}")
         hessian_torch = self.gnm_torch.compute_hessian()  # already on device
         q_grid_torch = torch.tensor(self.q_grid, device=self.device, dtype=torch.float32)
         crystal_transform = self._compute_crystal_transform_torch(q_grid_torch)
         print("Crystal transform shape: ", crystal_transform.shape)
+        print("Crystal transform shape: ", crystal_transform.shape)
         Id = self._incoherent_sum_torch(crystal_transform)
+        print("Final output shape: ", Id.shape)
         print("Final output shape: ", Id.shape)
         logging.debug(f"Id (diffuse intensity) shape: {Id.shape}, device: {Id.device}")
         logging.debug(f"Id (diffuse intensity) values: {Id}")

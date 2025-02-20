@@ -34,6 +34,10 @@ class GaussianNetworkModelTorch(nn.Module):
 
         self.build_gamma()
         self.build_neighbor_list()
+        print(f"\n=== GNM Init ===")
+        print(f"n_asu = {self.n_asu}")
+        print(f"n_atoms_per_asu = {self.n_atoms_per_asu}")
+        print(f"n_cell = {self.n_cell}")
 
     def build_gamma(self) -> None:
         """
@@ -73,6 +77,8 @@ class GaussianNetworkModelTorch(nn.Module):
         Returns a tensor with shape:
            (n_asu, n_atoms_per_asu, n_cell, n_asu, n_atoms_per_asu) of dtype complex.
         """
+        print("\n=== Computing Hessian ===")
+        print(f"Expected shape: (n_asu={self.n_asu}, n_atoms={self.n_atoms_per_asu}, n_cell={self.n_cell}, n_asu={self.n_asu}, n_atoms={self.n_atoms_per_asu})")
         print("\n=== Computing Hessian ===")
         print(f"Expected shape: (n_asu={self.n_asu}, n_atoms={self.n_atoms_per_asu}, n_cell={self.n_cell}, n_asu={self.n_asu}, n_atoms={self.n_atoms_per_asu})")
         shape = (self.n_asu, self.n_atoms_per_asu, self.n_cell, self.n_asu, self.n_atoms_per_asu)
@@ -120,9 +126,14 @@ class GaussianNetworkModelTorch(nn.Module):
         # logging.debug(f"Hessian shape: {hessian.shape}")
         print("Actual hessian shape: ", hessian.shape)
         print("Hessian dtype: ", hessian.dtype)
+        print(f"Actual hessian shape: {hessian.shape}")
+        print(f"Hessian dtype: {hessian.dtype}")
         return hessian
 
     def compute_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
+        print("\n=== Computing K Matrix ===")
+        print(f"Input hessian shape: {hessian.shape}")
+        print(f"kvec: {kvec}")
         print("\n=== Computing K Matrix ===")
         print(f"Input hessian shape: {hessian.shape}")
         print(f"kvec: {kvec}")
@@ -143,6 +154,8 @@ class GaussianNetworkModelTorch(nn.Module):
         Kmat = hessian[:, :, self.id_cell_ref, :, :] + weighted_sum
         print("K matrix shape: ", Kmat.shape)
         print("K matrix dtype: ", Kmat.dtype)
+        print(f"K matrix shape: {Kmat.shape}")
+        print(f"K matrix dtype: {Kmat.dtype}")
         return Kmat
 
     def compute_Kinv(self, hessian: torch.Tensor, kvec: torch.Tensor = None, reshape: bool = True) -> torch.Tensor:
@@ -226,6 +239,10 @@ class GaussianNetworkModelTorch(nn.Module):
         print(f"Eigenvector shape (V): {U.shape}")
         print(f"Eigenvalue shape (Winv): {S.shape}")
         print(f"First few eigenvalues: {S[:5]}")
+        print("\n=== Phonon Computation ===")
+        print(f"Eigenvector shape (V): {U.shape}")
+        print(f"Eigenvalue shape (Winv): {S.shape}")
+        print(f"First few eigenvalues: {S[:5]}")
         self.V = U  # store eigenvectors
         self.Winv = 1.0 / S  # inverse singular values (ensure no detach)
 
@@ -242,7 +259,9 @@ class GaussianNetworkModelTorch(nn.Module):
         print("\n=== Mass Weighting ===")
         print(f"Input Kmat shape: {Kmat.shape}")
         print(f"Input Kmat ndim: {Kmat.ndim}")
-        if Kmat.ndim > 2:
+        print("\n=== Mass Weighting ===")
+        print(f"Input Kmat shape: {Kmat.shape}")
+        print(f"Input Kmat ndim: {Kmat.ndim}")
             print(f"Non-zero elements in first dim: {Kmat[0].nonzero().shape}")
         # Compute the total number of degrees of freedom (n_asu * n_atoms_per_asu)
         n_total = self.n_asu * self.n_atoms_per_asu
@@ -252,6 +271,8 @@ class GaussianNetworkModelTorch(nn.Module):
         # Create a properly sized L_inv
         L_inv = torch.eye(n_total, device=self.device, dtype=Kmat.dtype)
         print(f"Creating L_inv with shape {L_inv.shape}")
+        print("About to compute: L_inv @ Kmat @ L_inv.T")
+        print(f"L_inv shape: {L_inv.shape}")
         print("About to compute: L_inv @ Kmat @ L_inv.T")
         return L_inv @ Kmat @ L_inv.T
 
