@@ -402,7 +402,10 @@ class OnePhononTorch(nn.Module, ModelRunner):
         # Retrieve the physically correct scale factor (real)
         scale = self._compute_adp_scale_factor()
         cov = cov * scale
-
+        # [DEBUG] Compute eigenvalue statistics of the (real part of the) covariance matrix
+        eigvals = torch.linalg.eigvalsh(cov.real)
+        logging.debug(f"[DEBUG] Covariance eigenvalues: min={eigvals.min().item()}, max={eigvals.max().item()}, mean={eigvals.mean().item()}")
+        
         logging.debug(f"[DEBUG] ADP Scale Factor in Covariance: {scale.item()}")
         # Log real and imaginary statistics using the updated validation method.
         self._validate_intermediate_values("Covariance matrix", cov)
