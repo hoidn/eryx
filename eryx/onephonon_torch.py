@@ -2,6 +2,7 @@ import logging
 import torch
 import torch.nn as nn
 import numpy as np
+from typing import List
 import logging
 from eryx.models import ModelRunner
 from eryx.gaussian_network_torch import GaussianNetworkModelTorch
@@ -14,9 +15,9 @@ class OnePhononTorch(nn.Module, ModelRunner):
     @log_method_call
     def __init__(self,
                  pdb_path: str,
-                 hsampling: list,
-                 ksampling: list,
-                 lsampling: list,
+                 hsampling: List[int],
+                 ksampling: List[int],
+                 lsampling: List[int],
                  expand_p1: bool = True,
                  group_by: str = 'asu',
                  res_limit: float = 0.0,
@@ -65,6 +66,8 @@ class OnePhononTorch(nn.Module, ModelRunner):
 
         # Initialize the torch-based GNM
         self.gnm_torch = GaussianNetworkModelTorch(pdb_path, gnm_cutoff, gamma_intra, gamma_inter, device=device)
+        self.gnm_torch.compute_gnm_phonons_torch()
+        logging.info("Initialized phonon modes via gnm_torch.compute_gnm_phonons_torch()")
         # Ensure full symmetry matrices in atomic_model.
         sym_ops = self.gnm_torch.atomic_model.sym_ops
         # Process the first symmetry set:
@@ -155,8 +158,18 @@ class OnePhononTorch(nn.Module, ModelRunner):
     @log_method_call
     def apply_disorder(self) -> torch.Tensor:
         """
-        Apply disorder computation using torch operations.
+        Compute diffuse intensity using a torch-based one-phonon model.
+        
+        This routine:
+          - Computes the covariance matrix using torch operations.
+          - Uses the structure factors (via _compute_crystal_transform_torch)
+            combined with the covariance effects.
+        
+        Returns:
+            torch.Tensor: Diffuse intensity as a flattened tensor.
         """
+        cov_matrix: torch.Tensor = self.compute_covariance_matrix_torch()
+        logging.info(f"Computed covariance matrix with shape: {cov_matrix.shape}")
         hessian_torch = self.gnm_torch.compute_hessian()  # already on device
         q_grid_torch = torch.tensor(self.q_grid, device=self.device, dtype=torch.float32)
         crystal_transform = self._compute_crystal_transform_torch(q_grid_torch)
@@ -295,3 +308,23 @@ class OnePhononTorch(nn.Module, ModelRunner):
             qUq = (qmags**2).view(-1, 1) * U.view(1, -1)
             A = A * torch.exp(-0.5 * qUq)
         return A
+  @staticmethod
+  def _compare_to_numpy(torch_val: torch.Tensor, numpy_val: np.ndarray, name: str, rtol: float = 1e-5) -> bool:
+      """Compares a torch tensor to a numpy array within a specified relative tolerance.
+      
+      Args:
+          torch_val (torch.Tensor): The tensor computed via torch.
+          numpy_val (np.ndarray): The reference numpy array.
+          name (str): Name of the quantity being compared.
+          rtol (float, optional): Relative tolerance. Defaults to 1e-5.
+      
+      Returns:
+          bool: True if the values are close within the tolerance; False otherwise.
+      """
+      torch_np = torch_val.cpu().detach().numpy()
+      if not np.allclose(torch_np, numpy_val, rtol=rtol):
+          diff = np.abs(torch_np - numpy_val)
+          logging.error(f"{name} mismatch: max diff {diff.max()} exceeds tolerance {rtol}")
+          return False
+      logging.info(f"{name} validation passed with max diff {np.abs(torch_np - numpy_val).max()}")
+      return True
