@@ -244,9 +244,10 @@ class GaussianNetworkModelTorch(nn.Module):
         print(f"Input Kmat ndim: {Kmat.ndim}")
         if Kmat.ndim > 2:
             print(f"Non-zero elements in first dim: {Kmat[0].nonzero().shape}")
+        n = Kmat.shape[0]
+        L_inv = torch.eye(n, device=self.device, dtype=Kmat.dtype)
         print(f"L_inv shape: {L_inv.shape}")
         print("About to compute: L_inv @ Kmat @ L_inv.T")
-        n = Kmat.shape[0]
         L_inv = torch.eye(n, device=self.device, dtype=Kmat.dtype)
         return L_inv @ Kmat @ L_inv.T
 
