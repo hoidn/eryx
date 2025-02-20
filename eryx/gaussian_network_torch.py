@@ -305,6 +305,6 @@ class GaussianNetworkModelTorch(nn.Module):
         # from torch.utils.checkpoint import checkpoint
         # Dmat = checkpoint(lambda x: x, Dmat)
         U, S, Vh = torch.linalg.svd(Dmat)
-        self.V = U.detach()
-        self.Winv = (1.0 / S).detach()
+        self.V = U.real
+        self.Winv = (1.0 / S).real
         return self.V, self.Winv
