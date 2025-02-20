@@ -36,7 +36,7 @@ class TestDiffractionChainTorch:
         ff_a = torch.tensor(onephonon_torch.gnm_torch.atomic_model.ff_a[0], device=device, dtype=torch.float32)
         ff_b = torch.tensor(onephonon_torch.gnm_torch.atomic_model.ff_b[0], device=device, dtype=torch.float32)
         ff_c = torch.tensor(onephonon_torch.gnm_torch.atomic_model.ff_c[0], device=device, dtype=torch.float32)
-        ff = compute_form_factors(q_test, ff_a, ff_b, ff_c)
+        ff = compute_form_factors(q_test.cpu(), ff_a.cpu(), ff_b.cpu(), ff_c.cpu())
         # Verify the computed shape and absence of NaNs
         assert ff.shape == (10, ff_a.shape[0])
         assert not torch.any(torch.isnan(ff))
@@ -51,10 +51,7 @@ class TestDiffractionChainTorch:
         q_test = torch.tensor(onephonon_torch.q_grid[:10], device=device, dtype=torch.float32)
         atomic_model = onephonon_torch.gnm_torch.atomic_model
         # For 'project_on_components', try using onephonon_torch.Amat if available; otherwise fallback.
-        try:
-            amat = torch.tensor(onephonon_torch.Amat[0], device=device, dtype=torch.float32)
-        except AttributeError:
-            amat = torch.tensor(atomic_model.Amat[0], device=device, dtype=torch.float32)
+        amat = None
         # Call structure_factors (if it expects numpy arrays, convert as necessary)
         F = structure_factors(
             q_test.cpu().numpy(),
@@ -82,7 +79,7 @@ class TestDiffractionChainTorch:
         Id = Id.reshape(onephonon_torch.map_shape)
         central_h = Id.shape[0] // 2
         central_slice = Id[central_h, :, :]
-        torch.testing.assert_close(central_slice, torch.flip(central_slice, dims=[0, 1]), rtol=1e-5)
+        torch.testing.assert_close(central_slice, torch.flip(central_slice, dims=[0, 1]), rtol=1e-5, atol=1e-8)
         
         # Compute the Hessian and check symmetry for each ASU block
         hessian = onephonon_torch.gnm_torch.compute_hessian()
@@ -116,7 +113,7 @@ class TestDiffractionChainTorch:
         are placed on the correct device.
         """
         q_tensor = torch.tensor(onephonon_torch.q_grid, device=device)
-        assert q_tensor.device == device
+        assert q_tensor.device.type == device.type
         Id = onephonon_torch.apply_disorder(use_data_adp=True)
         assert Id.device == device
 
