@@ -343,10 +343,18 @@ class OnePhononTorch(nn.Module, ModelRunner):
         I = self.apply_disorder(use_data_adp=False)
         return I
     def compute_covariance_matrix_torch(self):
-        # [NEW] Implement a vectorized computation of the covariance matrix 
-        # from the phonon modes (using self.V, self.Winv, etc.)
-        # Ensure that all operations are differentiable.
-        return torch.tensor(0.0, device=self.device)  # placeholder; replace with actual code
+        """
+        Compute covariance matrix from phonon modes using torch operations.
+        Uses V (eigenvectors) and Winv (inverse eigenvalues) from GNM.
+        """
+        # Get phonon modes from GNM
+        V = self.gnm_torch.V  # shape: (..., n_modes, n_modes)
+        Winv = self.gnm_torch.Winv  # shape: (..., n_modes)
+        
+        # Compute covariance as V @ diag(Winv) @ V.T
+        cov = torch.matmul(V * Winv.unsqueeze(-2), V.transpose(-2, -1))
+        
+        return cov
     @staticmethod
     def structure_factors_torch(q_grid: torch.Tensor,
                                 xyz: torch.Tensor,
