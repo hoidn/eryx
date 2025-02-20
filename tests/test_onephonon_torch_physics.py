@@ -9,6 +9,10 @@ def device():
     return torch.device("cpu")
 
 def test_phonon_modes_equivalence(device):
+    """
+    Compare the full onephonon diffuse intensity computed by the torch and numpy implementations.
+    The computed intensities should match within a relative tolerance of 1e-5.
+    """
     pdb_path = "tests/pdbs/5zck.pdb"  # example pdb file
     hsampling = [-1, 2, 10]
     ksampling = [-1, 2, 10]
@@ -23,6 +27,10 @@ def test_phonon_modes_equivalence(device):
     assert np.allclose(I_torch, I_np, rtol=1e-5), "Diffuse intensities mismatch between torch and numpy implementations."
 
 def test_structure_factors_match(device):
+    """
+    Validate that the structure factors computed with torch operations match the numpy reference
+    within a relative tolerance of 1e-5.
+    """
     pdb_path = "tests/pdbs/5zck.pdb"
     hsampling = [-1, 2, 10]
     ksampling = [-1, 2, 10]

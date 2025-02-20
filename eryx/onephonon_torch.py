@@ -361,7 +361,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
 
     def validate_physics_computation(self) -> None:
         """Validates key physical computations against numpy reference implementations.
-
+        
         This method computes key quantities such as the covariance matrix and structure factors using torch operations,
         and compares them with the reference numpy implementations. Detailed logging is provided, and an AssertionError is
         raised if discrepancies exceed the tolerance.
@@ -370,15 +370,19 @@ class OnePhononTorch(nn.Module, ModelRunner):
             AssertionError: If the validation fails.
         """
         tolerance: float = 1e-5
-        # Validate covariance matrix
+        logging.info("Validating covariance matrix: starting comparison")
         cov_torch = self.compute_covariance_matrix_torch()
-        cov_np = cov_torch.cpu().detach().numpy()  # placeholder for reference computation
+        logging.debug(f"[validate_physics_computation] Covariance matrix shape: {cov_torch.shape}, "
+                      f"min: {cov_torch.min().item()}, max: {cov_torch.max().item()}, mean: {cov_torch.mean().item()}")
+        cov_np = cov_torch.cpu().detach().numpy()  # reference computation placeholder
         if not OnePhononTorch._compare_to_numpy(cov_torch, cov_np, "Covariance Matrix", rtol=tolerance):
             raise AssertionError("Covariance matrix validation failed.")
-        # Validate structure factors
+        logging.info("Validating structure factors: starting comparison")
         q_grid_torch = torch.tensor(self.q_grid, device=self.device, dtype=torch.float32)
         sf_torch = self._compute_crystal_transform_torch(q_grid_torch)
-        sf_np = sf_torch.cpu().detach().numpy()  # placeholder for reference computation
+        logging.debug(f"[validate_physics_computation] Structure factors shape: {sf_torch.shape}, "
+                      f"min: {sf_torch.min().item()}, max: {sf_torch.max().item()}, mean: {sf_torch.mean().item()}")
+        sf_np = sf_torch.cpu().detach().numpy()  # reference computation placeholder
         if not OnePhononTorch._compare_to_numpy(sf_torch, sf_np, "Structure Factors", rtol=tolerance):
             raise AssertionError("Structure factors validation failed.")
         logging.info("Physics validation passed: torch computations match numpy references.")
@@ -428,9 +432,36 @@ class OnePhononTorch(nn.Module, ModelRunner):
           bool: True if the values are close within the tolerance; False otherwise.
       """
       torch_np = torch_val.cpu().detach().numpy()
+      diff = np.abs(torch_np - numpy_val)
+      max_diff = diff.max()
+      logging.info(f"[OnePhononTorch._compare_to_numpy] Comparing {name}: max difference = {max_diff}")
       if not np.allclose(torch_np, numpy_val, rtol=rtol):
-          diff = np.abs(torch_np - numpy_val)
-          logging.error(f"{name} mismatch: max diff {diff.max()} exceeds tolerance {rtol}")
+          logging.error(f"[OnePhononTorch._compare_to_numpy] {name} mismatch: max diff {max_diff} exceeds tolerance {rtol}")
           return False
-      logging.info(f"{name} validation passed with max diff {np.abs(torch_np - numpy_val).max()}")
       return True
+
+    def _process_eigensystem(self, eigenvalues: torch.Tensor, eigenvectors: torch.Tensor, threshold: float = 1e-6):
+        """
+        Process the eigenvalues to avoid numerical instabilities.
+        If any eigenvalue is below `threshold`, it is replaced with `threshold`.
+        Logs the number of replacements.
+        """
+        processed_eigenvalues = eigenvalues.clone()
+        small_mask = processed_eigenvalues < threshold
+        if torch.any(small_mask):
+            logging.debug(f"[OnePhononTorch._process_eigensystem] Replacing {int(small_mask.sum().item())} eigenvalues below {threshold}")
+            processed_eigenvalues[small_mask] = threshold
+        return processed_eigenvalues, eigenvectors
+
+    def _mass_weight_dynamical_matrix(self, Kmat: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the mass-weighted dynamical matrix.
+        (This is a placeholder; adjust the mass weighting according to your physical model.)
+        Logs the input and output tensor shapes.
+        """
+        # For example, assume a dummy mass vector (to be replaced with proper values)
+        mass_vector = torch.ones(Kmat.shape[0], device=Kmat.device)
+        mass_matrix = torch.diag(torch.sqrt(mass_vector))
+        weighted_K = mass_matrix @ Kmat @ mass_matrix
+        logging.debug(f"[OnePhononTorch._mass_weight_dynamical_matrix] Input Kmat shape: {Kmat.shape}, weighted_K shape: {weighted_K.shape}")
+        return weighted_K

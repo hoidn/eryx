@@ -1406,6 +1406,7 @@ class OnePhonon(ModelRunner):
         """
         import time
         import logging
+        logging.debug(f"[OnePhonon.apply_disorder] Starting disorder computation with map shape: {self.q_grid.shape}")
 
         def test_validate_physics_computation(device):
             pdb_path = "tests/pdbs/5zck.pdb"

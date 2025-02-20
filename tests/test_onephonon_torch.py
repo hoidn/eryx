@@ -145,6 +145,11 @@ class TestOnePhononTorch:
     def test_cuda_vs_cpu(self, device):
         pass
 def test_gradient_flow(onephonon_torch, device):
+    """
+    Ensure that gradients propagate through the OnePhononTorch model.
+    After a backward pass on a loss computed from the model output, the learnable
+    parameters (e.g. gamma_intra and gamma_inter in the torch GNM) should have non-None gradients.
+    """
     onephonon_torch.train()
     I = onephonon_torch.forward()
     loss = I.sum()
@@ -153,6 +158,10 @@ def test_gradient_flow(onephonon_torch, device):
     assert onephonon_torch.gnm_torch.gamma_intra.grad is not None, "gamma_intra did not receive gradients"
     assert onephonon_torch.gnm_torch.gamma_inter.grad is not None, "gamma_inter did not receive gradients"
 def test_performance_torch(onephonon_torch):
+    """
+    Benchmark the forward pass of the OnePhononTorch model.
+    The computation should complete within 5 seconds on CPU.
+    """
     import time
     start_time = time.time()
     I = onephonon_torch.forward()
