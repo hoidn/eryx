@@ -170,62 +170,28 @@ class OnePhononTorch(nn.Module, ModelRunner):
         return Id
     def _compute_crystal_transform_torch(self, q_grid_torch: torch.Tensor) -> torch.Tensor:
         """
-        Compute the crystal transform in torch by leveraging the existing NP structure factors.
+        Compute the crystal transform in torch using fully differentiable operations.
+        Converts necessary atomic model arrays to torch tensors and computes structure factors.
         """
-        # -- DEBUG_HYP3: Compare NP and Torch q_grids. 
         atomic_model = self.gnm_torch.atomic_model
-        hkl = self.hkl_grid  # NP hkl
-        logging.debug("DEBUG_HYP_TORCH: hkl_grid shape from Torch branch: %s", hkl.shape)
-        q_grid_np = 2 * np.pi * np.inner(atomic_model.A_inv.T, hkl).T
-        diff_q = np.abs(q_grid_np - q_grid_torch.cpu().numpy())
-        print("DEBUG_HYP_TORCH: np_q_grid.shape =", q_grid_np.shape)
-        print("DEBUG_HYP_TORCH: max difference between np and torch q_grid =", diff_q.max())
-        hkl = self.hkl_grid  # already a NP array
-        # Use atomic_model.cell only for the mask; use atomic_model.A_inv for dq and q_grid
-        mask_np, _ = get_resolution_mask(atomic_model.cell, hkl, self.res_limit)
-        dq_map_np = np.around(get_dq_map(atomic_model.A_inv, hkl), 5)
-        # Remove valid mask logic and compute structure factors for full grid
-        # Retrieve all ASU arrays
-        all_xyz = atomic_model.xyz       # shape: (n_asu, n_atoms, 3)
-        all_ff_a = atomic_model.ff_a     # shape: (n_asu, n_atoms, 4)
-        all_ff_b = atomic_model.ff_b     # shape: (n_asu, n_atoms, 4)
-        all_ff_c = atomic_model.ff_c     # shape: (n_asu, n_atoms)
-    
-        q_sel = q_grid_torch.cpu().numpy()  # Compute structure factors for every q vector
-        # Compute the displacement parameter U from data (mirroring NP branch)
-        U = atomic_model.adp[0] / (8 * np.pi * np.pi)
-    
-        # Loop over all ASUs and compute structure factors for each
+        device = self.device
+        xyz_torch = torch.tensor(atomic_model.xyz, dtype=torch.float32, device=device)
+        ff_a_torch = torch.tensor(atomic_model.ff_a, dtype=torch.float32, device=device)
+        ff_b_torch = torch.tensor(atomic_model.ff_b, dtype=torch.float32, device=device)
+        ff_c_torch = torch.tensor(atomic_model.ff_c, dtype=torch.float32, device=device)
+        U = torch.tensor(atomic_model.adp[0], dtype=torch.float32, device=device) / (8 * torch.pi * torch.pi)
         structure_factors_list = []
-        for asu in range(all_xyz.shape[0]):
-            # For each ASU, select its data
-            xyz_ = all_xyz[asu]
-            ff_a_ = all_ff_a[asu]
-            ff_b_ = all_ff_b[asu]
-            ff_c_ = all_ff_c[asu]
-            # Compute structure factors for the selected ASU.
-            A_np = structure_factors(
-                q_sel,
-                xyz_,
-                ff_a_,
-                ff_b_,
-                ff_c_,
-                U=U,
-                batch_size=self.batch_size,
-                n_processes=self.n_processes
-            )
-            # Convert to torch tensor and transfer to device
-            structure_factors_list.append(torch.from_numpy(A_np).to(self.device, dtype=torch.float32))
-            # After computing A_np for each ASU, add a debug log:
-            sf_abs = np.abs(A_np)
-            logging.debug(f"DEBUG_HYP_TORCH: ASU {asu} structure factors amplitude: min={sf_abs.min():.6f}, max={sf_abs.max():.6f}, mean={sf_abs.mean():.6f}")
-        # Sum over all ASUs:
-        results_tensor = torch.stack(structure_factors_list, dim=0)  # shape: (n_asu, n_q)
-        results_tensor = torch.sum(results_tensor, dim=0)
-    
+        for asu in range(xyz_torch.shape[0]):
+            A = OnePhononTorch.structure_factors_torch(q_grid_torch,
+                                                       xyz_torch[asu],
+                                                       ff_a_torch[asu],
+                                                       ff_b_torch[asu],
+                                                       ff_c_torch[asu],
+                                                       U=U)
+            structure_factors_list.append(A)
+        results_tensor = torch.stack(structure_factors_list, dim=0).sum(dim=0)
         I_torch = torch.square(torch.abs(results_tensor))
-        logging.debug(f"Computed structure factors for {all_xyz.shape[0]} ASUs with shapes: {[s.shape for s in structure_factors_list]}")
-        return I_torch.to(self.device)
+        return I_torch
 
     def _incoherent_sum_torch(self, transform: torch.Tensor) -> torch.Tensor:
         """
@@ -362,9 +328,9 @@ class OnePhononTorch(nn.Module, ModelRunner):
                                 ff_b: torch.Tensor,
                                 ff_c: torch.Tensor,
                                 U: torch.Tensor = None) -> torch.Tensor:
-        # q_grid: (n_points, 3), xyz: (n_atoms, 3), ff_a: (n_atoms,4), etc.
+        # q_grid: (n_points, 3), xyz: (n_atoms, 3), ff_a: (n_atoms, 4), etc.
         qmags = torch.norm(q_grid, dim=1)
-        Q = (qmags / (4 * np.pi))**2  # shape (n_points,)
+        Q = (qmags / (4 * torch.pi))**2  # shape (n_points,)
         Q_exp = Q.view(-1, 1, 1)  # expand for broadcasting
         exp_term = torch.exp(-ff_b.unsqueeze(0) * Q_exp)
         ff = (ff_a.unsqueeze(0) * exp_term).sum(dim=2) + ff_c.unsqueeze(0)  # (n_points, n_atoms)

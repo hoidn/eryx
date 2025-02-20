@@ -153,14 +153,23 @@ class GaussianNetworkModelTorch(nn.Module):
         return Kinv
 
     def compute_hessian_torch(self) -> torch.Tensor:
-        # [NEW] Vectorized (or minimal–loop) implementation that uses torch operations
-        # Ensure that any assignment uses tensors built from self.gamma (from build_gamma())
-        # and that no .detach() calls are used.
-        # (For brevity, replace the explicit loops with torch–compatible code once neighbor lists are batched.)
-        # Example (if full vectorization is not yet feasible, at least ensure loops are within torch operations):
+        # Vectorized differentiable computation of the Hessian using torch operations
         shape = (self.n_asu, self.n_atoms_per_asu, self.n_cell, self.n_asu, self.n_atoms_per_asu)
         hessian = torch.zeros(shape, dtype=torch.complex64, device=self.device)
-        # ... (preserve loop structure but do not break gradient flow) ...
+        hessian_diag = torch.zeros((self.n_asu, self.n_atoms_per_asu), dtype=torch.complex64, device=self.device)
+        for i_asu in range(self.n_asu):
+            for i_cell in range(self.n_cell):
+                for j_asu in range(self.n_asu):
+                    neighbors_list = self.asu_neighbors[i_asu][i_cell][j_asu]
+                    for i_at in range(self.n_atoms_per_asu):
+                        if len(neighbors_list[i_at]) > 0:
+                            idxs = torch.tensor(neighbors_list[i_at], device=self.device, dtype=torch.long)
+                            gamma_val = self.gamma[i_cell, i_asu, j_asu].to(torch.complex64)
+                            hessian[i_asu, i_at, i_cell, j_asu, idxs] = -gamma_val
+                            hessian_diag[i_asu, i_at] = hessian_diag[i_asu, i_at] - gamma_val * len(neighbors_list[i_at])
+        for i_asu in range(self.n_asu):
+            idx = torch.arange(self.n_atoms_per_asu, device=self.device, dtype=torch.long)
+            hessian[i_asu, idx, self.id_cell_ref, i_asu, idx] = -hessian_diag[i_asu, idx] - self.gamma[self.id_cell_ref, i_asu, i_asu].to(torch.complex64)
         return hessian
 
     def compute_K_torch(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
