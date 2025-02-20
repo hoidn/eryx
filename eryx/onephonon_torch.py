@@ -247,6 +247,9 @@ class OnePhononTorch(nn.Module, ModelRunner):
         hkl_sym_adj = hkl_sym - lbounds.unsqueeze(0).unsqueeze(0)
         ubounds = torch.max(hkl_grid_tensor, dim=0)[0]
         map_shape_ravel = (ubounds - lbounds + 1).tolist()
+        multipliers = torch.tensor([map_shape_ravel[1]*map_shape_ravel[2],
+                                    map_shape_ravel[2], 1],
+                                     device=self.device, dtype=torch.long)
         print("\n=== Shape Debug ===")
         print(f"map_shape_ravel: {map_shape_ravel}")
         print(f"multipliers: {multipliers}")
