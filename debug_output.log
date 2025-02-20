@@ -1,6 +1,6 @@
-2025-02-18 21:37:03,993 DEBUG: AGGRESSIVE_HELLO_SCATTER_NP
-2025-02-18 21:37:03,994 INFO: Starting NP branch computation
-2025-02-18 21:37:03,995 DEBUG: [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+2025-02-19 21:57:56,500 DEBUG: AGGRESSIVE_HELLO_SCATTER_NP
+2025-02-19 21:57:56,501 INFO: Starting NP branch computation
+2025-02-19 21:57:56,502 DEBUG: [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
        [0., 1., 0.],
        [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
        [ 0., -1.,  0.],
@@ -17,11 +17,11 @@
        [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
        [ 0.    , -1.    ,  0.    ,  8.5755],
        [ 0.    ,  0.    , -1.    ,  0.    ]])})
-2025-02-18 21:37:03,995 DEBUG: [Array Shape] xyz initial is None
-2025-02-18 21:37:04,013 DEBUG: [Array Shape] hkl_grid.shape=(450625, 3)
-2025-02-18 21:37:04,018 DEBUG: [Array Shape] q_grid.shape=(450625, 3)
-2025-02-18 21:37:04,019 DEBUG: [Array Shape] Amat.shape=(4, 28, 3, 6)
-2025-02-18 21:37:04,027 DEBUG: [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+2025-02-19 21:57:56,502 DEBUG: [Array Shape] xyz initial is None
+2025-02-19 21:57:56,518 DEBUG: [Array Shape] hkl_grid.shape=(450625, 3)
+2025-02-19 21:57:56,523 DEBUG: [Array Shape] q_grid.shape=(450625, 3)
+2025-02-19 21:57:56,524 DEBUG: [Array Shape] Amat.shape=(4, 28, 3, 6)
+2025-02-19 21:57:56,532 DEBUG: [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
        [0., 1., 0.],
        [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
        [ 0., -1.,  0.],
@@ -38,617 +38,617 @@
        [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
        [ 0.    , -1.    ,  0.    ,  8.5755],
        [ 0.    ,  0.    , -1.    ,  0.    ]])})
-2025-02-18 21:37:04,027 DEBUG: [Array Shape] xyz initial is None
-2025-02-18 21:37:04,114 DEBUG: [Array Shape] hessian.shape=(4, 6, 27, 4, 6)
-2025-02-18 21:37:04,118 DEBUG: [GaussianNetworkModel.compute_hessian] Return array shape: (4, 28, 27, 4, 28), first few values: [0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j]
-2025-02-18 21:37:04,159 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,162 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,165 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,168 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,170 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,171 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,173 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,175 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,177 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,179 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,181 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,183 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,184 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,186 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,188 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,190 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,192 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,194 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,196 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,198 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,199 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,201 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,203 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,205 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,207 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,209 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,211 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,212 DEBUG: [Array Shape] hessian.shape=(4, 6, 27, 4, 6)
-2025-02-18 21:37:04,215 DEBUG: [GaussianNetworkModel.compute_hessian] Return array shape: (4, 28, 27, 4, 28), first few values: [0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j]
-2025-02-18 21:37:04,243 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,246 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,248 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,250 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,253 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,255 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,257 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,260 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,262 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,264 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,267 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,269 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,271 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,274 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,276 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,278 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,281 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,283 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,285 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,288 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,290 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,292 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,295 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,297 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,299 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,302 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,304 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
-2025-02-18 21:37:04,307 DEBUG: [OnePhonon.apply_disorder] Starting disorder computation with rank=-1
-2025-02-18 21:37:04,307 DEBUG: [Array Shape] Id.shape=(450625,)
-2025-02-18 21:37:04,314 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:04,335 DEBUG: [TestReference] Mean of form factors: 2.17854833
-2025-02-18 21:37:04,406 DEBUG: [TestReference] First element of structure factors: [  -6.38594415 +10.21666407j   -7.61623719 +12.18496984j
+2025-02-19 21:57:56,532 DEBUG: [Array Shape] xyz initial is None
+2025-02-19 21:57:56,620 DEBUG: [Array Shape] hessian.shape=(4, 6, 27, 4, 6)
+2025-02-19 21:57:56,623 DEBUG: [GaussianNetworkModel.compute_hessian] Return array shape: (4, 28, 27, 4, 28), first few values: [0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j]
+2025-02-19 21:57:56,652 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,654 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,656 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,657 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,659 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,661 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,663 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,665 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,667 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,669 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,671 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,673 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,674 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,676 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,678 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,680 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,682 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,684 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,686 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,688 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,690 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,691 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,693 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,695 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,697 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,699 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,701 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,703 DEBUG: [Array Shape] hessian.shape=(4, 6, 27, 4, 6)
+2025-02-19 21:57:56,705 DEBUG: [GaussianNetworkModel.compute_hessian] Return array shape: (4, 28, 27, 4, 28), first few values: [0.+0.j 0.+0.j 0.+0.j 0.+0.j 0.+0.j]
+2025-02-19 21:57:56,734 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,736 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,738 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,741 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,743 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,746 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,748 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,750 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,753 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,755 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,757 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,760 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,762 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,765 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,767 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,769 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,772 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,774 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,776 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,779 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,781 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,784 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,786 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,788 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,791 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,793 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,795 DEBUG: [Array Shape] Kmat.shape=(4, 6, 4, 6)
+2025-02-19 21:57:56,798 DEBUG: [OnePhonon.apply_disorder] Starting disorder computation with rank=-1
+2025-02-19 21:57:56,798 DEBUG: [Array Shape] Id.shape=(450625,)
+2025-02-19 21:57:56,806 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:56,826 DEBUG: [TestReference] Mean of form factors: 2.17854833
+2025-02-19 21:57:56,895 DEBUG: [TestReference] First element of structure factors: [  -6.38594415 +10.21666407j   -7.61623719 +12.18496984j
    -7.53729981 +12.0586805j   271.06062881-502.21803167j
  -234.44244998+419.03264495j    7.24281525  +2.08088928j]
-2025-02-18 21:37:04,410 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:04,428 DEBUG: [TestReference] Mean of form factors: 2.17854833
-2025-02-18 21:37:04,492 DEBUG: [TestReference] First element of structure factors: [   3.13031836  -2.84287052j    3.73339424  -3.39056774j
+2025-02-19 21:57:56,899 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:56,918 DEBUG: [TestReference] Mean of form factors: 2.17854833
+2025-02-19 21:57:56,981 DEBUG: [TestReference] First element of structure factors: [   3.13031836  -2.84287052j    3.73339424  -3.39056774j
     3.69470002  -3.35542669j -132.73015108+152.9451881j
   101.67760533-166.39190086j    9.71257272 +38.55236779j]
-2025-02-18 21:37:04,494 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:04,514 DEBUG: [TestReference] Mean of form factors: 2.17854833
-2025-02-18 21:37:04,577 DEBUG: [TestReference] First element of structure factors: [ -1.18492775 +1.18291175j  -1.41321167 +1.41080727j
+2025-02-19 21:57:56,983 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:57,004 DEBUG: [TestReference] Mean of form factors: 2.17854833
+2025-02-19 21:57:57,067 DEBUG: [TestReference] First element of structure factors: [ -1.18492775 +1.18291175j  -1.41321167 +1.41080727j
   -1.39856464 +1.39618516j -76.71312731 +8.30110812j
  108.13437343+26.50537035j -44.27199373-33.8160358j ]
-2025-02-18 21:37:04,579 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:04,599 DEBUG: [TestReference] Mean of form factors: 2.17854833
-2025-02-18 21:37:04,662 DEBUG: [TestReference] First element of structure factors: [  2.1994813   -6.41394174j   2.62322547  -7.6496287j
+2025-02-19 21:57:57,068 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:57,089 DEBUG: [TestReference] Mean of form factors: 2.17854833
+2025-02-19 21:57:57,152 DEBUG: [TestReference] First element of structure factors: [  2.1994813   -6.41394174j   2.62322547  -7.6496287j
    2.59603743  -7.57034524j  13.52527039-251.65797935j
  -73.92568043+250.52769246j  63.2406707  -39.93532635j]
-2025-02-18 21:37:04,680 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:04,701 DEBUG: [TestReference] Mean of form factors: 2.18814700
-2025-02-18 21:37:04,763 DEBUG: [TestReference] First element of structure factors: [  -6.68278333 -11.26895098j   -7.97026434 -13.43998657j
+2025-02-19 21:57:57,170 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:57,191 DEBUG: [TestReference] Mean of form factors: 2.18814700
+2025-02-19 21:57:57,253 DEBUG: [TestReference] First element of structure factors: [  -6.68278333 -11.26895098j   -7.97026434 -13.43998657j
    -7.79699496 -13.1478083j   342.0803599 +514.64693365j
  -273.52801395-436.83018346j  -13.5896395   +5.43518182j]
-2025-02-18 21:37:04,764 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:04,789 DEBUG: [TestReference] Mean of form factors: 2.18814700
-2025-02-18 21:37:04,851 DEBUG: [TestReference] First element of structure factors: [   2.79493308 +0.04800119j    3.33339483 +0.05724893j
+2025-02-19 21:57:57,255 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:57,279 DEBUG: [TestReference] Mean of form factors: 2.18814700
+2025-02-19 21:57:57,342 DEBUG: [TestReference] First element of structure factors: [   2.79493308 +0.04800119j    3.33339483 +0.05724893j
     3.26092858 +0.05600436j -162.10893543-11.13814834j
   161.94959404-30.5698218j   -26.60540169+40.79563909j]
-2025-02-18 21:37:04,854 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:04,879 DEBUG: [TestReference] Mean of form factors: 2.18814700
-2025-02-18 21:37:04,941 DEBUG: [TestReference] First element of structure factors: [-0.098974   +0.25320893j -0.11804197 +0.30199125j
+2025-02-19 21:57:57,344 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:57,369 DEBUG: [TestReference] Mean of form factors: 2.18814700
+2025-02-19 21:57:57,432 DEBUG: [TestReference] First element of structure factors: [-0.098974   +0.25320893j -0.11804197 +0.30199125j
  -0.1154758  +0.29542612j -7.02989752-40.6412249j
  -8.74059576+75.17210725j 14.96014056-42.00914159j]
-2025-02-18 21:37:04,943 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:04,968 DEBUG: [TestReference] Mean of form factors: 2.18814700
-2025-02-18 21:37:05,030 DEBUG: [TestReference] First element of structure factors: [  2.34921154  -5.93186118j   2.80180219  -7.07467223j
+2025-02-19 21:57:57,434 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:57,458 DEBUG: [TestReference] Mean of form factors: 2.18814700
+2025-02-19 21:57:57,520 DEBUG: [TestReference] First element of structure factors: [  2.34921154  -5.93186118j   2.80180219  -7.07467223j
    2.74089248  -6.92087256j  25.90306078-226.79245222j
  -80.5471519 +233.24375121j  60.13567429 -44.04383168j]
-2025-02-18 21:37:05,052 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:05,075 DEBUG: [TestReference] Mean of form factors: 2.18814700
-2025-02-18 21:37:05,140 DEBUG: [TestReference] First element of structure factors: [  13.86110991 -0.93001482j   16.53154151 -1.10918814j
+2025-02-19 21:57:57,541 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:57,564 DEBUG: [TestReference] Mean of form factors: 2.18814700
+2025-02-19 21:57:57,628 DEBUG: [TestReference] First element of structure factors: [  13.86110991 -0.93001482j   16.53154151 -1.10918814j
    15.98410615 -1.07245782j -646.30087762+67.30781238j
   537.37709168-34.28345616j    4.67813463-22.91042134j]
-2025-02-18 21:37:05,142 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:05,165 DEBUG: [TestReference] Mean of form factors: 2.18814700
-2025-02-18 21:37:05,229 DEBUG: [TestReference] First element of structure factors: [  1.60901808 +0.63346324j   1.91900572 +0.75550399j
+2025-02-19 21:57:57,630 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:57,654 DEBUG: [TestReference] Mean of form factors: 2.18814700
+2025-02-19 21:57:57,717 DEBUG: [TestReference] First element of structure factors: [  1.60901808 +0.63346324j   1.91900572 +0.75550399j
    1.85545862 +0.73048577j -65.8015768 -93.51502168j
  111.05482827+71.87020047j -57.79645148 +6.76276735j]
-2025-02-18 21:37:05,230 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:05,254 DEBUG: [TestReference] Mean of form factors: 2.18814700
-2025-02-18 21:37:05,318 DEBUG: [TestReference] First element of structure factors: [ -0.17452127 +1.68032914j  -0.20814391 +2.00405531j
+2025-02-19 21:57:57,719 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:57,743 DEBUG: [TestReference] Mean of form factors: 2.18814700
+2025-02-19 21:57:57,806 DEBUG: [TestReference] First element of structure factors: [ -0.17452127 +1.68032914j  -0.20814391 +2.00405531j
   -0.20125131 +1.93769182j  23.66682654+20.7716719j
  -54.82773957-22.56774958j  36.18210262 +5.32787139j]
-2025-02-18 21:37:05,320 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:05,344 DEBUG: [TestReference] Mean of form factors: 2.18814700
-2025-02-18 21:37:05,409 DEBUG: [TestReference] First element of structure factors: [  2.43324113  -5.60360452j   2.90202062  -6.68317482j
+2025-02-19 21:57:57,808 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:57,830 DEBUG: [TestReference] Mean of form factors: 2.18814700
+2025-02-19 21:57:57,893 DEBUG: [TestReference] First element of structure factors: [  2.43324113  -5.60360452j   2.90202062  -6.68317482j
    2.80592138  -6.46186417j  34.3202238 -205.06962996j
  -84.71434257+219.15970398j  57.85386235 -48.83320075j]
-2025-02-18 21:37:05,430 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:05,454 DEBUG: [TestReference] Mean of form factors: 2.19512660
-2025-02-18 21:37:05,518 DEBUG: [TestReference] First element of structure factors: [  -7.31902061  -9.48570422j   -8.55791844 -11.09135872j
+2025-02-19 21:57:57,914 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:57,938 DEBUG: [TestReference] Mean of form factors: 2.19512660
+2025-02-19 21:57:58,000 DEBUG: [TestReference] First element of structure factors: [  -7.31902061  -9.48570422j   -8.55791844 -11.09135872j
    -8.63860557 -11.19593203j  361.35051658+411.87461292j
  -310.10720637-359.4860182j     1.058076    +7.16935651j]
-2025-02-18 21:37:05,520 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:05,544 DEBUG: [TestReference] Mean of form factors: 2.19512660
-2025-02-18 21:37:05,605 DEBUG: [TestReference] First element of structure factors: [   3.49949402  -1.71877878j    4.09185682  -2.00971816j
+2025-02-19 21:57:58,002 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:58,026 DEBUG: [TestReference] Mean of form factors: 2.19512660
+2025-02-19 21:57:58,090 DEBUG: [TestReference] First element of structure factors: [   3.49949402  -1.71877878j    4.09185682  -2.00971816j
     4.13043632  -2.0286665j  -149.23169463 +94.52701284j
   112.80478255-130.88762786j   14.68474502 +49.57750247j]
-2025-02-18 21:37:05,607 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:05,630 DEBUG: [TestReference] Mean of form factors: 2.19512660
-2025-02-18 21:37:05,693 DEBUG: [TestReference] First element of structure factors: [ -0.60546669 +0.90962629j  -0.70795463 +1.06359962j
+2025-02-19 21:57:58,092 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:58,116 DEBUG: [TestReference] Mean of form factors: 2.19512660
+2025-02-19 21:57:58,179 DEBUG: [TestReference] First element of structure factors: [ -0.60546669 +0.90962629j  -0.70795463 +1.06359962j
   -0.71462949 +1.07362762j   6.95923069 +0.8693917j
  -11.98130963+47.84279343j   5.97322304-48.13251591j]
-2025-02-18 21:37:05,695 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:05,719 DEBUG: [TestReference] Mean of form factors: 2.19512660
-2025-02-18 21:37:05,782 DEBUG: [TestReference] First element of structure factors: [   7.96257898  -0.89329204j    9.31041257  -1.04450047j
+2025-02-19 21:57:58,181 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:58,205 DEBUG: [TestReference] Mean of form factors: 2.19512660
+2025-02-19 21:57:58,268 DEBUG: [TestReference] First element of structure factors: [   7.96257898  -0.89329204j    9.31041257  -1.04450047j
     9.39819448  -1.05434839j  266.52545822-117.24811537j
  -299.54023083 +48.9338503j    70.9299132  +50.86115691j]
-2025-02-18 21:37:05,804 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:05,828 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:05,891 DEBUG: [TestReference] First element of structure factors: [  13.34428591  -2.44360201j   15.60308633  -2.85723293j
+2025-02-19 21:57:58,287 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:58,309 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:58,370 DEBUG: [TestReference] First element of structure factors: [  13.34428591  -2.44360201j   15.60308633  -2.85723293j
    15.56916107  -2.85102055j -602.91714045+142.70592189j
   517.000956  -111.41776935j   -1.36885013 -10.65231119j]
-2025-02-18 21:37:05,895 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:05,918 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:05,980 DEBUG: [TestReference] First element of structure factors: [   1.71035423 +0.76617137j    1.99986758 +0.89586195j
+2025-02-19 21:57:58,372 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:58,396 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:58,457 DEBUG: [TestReference] First element of structure factors: [   1.71035423 +0.76617137j    1.99986758 +0.89586195j
     1.99551934 +0.89391411j -107.96802299-48.44662003j
   127.60284618 -7.89108991j  -35.34179232+49.43175182j]
-2025-02-18 21:37:05,982 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:06,004 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:06,065 DEBUG: [TestReference] First element of structure factors: [ -0.37703729 +1.90986587j  -0.44085876 +2.23315074j
+2025-02-19 21:57:58,460 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:58,484 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:58,546 DEBUG: [TestReference] First element of structure factors: [ -0.37703729 +1.90986587j  -0.44085876 +2.23315074j
   -0.43990022 +2.22829528j  26.99318633+61.39450568j
  -58.85110154-49.10009639j  35.8435512  -3.41397934j]
-2025-02-18 21:37:06,067 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:06,091 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:06,153 DEBUG: [TestReference] First element of structure factors: [   7.56626635  -0.74575959j    8.84701571  -0.87199505j
+2025-02-19 21:57:58,547 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:58,571 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:58,633 DEBUG: [TestReference] First element of structure factors: [   7.56626635  -0.74575959j    8.84701571  -0.87199505j
     8.82777994  -0.8700991j   245.24854825-103.72281967j
  -285.47621794 +42.22750998j   75.89640328 +46.58102475j]
-2025-02-18 21:37:06,173 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:06,197 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:06,258 DEBUG: [TestReference] First element of structure factors: [  -4.26250386 +14.34614489j   -4.98402209 +16.77453097j
+2025-02-19 21:57:58,654 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:58,678 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:58,739 DEBUG: [TestReference] First element of structure factors: [  -4.26250386 +14.34614489j   -4.98402209 +16.77453097j
    -4.91535776 +16.54343009j  168.36238133-657.53160101j
  -159.58877824+550.39692185j   15.81750489 +12.11317157j]
-2025-02-18 21:37:06,260 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:06,283 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:06,343 DEBUG: [TestReference] First element of structure factors: [  0.49573045 -0.28948804j   0.57964323 -0.33848996j
+2025-02-19 21:57:58,741 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:58,765 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:58,825 DEBUG: [TestReference] First element of structure factors: [  0.49573045 -0.28948804j   0.57964323 -0.33848996j
    0.57165755 -0.33382662j  -8.44633032-52.38116309j
   75.27081101+43.13788897j -68.99779947 +1.68344174j]
-2025-02-18 21:37:06,346 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:06,369 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:06,430 DEBUG: [TestReference] First element of structure factors: [ -3.12385649  +2.16020149j  -3.65263476  +2.52586092j
+2025-02-19 21:57:58,827 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:58,850 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:58,910 DEBUG: [TestReference] First element of structure factors: [ -3.12385649  +2.16020149j  -3.65263476  +2.52586092j
   -3.60231281  +2.49106241j -77.83987662 +95.80260179j
   63.89915589-111.30365863j   2.70946101 +29.78032124j]
-2025-02-18 21:37:06,432 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:06,455 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:06,516 DEBUG: [TestReference] First element of structure factors: [   7.24821949 -0.75823788j    8.47513274 -0.88658556j
+2025-02-19 21:57:58,911 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:58,936 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:58,997 DEBUG: [TestReference] First element of structure factors: [   7.24821949 -0.75823788j    8.47513274 -0.88658556j
     8.35837176 -0.87437117j  224.02407394-95.46350274j
  -272.32632205+40.19185091j   81.86116738+42.03081166j]
-2025-02-18 21:37:06,539 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:06,562 DEBUG: [TestReference] Mean of form factors: 2.19512660
-2025-02-18 21:37:06,622 DEBUG: [TestReference] First element of structure factors: [  10.71309816  -2.73347425j   12.27598455  -3.13224869j
+2025-02-19 21:57:59,018 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:59,043 DEBUG: [TestReference] Mean of form factors: 2.19512660
+2025-02-19 21:57:59,102 DEBUG: [TestReference] First element of structure factors: [  10.71309816  -2.73347425j   12.27598455  -3.13224869j
    12.64461932  -3.22630679j -457.46600874+145.47671932j
   411.43900757-133.42385656j  -11.85805891  +6.27957432j]
-2025-02-18 21:37:06,624 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:06,649 DEBUG: [TestReference] Mean of form factors: 2.19512660
-2025-02-18 21:37:06,710 DEBUG: [TestReference] First element of structure factors: [   3.76749161-6.81940563e-02j    4.31711425-7.81425847e-02j
+2025-02-19 21:57:59,105 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:59,130 DEBUG: [TestReference] Mean of form factors: 2.19512660
+2025-02-19 21:57:59,189 DEBUG: [TestReference] First element of structure factors: [   3.76749161-6.81940563e-02j    4.31711425-7.81425847e-02j
     4.4467526 -8.04891235e-02j -156.77995588+1.17904177e+01j
   120.78461298-7.58567551e+01j   15.56780872+6.36558864e+01j]
-2025-02-18 21:37:06,712 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:06,737 DEBUG: [TestReference] Mean of form factors: 2.19512660
-2025-02-18 21:37:06,797 DEBUG: [TestReference] First element of structure factors: [ -0.62059117  +2.15745568j  -0.71112646  +2.47219732j
+2025-02-19 21:57:59,191 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:59,215 DEBUG: [TestReference] Mean of form factors: 2.19512660
+2025-02-19 21:57:59,273 DEBUG: [TestReference] First element of structure factors: [ -0.62059117  +2.15745568j  -0.71112646  +2.47219732j
   -0.73248083  +2.54643478j  25.22676864+110.64607108j
  -68.88071568 -81.214136j    45.49933359 -14.89793703j]
-2025-02-18 21:37:06,799 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:06,824 DEBUG: [TestReference] Mean of form factors: 2.19512660
-2025-02-18 21:37:06,885 DEBUG: [TestReference] First element of structure factors: [   4.49301584  +8.25324549j    5.148482    +9.45727487j
+2025-02-19 21:57:59,275 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:59,298 DEBUG: [TestReference] Mean of form factors: 2.19512660
+2025-02-19 21:57:59,358 DEBUG: [TestReference] First element of structure factors: [   4.49301584  +8.25324549j    5.148482    +9.45727487j
     5.30308544  +9.74126679j  236.16982926+234.80442089j
  -182.28974295-301.97005072j  -23.1184893  +94.22955614j]
-2025-02-18 21:37:06,904 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:06,928 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:06,991 DEBUG: [TestReference] First element of structure factors: [ -2.78005422 +12.76861496j  -3.185624   +14.63137157j
+2025-02-19 21:57:59,378 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:59,401 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:59,464 DEBUG: [TestReference] First element of structure factors: [ -2.78005422 +12.76861496j  -3.185624   +14.63137157j
   -3.24356899 +14.89750927j  93.53533062-561.67371578j
  -86.64333976+494.22898768j   4.92661391  -3.99077123j]
-2025-02-18 21:37:06,993 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:07,018 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:07,081 DEBUG: [TestReference] First element of structure factors: [ 6.90553856e-02 +1.61141797j  7.91295696e-02 +1.84650059j
+2025-02-19 21:57:59,466 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:59,489 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:59,550 DEBUG: [TestReference] First element of structure factors: [ 6.90553856e-02 +1.61141797j  7.91295696e-02 +1.84650059j
   8.05688988e-02 +1.88008755j -2.64833456e+01-87.31149252j
   7.28793529e+01+20.08007953j -4.88785901e+01+55.11308704j]
-2025-02-18 21:37:07,083 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:07,106 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:07,167 DEBUG: [TestReference] First element of structure factors: [  -3.39303022  +2.81157368j   -3.88802435  +3.22174169j
+2025-02-19 21:57:59,552 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:59,576 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:59,638 DEBUG: [TestReference] First element of structure factors: [  -3.39303022  +2.81157368j   -3.88802435  +3.22174169j
    -3.95874567  +3.28034364j -108.81727801+151.93372163j
    77.75313353-164.36967991j   16.90288838 +31.2113027j ]
-2025-02-18 21:37:07,169 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:07,192 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:07,256 DEBUG: [TestReference] First element of structure factors: [   4.42541124  +7.89756061j    5.07101486  +9.04970071j
+2025-02-19 21:57:59,640 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:59,662 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:59,723 DEBUG: [TestReference] First element of structure factors: [   4.42541124  +7.89756061j    5.07101486  +9.04970071j
     5.16325421  +9.21431046j  224.06483635+216.05262128j
  -178.94349099-289.96698115j  -16.2986248  +99.60872564j]
-2025-02-18 21:37:07,275 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:07,298 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:07,358 DEBUG: [TestReference] First element of structure factors: [ -11.69150022  -9.41248294j  -13.39712134 -10.78562833j
+2025-02-19 21:57:59,744 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:59,767 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:59,828 DEBUG: [TestReference] First element of structure factors: [ -11.69150022  -9.41248294j  -13.39712134 -10.78562833j
   -13.48219455 -10.85411828j  522.90842093+387.88118479j
  -446.6239976 -345.84979082j   -9.65035984  +7.30434913j]
-2025-02-18 21:37:07,359 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:07,383 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:07,444 DEBUG: [TestReference] First element of structure factors: [ -0.97052735 -1.70843876j  -1.11211328 -1.95767531j
+2025-02-19 21:57:59,830 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:59,854 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:57:59,915 DEBUG: [TestReference] First element of structure factors: [ -0.97052735 -1.70843876j  -1.11211328 -1.95767531j
   -1.11917532 -1.97010677j  61.49922489+14.83614768j
   25.94828238 -3.39722805j -79.1154945  -9.48983097j]
-2025-02-18 21:37:07,446 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:07,470 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:07,532 DEBUG: [TestReference] First element of structure factors: [  -6.5185327  -1.3486622j    -7.46949253 -1.54541255j
+2025-02-19 21:57:59,917 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:57:59,941 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:58:00,001 DEBUG: [TestReference] First element of structure factors: [  -6.5185327  -1.3486622j    -7.46949253 -1.54541255j
    -7.51692464 -1.55522609j -254.86483497 -5.97085868j
   250.75283227 -7.96887746j  -28.15668063+13.0964075j ]
-2025-02-18 21:37:07,534 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:07,557 DEBUG: [TestReference] Mean of form factors: 2.20492352
-2025-02-18 21:37:07,618 DEBUG: [TestReference] First element of structure factors: [   4.5493047   +7.47129453j    5.21298259  +8.56124856j
+2025-02-19 21:58:00,003 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:00,027 DEBUG: [TestReference] Mean of form factors: 2.20492352
+2025-02-19 21:58:00,086 DEBUG: [TestReference] First element of structure factors: [   4.5493047   +7.47129453j    5.21298259  +8.56124856j
     5.24608561  +8.61561344j  216.61801335+192.76492827j
  -180.77224704-274.29867647j   -8.2154149 +105.40579616j]
-2025-02-18 21:37:07,641 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:07,663 DEBUG: [TestReference] Mean of form factors: 2.23960565
-2025-02-18 21:37:07,723 DEBUG: [TestReference] First element of structure factors: [ -10.40726599 +1.05560303j  -13.54068266 +1.37342369j
+2025-02-19 21:58:00,105 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:00,125 DEBUG: [TestReference] Mean of form factors: 2.23960565
+2025-02-19 21:58:00,182 DEBUG: [TestReference] First element of structure factors: [ -10.40726599 +1.05560303j  -13.54068266 +1.37342369j
   -13.40034223 +1.35918904j  519.46697356-69.00154217j
  -412.61379661+62.82022993j   13.49529078 -9.88865753j]
-2025-02-18 21:37:07,724 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:07,746 DEBUG: [TestReference] Mean of form factors: 2.23960565
-2025-02-18 21:37:07,805 DEBUG: [TestReference] First element of structure factors: [   2.31616269  -4.20592323j    3.01351229  -5.4722414j
+2025-02-19 21:58:00,183 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:00,203 DEBUG: [TestReference] Mean of form factors: 2.23960565
+2025-02-19 21:58:00,259 DEBUG: [TestReference] First element of structure factors: [   2.31616269  -4.20592323j    3.01351229  -5.4722414j
     2.98227918  -5.41552515j -120.67813948+223.6133883j
    66.23240729-194.98594448j   26.79763557 +23.36050686j]
-2025-02-18 21:37:07,806 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:07,826 DEBUG: [TestReference] Mean of form factors: 2.23960565
-2025-02-18 21:37:07,883 DEBUG: [TestReference] First element of structure factors: [  -3.7423491   -2.1129046j    -4.8690945   -2.74905731j
+2025-02-19 21:58:00,261 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:00,282 DEBUG: [TestReference] Mean of form factors: 2.23960565
+2025-02-19 21:58:00,337 DEBUG: [TestReference] First element of structure factors: [  -3.7423491   -2.1129046j    -4.8690945   -2.74905731j
    -4.81862948  -2.72056511j -160.20691627-166.27097971j
   113.12332662+184.20458768j   10.11533297 -57.00074977j]
-2025-02-18 21:37:07,884 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:07,904 DEBUG: [TestReference] Mean of form factors: 2.23960565
-2025-02-18 21:37:07,963 DEBUG: [TestReference] First element of structure factors: [   4.83750673  +4.44237118j    6.29398188  +5.77987903j
+2025-02-19 21:58:00,339 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:00,359 DEBUG: [TestReference] Mean of form factors: 2.23960565
+2025-02-19 21:58:00,414 DEBUG: [TestReference] First element of structure factors: [   4.83750673  +4.44237118j    6.29398188  +5.77987903j
     6.22874882  +5.71997432j  171.63581478+100.12189397j
  -172.37431512-153.73393396j   40.88002477 +77.58512538j]
-2025-02-18 21:37:07,982 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:08,003 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:08,060 DEBUG: [TestReference] First element of structure factors: [   4.7401763  -10.34681004j    6.16734722 -13.46202465j
+2025-02-19 21:58:00,433 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:00,454 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:00,509 DEBUG: [TestReference] First element of structure factors: [   4.7401763  -10.34681004j    6.16734722 -13.46202465j
     6.03327232 -13.16936728j -228.39797881+523.30888949j
   173.43977624-414.74509621j    2.15196041 +12.81238757j]
-2025-02-18 21:37:08,062 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:08,084 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:08,141 DEBUG: [TestReference] First element of structure factors: [   3.17780996 -0.65623351j    4.13458407 -0.85381211j
+2025-02-19 21:58:00,511 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:00,531 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:00,585 DEBUG: [TestReference] First element of structure factors: [   3.17780996 -0.65623351j    4.13458407 -0.85381211j
     4.04470038 -0.83525068j -196.85043596+15.11807609j
   151.9989404 -53.58665462j   -0.71677062+42.89963153j]
-2025-02-18 21:37:08,143 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:08,165 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:08,222 DEBUG: [TestReference] First element of structure factors: [   0.9938856   -2.45887134j    1.29312439  -3.19918762j
+2025-02-19 21:58:00,587 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:00,607 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:00,662 DEBUG: [TestReference] First element of structure factors: [   0.9938856   -2.45887134j    1.29312439  -3.19918762j
     1.26501254  -3.12963896j   95.86058446-168.35515286j
  -122.11835347+136.1923516j    49.51711142  -6.94687959j]
-2025-02-18 21:37:08,224 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:08,246 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:08,303 DEBUG: [TestReference] First element of structure factors: [   4.55260298  +3.65511571j    5.92329938  +4.75559691j
+2025-02-19 21:58:00,664 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:00,684 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:00,738 DEBUG: [TestReference] First element of structure factors: [   4.55260298  +3.65511571j    5.92329938  +4.75559691j
     5.79452995  +4.65221272j  149.03581471 +67.88284962j
  -159.48506757-128.63735056j   45.93589306 +78.16231503j]
-2025-02-18 21:37:08,323 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:08,344 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:08,400 DEBUG: [TestReference] First element of structure factors: [   7.13631699  +9.79277573j    9.28491728 +12.74118185j
+2025-02-19 21:58:00,759 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:00,779 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:00,836 DEBUG: [TestReference] First element of structure factors: [   7.13631699  +9.79277573j    9.28491728 +12.74118185j
     8.97745096 +12.31926272j -358.07191134-490.26734966j
   282.97862954+379.84132245j   -8.0332937   -3.12917757j]
-2025-02-18 21:37:08,401 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:08,421 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:08,476 DEBUG: [TestReference] First element of structure factors: [  1.5699337   +0.68777989j   2.04260889  +0.89485647j
+2025-02-19 21:58:00,838 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:00,858 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:00,913 DEBUG: [TestReference] First element of structure factors: [  1.5699337   +0.68777989j   2.04260889  +0.89485647j
    1.97496871  +0.86522365j -76.5124018 -105.14773054j
   97.4378     +51.70916348j -39.9540093  +30.10344829j]
-2025-02-18 21:37:08,478 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:08,497 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:08,553 DEBUG: [TestReference] First element of structure factors: [   1.458023   +1.39441837j    1.89700415 +1.81424946j
+2025-02-19 21:58:00,915 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:00,936 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:00,991 DEBUG: [TestReference] First element of structure factors: [   1.458023   +1.39441837j    1.89700415 +1.81424946j
     1.83418562 +1.75417132j  152.03113403+47.82069437j
  -132.72338248-76.9815677j    16.41705003+41.60466656j]
-2025-02-18 21:37:08,555 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:08,574 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:08,631 DEBUG: [TestReference] First element of structure factors: [   4.51632875  +2.95218588j    5.87610372  +3.84102916j
+2025-02-19 21:58:00,993 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:01,013 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:01,069 DEBUG: [TestReference] First element of structure factors: [   4.51632875  +2.95218588j    5.87610372  +3.84102916j
     5.6815189   +3.71383502j  137.85953085 +38.04702559j
  -154.76859648-105.91894839j   50.48251494 +79.3023589j ]
-2025-02-18 21:37:08,650 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:08,670 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:08,725 DEBUG: [TestReference] First element of structure factors: [  2.35031792 -10.1307125j    2.99799115 -12.92241621j
+2025-02-19 21:58:01,088 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:01,107 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:01,164 DEBUG: [TestReference] First element of structure factors: [  2.35031792 -10.1307125j    2.99799115 -12.92241621j
    3.02625728 -13.04425338j -89.14274615+490.5575997j
   67.21760768-406.94385679j   2.64220796 +22.15534096j]
-2025-02-18 21:37:08,727 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:08,747 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:08,802 DEBUG: [TestReference] First element of structure factors: [   2.62857486  -2.79041948j    3.35292689  -3.55937077j
+2025-02-19 21:58:01,166 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:01,186 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:01,240 DEBUG: [TestReference] First element of structure factors: [   2.62857486  -2.79041948j    3.35292689  -3.55937077j
     3.38453949  -3.59292979j -136.34260548+144.47768982j
    74.19620844-144.19675202j   32.38617337 +30.64249787j]
-2025-02-18 21:37:08,804 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:08,824 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:08,879 DEBUG: [TestReference] First element of structure factors: [ -0.53127408  -3.01617376j  -0.6776764   -3.84733577j
+2025-02-19 21:58:01,242 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:01,262 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:01,316 DEBUG: [TestReference] First element of structure factors: [ -0.53127408  -3.01617376j  -0.6776764   -3.84733577j
   -0.68406578  -3.88360983j  39.79343197-148.76888926j
  -81.06307169+136.83282788j  49.40067581 -20.01463007j]
-2025-02-18 21:37:08,881 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:08,901 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:08,955 DEBUG: [TestReference] First element of structure factors: [ -2.25233509  +7.77428359j  -2.87300735  +9.91663007j
+2025-02-19 21:58:01,318 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:01,338 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:01,393 DEBUG: [TestReference] First element of structure factors: [ -2.25233509  +7.77428359j  -2.87300735  +9.91663007j
   -2.90009509 +10.01012762j  -7.96410829+261.72430436j
   72.35024749-276.2964525j  -65.48921538 +70.4497257j ]
-2025-02-18 21:37:08,976 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:08,997 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:09,052 DEBUG: [TestReference] First element of structure factors: [   8.48175732  +8.11609015j   10.81906117 +10.35262771j
+2025-02-19 21:58:01,412 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:01,432 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:01,486 DEBUG: [TestReference] First element of structure factors: [   8.48175732  +8.11609015j   10.81906117 +10.35262771j
    10.79553765 +10.33011834j -422.75810179-378.32871391j
   347.28416959+301.77405191j  -15.89147801  -5.18914295j]
-2025-02-18 21:37:09,054 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:09,075 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:09,129 DEBUG: [TestReference] First element of structure factors: [   1.786101   +0.10737614j    2.2782939  +0.1369656j
+2025-02-19 21:58:01,488 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:01,508 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:01,561 DEBUG: [TestReference] First element of structure factors: [   1.786101   +0.10737614j    2.2782939  +0.1369656j
     2.27334028 +0.1366678j  -122.55413028-27.85985714j
   101.52060453-28.66197775j   -5.45440538+50.6131566j ]
-2025-02-18 21:37:09,131 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:09,152 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:09,205 DEBUG: [TestReference] First element of structure factors: [   1.32011101 +0.46863076j    1.68389182 +0.59777057j
+2025-02-19 21:58:01,563 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:01,582 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:01,636 DEBUG: [TestReference] First element of structure factors: [   1.32011101 +0.46863076j    1.68389182 +0.59777057j
     1.68023059 +0.59647085j  122.79676363+40.99397559j
  -122.40578876-66.33427428j   26.19446814+34.27097662j]
-2025-02-18 21:37:09,207 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:09,227 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:09,280 DEBUG: [TestReference] First element of structure factors: [ -1.41991046  +7.21586901j  -1.81119284  +9.2043341j
+2025-02-19 21:58:01,637 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:01,657 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:01,710 DEBUG: [TestReference] First element of structure factors: [ -1.41991046  +7.21586901j  -1.81119284  +9.2043341j
   -1.80725482  +9.18432143j  24.41327774+225.64267674j
   46.3439419 -254.65590236j -65.62576708 +77.92954705j]
-2025-02-18 21:37:09,300 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:09,320 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:09,375 DEBUG: [TestReference] First element of structure factors: [ -12.42682649  +3.74296554j  -15.85126653  +4.77440837j
+2025-02-19 21:58:01,729 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:01,749 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:01,803 DEBUG: [TestReference] First element of structure factors: [ -12.42682649  +3.74296554j  -15.85126653  +4.77440837j
   -15.63288536  +4.70863187j  599.08537625-190.85355308j
  -476.81858345+157.39825247j    7.25703712  -7.88451135j]
-2025-02-18 21:37:09,376 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:09,397 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:09,451 DEBUG: [TestReference] First element of structure factors: [  0.2983247  -0.51848823j   0.38053354 -0.66136717j
+2025-02-19 21:58:01,805 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:01,825 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:01,879 DEBUG: [TestReference] First element of structure factors: [  0.2983247  -0.51848823j   0.38053354 -0.66136717j
    0.37529097 -0.65225559j  -7.22174249-46.26429458j
   53.5729616  +8.09623984j -48.58066407+28.56687653j]
-2025-02-18 21:37:09,453 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:09,473 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:09,528 DEBUG: [TestReference] First element of structure factors: [ -2.3199739   +1.67031275j  -2.95928528  +2.13059807j
+2025-02-19 21:58:01,880 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:01,901 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:01,955 DEBUG: [TestReference] First element of structure factors: [ -2.3199739   +1.67031275j  -2.95928528  +2.13059807j
   -2.91851553  +2.10124505j -55.06486072+135.45771463j
   69.68065125-131.83234732j -26.8821203  +25.99649065j]
-2025-02-18 21:37:09,529 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:09,550 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:09,604 DEBUG: [TestReference] First element of structure factors: [ -0.50345388  +6.89742491j  -0.64218983  +8.7981369j
+2025-02-19 21:58:01,956 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:01,977 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:02,031 DEBUG: [TestReference] First element of structure factors: [ -0.50345388  +6.89742491j  -0.64218983  +8.7981369j
   -0.63334245  +8.67692593j  60.77702457+199.4668863j
   17.26066199-240.76976571j -65.81439502 +85.57379595j]
-2025-02-18 21:37:09,623 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:09,645 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:09,697 DEBUG: [TestReference] First element of structure factors: [   7.72069589  +5.34307877j    9.6513098   +6.67915292j
+2025-02-19 21:58:02,051 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:02,074 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:02,127 DEBUG: [TestReference] First element of structure factors: [   7.72069589  +5.34307877j    9.6513098   +6.67915292j
     9.94112838  +6.87972078j -360.49396739-214.60856543j
   318.99505813+182.03037315j  -29.7205533  -10.04956881j]
-2025-02-18 21:37:09,698 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:09,720 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:09,771 DEBUG: [TestReference] First element of structure factors: [   2.55197529 -0.98718863j    3.19011453 -1.23404204j
+2025-02-19 21:58:02,129 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:02,152 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:02,205 DEBUG: [TestReference] First element of structure factors: [   2.55197529 -0.98718863j    3.19011453 -1.23404204j
     3.28591028 -1.27109901j -128.98428704+46.10744292j
    66.65087399-79.81290071j   35.46682116+41.67710843j]
-2025-02-18 21:37:09,773 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:09,794 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:09,846 DEBUG: [TestReference] First element of structure factors: [   0.94709539 -0.6552112j     1.18392321 -0.81905133j
+2025-02-19 21:58:02,207 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:02,229 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:02,283 DEBUG: [TestReference] First element of structure factors: [   0.94709539 -0.6552112j     1.18392321 -0.81905133j
     1.21947516 -0.84364658j   73.66552901+28.13978597j
  -102.78823925-57.60841348j   42.57987394+34.07439303j]
-2025-02-18 21:37:09,848 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:09,869 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:09,921 DEBUG: [TestReference] First element of structure factors: [  -9.73783966  +1.03827345j  -12.17285444  +1.29790097j
+2025-02-19 21:58:02,285 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:02,308 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:02,361 DEBUG: [TestReference] First element of structure factors: [  -9.73783966  +1.03827345j  -12.17285444  +1.29790097j
   -12.53839233  +1.33687556j -311.4045078 +103.32233827j
   345.58325672 -42.46273235j  -93.65853968 -39.01965184j]
-2025-02-18 21:37:09,938 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:09,958 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:10,016 DEBUG: [TestReference] First element of structure factors: [ -10.03974025  +4.64514886j  -12.55024739  +5.80670076j
+2025-02-19 21:58:02,380 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:02,401 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:02,457 DEBUG: [TestReference] First element of structure factors: [ -10.03974025  +4.64514886j  -12.55024739  +5.80670076j
   -12.77853042  +5.91232189j  446.53296449-234.47141864j
  -374.547566  +205.89254048j   17.02775093 -17.99660606j]
-2025-02-18 21:37:10,017 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:10,038 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:10,092 DEBUG: [TestReference] First element of structure factors: [ -0.12859669 +0.66557981j  -0.1607532  +0.83201269j
+2025-02-19 21:58:02,458 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:02,480 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:02,534 DEBUG: [TestReference] First element of structure factors: [ -0.12859669 +0.66557981j  -0.1607532  +0.83201269j
   -0.16367722 +0.8471466j  -20.84866787-56.90226798j
   32.06408393-12.65463876j -15.11104714+57.13511753j]
-2025-02-18 21:37:10,093 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:10,115 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:10,170 DEBUG: [TestReference] First element of structure factors: [ -2.06855377  +1.27715511j  -2.58581008  +1.59651666j
+2025-02-19 21:58:02,536 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:02,557 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:02,612 DEBUG: [TestReference] First element of structure factors: [ -2.06855377  +1.27715511j  -2.58581008  +1.59651666j
   -2.63284473  +1.62555654j -88.81485721+118.18965058j
   87.97738838-134.58398309j -16.62631654 +39.32133611j]
-2025-02-18 21:37:10,171 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:10,193 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:10,248 DEBUG: [TestReference] First element of structure factors: [  -8.89705089  +1.85169382j  -11.12182057  +2.31472279j
+2025-02-19 21:58:02,613 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:02,634 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:02,689 DEBUG: [TestReference] First element of structure factors: [  -8.89705089  +1.85169382j  -11.12182057  +2.31472279j
   -11.32412119  +2.35682649j -262.92456531+131.41679412j
   315.85488893 -67.90618793j -103.63966818 -36.55749175j]
-2025-02-18 21:37:10,267 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:10,288 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:10,345 DEBUG: [TestReference] First element of structure factors: [  0.99502942 -12.70983356j   1.24384347 -15.88801617j
+2025-02-19 21:58:02,709 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:02,731 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:02,786 DEBUG: [TestReference] First element of structure factors: [  0.99502942 -12.70983356j   1.24384347 -15.88801617j
    1.25174202 -15.98890684j -27.21435608+586.20319798j
   14.82673398-485.46121214j   6.89994309 +16.41578808j]
-2025-02-18 21:37:10,346 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:10,369 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:10,424 DEBUG: [TestReference] First element of structure factors: [ -0.98821628 -2.30805147j  -1.23532665 -2.88519585j
+2025-02-19 21:58:02,788 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:02,810 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:02,865 DEBUG: [TestReference] First element of structure factors: [ -0.98821628 -2.30805147j  -1.23532665 -2.88519585j
   -1.24317112 -2.90351717j  59.59959976+44.36235051j
   10.5449105 -57.08265835j -57.85503106+21.45813411j]
-2025-02-18 21:37:10,427 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:10,449 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:10,505 DEBUG: [TestReference] First element of structure factors: [  -4.34057216 -3.33109305j   -5.42596253 -4.16405612j
+2025-02-19 21:58:02,866 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:02,888 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:02,943 DEBUG: [TestReference] First element of structure factors: [  -4.34057216 -3.33109305j   -5.42596253 -4.16405612j
    -5.460418   -4.19049834j -223.67787325-83.12640922j
   212.65241418+77.95355155j  -33.50550848-11.38317104j]
-2025-02-18 21:37:10,507 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:10,539 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:10,602 DEBUG: [TestReference] First element of structure factors: [  -8.16395306  +2.89572477j  -10.20540651  +3.61982096j
+2025-02-19 21:58:02,945 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:02,965 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:03,019 DEBUG: [TestReference] First element of structure factors: [  -8.16395306  +2.89572477j  -10.20540651  +3.61982096j
   -10.27021198  +3.64280723j -218.5363514 +168.76435802j
   289.2709885 -101.41099218j -113.72769298 -33.3823584j ]
-2025-02-18 21:37:10,622 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:10,642 DEBUG: [TestReference] Mean of form factors: 2.23960565
-2025-02-18 21:37:10,697 DEBUG: [TestReference] First element of structure factors: [  -6.46627195  -5.33917432j   -9.25444879  -7.64136053j
+2025-02-19 21:58:03,038 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:03,059 DEBUG: [TestReference] Mean of form factors: 2.23960565
+2025-02-19 21:58:03,113 DEBUG: [TestReference] First element of structure factors: [  -6.46627195  -5.33917432j   -9.25444879  -7.64136053j
    -9.15853241  -7.56216277j  372.35669161+296.07649198j
  -274.96385932-209.22969358j   14.94555223  +2.3796792j ]
-2025-02-18 21:37:10,699 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:10,720 DEBUG: [TestReference] Mean of form factors: 2.23960565
-2025-02-18 21:37:10,775 DEBUG: [TestReference] First element of structure factors: [   2.41020418  -3.25590847j    3.44945454  -4.65981611j
+2025-02-19 21:58:03,115 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:03,136 DEBUG: [TestReference] Mean of form factors: 2.23960565
+2025-02-19 21:58:03,190 DEBUG: [TestReference] First element of structure factors: [   2.41020418  -3.25590847j    3.44945454  -4.65981611j
     3.41370317  -4.61152012j -162.32332933+192.95368528j
    74.0893679 -139.25281377j   39.74114129  +4.47855934j]
-2025-02-18 21:37:10,776 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:10,798 DEBUG: [TestReference] Mean of form factors: 2.23960565
-2025-02-18 21:37:10,853 DEBUG: [TestReference] First element of structure factors: [   0.11875641  -5.57811832j    0.16996271  -7.98333425j
+2025-02-19 21:58:03,191 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:03,212 DEBUG: [TestReference] Mean of form factors: 2.23960565
+2025-02-19 21:58:03,266 DEBUG: [TestReference] First element of structure factors: [   0.11875641  -5.57811832j    0.16996271  -7.98333425j
     0.16820116  -7.90059215j   98.88374946-331.42759886j
  -105.98634956+251.3789296j    37.28064866 -20.01111492j]
-2025-02-18 21:37:10,854 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:10,876 DEBUG: [TestReference] Mean of form factors: 2.23960565
-2025-02-18 21:37:10,932 DEBUG: [TestReference] First element of structure factors: [ -4.75541426  +3.39956611j  -6.80589033  +4.86541715j
+2025-02-19 21:58:03,268 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:03,289 DEBUG: [TestReference] Mean of form factors: 2.23960565
+2025-02-19 21:58:03,343 DEBUG: [TestReference] First element of structure factors: [ -4.75541426  +3.39956611j  -6.80589033  +4.86541715j
   -6.73535167  +4.81499024j -65.23146927+148.29456483j
  142.71988531-123.38941389j -98.1586798  +19.98006j   ]
-2025-02-18 21:37:10,950 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:10,973 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:11,031 DEBUG: [TestReference] First element of structure factors: [   8.3317425   -2.77581169j   11.92428726  -3.9727075j
+2025-02-19 21:58:03,359 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:03,379 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:03,435 DEBUG: [TestReference] First element of structure factors: [   8.3317425   -2.77581169j   11.92428726  -3.9727075j
    11.6650595   -3.88634292j -473.51152636+156.73416506j
   339.92591902-122.15635209j   -9.27540916 +12.92395719j]
-2025-02-18 21:37:11,032 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:11,054 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:11,111 DEBUG: [TestReference] First element of structure factors: [   2.48173551 +0.55512962j    3.5518293  +0.79449468j
+2025-02-19 21:58:03,437 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:03,456 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:03,511 DEBUG: [TestReference] First element of structure factors: [   2.48173551 +0.55512962j    3.5518293  +0.79449468j
     3.47461439 +0.77722278j -185.00278344-59.81253163j
   107.0632627  +3.79691103j   22.69533671+38.83967791j]
-2025-02-18 21:37:11,112 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:11,134 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:11,189 DEBUG: [TestReference] First element of structure factors: [   4.54651409 -0.26179269j    6.50691498 -0.37467447j
+2025-02-19 21:58:03,513 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:03,533 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:03,588 DEBUG: [TestReference] First element of structure factors: [   4.54651409 -0.26179269j    6.50691498 -0.37467447j
     6.36545806 -0.36652924j  331.81145447 +3.90153751j
  -256.69023668-27.41046491j   25.39897235+25.23293188j]
-2025-02-18 21:37:11,191 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:11,211 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:11,268 DEBUG: [TestReference] First element of structure factors: [  -3.94597853  +4.29144823j   -5.64743588  +6.14186786j
+2025-02-19 21:58:03,590 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:03,610 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:03,665 DEBUG: [TestReference] First element of structure factors: [  -3.94597853  +4.29144823j   -5.64743588  +6.14186786j
    -5.52466358  +6.00834687j  -23.73833764+180.77503618j
   115.05330757-148.97624971j -100.6550351  +23.16872414j]
-2025-02-18 21:37:11,286 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:11,307 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:11,365 DEBUG: [TestReference] First element of structure factors: [ -1.95962001  +8.89444275j  -2.80458403 +12.72961693j
+2025-02-19 21:58:03,684 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:03,704 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:03,760 DEBUG: [TestReference] First element of structure factors: [ -1.95962001  +8.89444275j  -2.80458403 +12.72961693j
   -2.71171135 +12.30808077j 126.19094716-501.01727707j
  -80.93670432+363.74088769j  -7.48328798 -14.13808374j]
-2025-02-18 21:37:11,367 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:11,390 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:11,447 DEBUG: [TestReference] First element of structure factors: [ -0.32018224  +1.15953704j  -0.45824087  +1.65951513j
+2025-02-19 21:58:03,762 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:03,782 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:03,839 DEBUG: [TestReference] First element of structure factors: [ -0.32018224  +1.15953704j  -0.45824087  +1.65951513j
   -0.44306641  +1.60456095j  16.39350339-141.67227545j
    7.90180088 +55.48505159j -20.01920365 +44.99421972j]
-2025-02-18 21:37:11,449 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:11,469 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:11,525 DEBUG: [TestReference] First element of structure factors: [  0.1622729   +4.62658144j   0.23224297  +6.62150638j
+2025-02-19 21:58:03,841 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:03,862 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:03,919 DEBUG: [TestReference] First element of structure factors: [  0.1622729   +4.62658144j   0.23224297  +6.62150638j
    0.22455234  +6.40223785j  82.69164991+314.02029111j
  -40.17330528-244.77104767j -18.2079857  +26.22717368j]
-2025-02-18 21:37:11,527 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:11,549 DEBUG: [TestReference] Mean of form factors: 2.24996537
-2025-02-18 21:37:11,606 DEBUG: [TestReference] First element of structure factors: [  -3.42388902  +5.33317773j   -4.9002278   +7.6327783j
+2025-02-19 21:58:03,921 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:03,942 DEBUG: [TestReference] Mean of form factors: 2.24996537
+2025-02-19 21:58:03,999 DEBUG: [TestReference] First element of structure factors: [  -3.42388902  +5.33317773j   -4.9002278   +7.6327783j
    -4.73795872  +7.3800219j     1.46880686+221.33190378j
    98.14146741-179.66285416j -102.56412246 +25.87043179j]
-2025-02-18 21:37:11,627 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:11,649 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:11,706 DEBUG: [TestReference] First element of structure factors: [   7.1524102   -4.57970566j   10.03572687  -6.42590034j
+2025-02-19 21:58:04,019 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:04,040 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:04,096 DEBUG: [TestReference] First element of structure factors: [   7.1524102   -4.57970566j   10.03572687  -6.42590034j
    10.1303473   -6.48648604j -377.66550878+266.74019848j
   282.13749923-204.13434019j  -12.85604921 +13.89894752j]
-2025-02-18 21:37:11,708 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:11,730 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:11,786 DEBUG: [TestReference] First element of structure factors: [   2.48880162 -1.56410018j    3.49210023 -2.19462834j
+2025-02-19 21:58:04,098 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:04,118 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:04,173 DEBUG: [TestReference] First element of structure factors: [   2.48880162 -1.56410018j    3.49210023 -2.19462834j
     3.525025   -2.21532009j -166.51780821+92.25006046j
    72.5145036 -73.90188293j   45.73070442 +8.07956886j]
-2025-02-18 21:37:11,787 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:11,809 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:11,865 DEBUG: [TestReference] First element of structure factors: [   3.96894693 -2.26590509j    5.56892939 -3.17934849j
+2025-02-19 21:58:04,176 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:04,196 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:04,252 DEBUG: [TestReference] First element of structure factors: [   3.96894693 -2.26590509j    5.56892939 -3.17934849j
     5.62143525 -3.20932453j  276.03212831-52.07435224j
  -234.0664457 +18.51491678j   36.99102274+18.42448979j]
-2025-02-18 21:37:11,867 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:11,889 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:11,945 DEBUG: [TestReference] First element of structure factors: [  -6.33371715  -3.79660237j   -8.88699802  -5.32710839j
+2025-02-19 21:58:04,254 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:04,274 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:04,330 DEBUG: [TestReference] First element of structure factors: [  -6.33371715  -3.79660237j   -8.88699802  -5.32710839j
    -8.97078783  -5.37733428j -229.86082698 -22.71167813j
   218.45849085+107.90377779j  -54.12754429 -90.86061673j]
-2025-02-18 21:37:11,964 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:11,986 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:12,042 DEBUG: [TestReference] First element of structure factors: [  0.03333271  +9.19784646j   0.04676996 +12.90572998j
+2025-02-19 21:58:04,351 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:04,372 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:04,426 DEBUG: [TestReference] First element of structure factors: [  0.03333271  +9.19784646j   0.04676996 +12.90572998j
    0.04666827 +12.87766949j -12.65838381-503.31781182j
   16.63176208+375.13798245j  -7.6267806  -16.46179511j]
-2025-02-18 21:37:12,043 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:12,065 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:12,121 DEBUG: [TestReference] First element of structure factors: [  0.75142385 +1.2121972j    1.05434172 +1.70086441j
+2025-02-19 21:58:04,427 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:04,448 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:04,501 DEBUG: [TestReference] First element of structure factors: [  0.75142385 +1.2121972j    1.05434172 +1.70086441j
    1.0520493  +1.69716628j -85.8433077 -99.25603379j
   39.46037435+25.46764371j  21.76703068+45.37026097j]
-2025-02-18 21:37:12,123 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:12,145 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:12,200 DEBUG: [TestReference] First element of structure factors: [  1.25512779  +3.61185283j   1.7611014   +5.06788167j
+2025-02-19 21:58:04,502 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:04,523 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:04,577 DEBUG: [TestReference] First element of structure factors: [  1.25512779  +3.61185283j   1.7611014   +5.06788167j
    1.7572723   +5.05686274j  90.0769782 +270.3865803j
  -59.13472676-223.7777336j   -5.07369742 +31.14233963j]
-2025-02-18 21:37:12,202 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:12,224 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:12,280 DEBUG: [TestReference] First element of structure factors: [  -6.96431726 -2.44369369j   -9.77180893 -3.42880816j
+2025-02-19 21:58:04,578 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:04,600 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:04,655 DEBUG: [TestReference] First element of structure factors: [  -6.96431726 -2.44369369j   -9.77180893 -3.42880816j
    -9.75056241 -3.42135302j -246.79019428+44.44344205j
   235.49152182+62.99256147j  -59.73531785-94.87345096j]
-2025-02-18 21:37:12,300 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:12,322 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:12,377 DEBUG: [TestReference] First element of structure factors: [  -8.49797918  -5.09599652j  -11.92372858  -7.15032105j
+2025-02-19 21:58:04,675 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:04,696 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:04,752 DEBUG: [TestReference] First element of structure factors: [  -8.49797918  -5.09599652j  -11.92372858  -7.15032105j
   -11.75945668  -7.05181186j  463.23286768+282.62558033j
  -347.04836645-200.25697555j   17.14086526  -1.18512904j]
-2025-02-18 21:37:12,379 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:12,400 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:12,455 DEBUG: [TestReference] First element of structure factors: [ -1.62264432 -0.38598298j  -2.27677311 -0.54158244j
+2025-02-19 21:58:04,753 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:04,775 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:04,829 DEBUG: [TestReference] First element of structure factors: [ -1.62264432 -0.38598298j  -2.27677311 -0.54158244j
   -2.24540625 -0.53412112j  91.10572458-57.62037663j
  -39.3966095  -4.91228112j -25.89065805+46.62030591j]
-2025-02-18 21:37:12,456 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:12,478 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:12,533 DEBUG: [TestReference] First element of structure factors: [  -4.95549709  +1.18437937j   -6.95318275  +1.66183252j
+2025-02-19 21:58:04,831 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:04,852 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:04,907 DEBUG: [TestReference] First element of structure factors: [  -4.95549709  +1.18437937j   -6.95318275  +1.66183252j
    -6.85738951  +1.63893763j -277.05497444+154.92692621j
   221.76285059-107.83178551j  -24.64677103  -2.61992122j]
-2025-02-18 21:37:12,535 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:12,556 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:12,611 DEBUG: [TestReference] First element of structure factors: [  -7.86429807  -1.22354946j  -11.03459467  -1.71679306j
+2025-02-19 21:58:04,909 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:04,930 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:04,985 DEBUG: [TestReference] First element of structure factors: [  -7.86429807  -1.22354946j  -11.03459467  -1.71679306j
   -10.88257226  -1.69314099j -277.50301686+102.66374288j
   262.17184422 +23.55843416j  -65.29647368 -98.07755204j]
-2025-02-18 21:37:12,630 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:12,654 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:12,709 DEBUG: [TestReference] First element of structure factors: [   1.73183648  +7.44844844j    2.38138371 +10.24208346j
+2025-02-19 21:58:05,005 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:05,027 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:05,083 DEBUG: [TestReference] First element of structure factors: [   1.73183648  +7.44844844j    2.38138371 +10.24208346j
     2.45289414 +10.54964234j -122.1010791 -372.11338004j
    96.37560217+296.69306364j   -7.35791476 -25.31723701j]
-2025-02-18 21:37:12,711 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:12,734 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:12,789 DEBUG: [TestReference] First element of structure factors: [   1.94203766 +0.29737081j    2.67042351 +0.4089035j
+2025-02-19 21:58:05,084 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:05,106 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:05,162 DEBUG: [TestReference] First element of structure factors: [   1.94203766 +0.29737081j    2.67042351 +0.4089035j
     2.75061349 +0.42118244j -134.12478181-17.19792494j
    45.24437685 -3.93332945j   50.77184801+15.96104779j]
-2025-02-18 21:37:12,792 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:12,814 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:12,870 DEBUG: [TestReference] First element of structure factors: [  2.45831274  +2.12077258j   3.3803341   +2.91619522j
+2025-02-19 21:58:05,164 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:05,185 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:05,241 DEBUG: [TestReference] First element of structure factors: [  2.45831274  +2.12077258j   3.3803341   +2.91619522j
    3.48184194  +3.00376546j  95.05946709+197.09281926j
  -74.22859605-189.61134166j   4.94897694 +44.92848847j]
-2025-02-18 21:37:12,871 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:12,894 DEBUG: [TestReference] Mean of form factors: 2.25749349
-2025-02-18 21:37:12,950 DEBUG: [TestReference] First element of structure factors: [  1.74714526  -8.79754584j   2.40243424 -12.09717694j
+2025-02-19 21:58:05,243 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:05,265 DEBUG: [TestReference] Mean of form factors: 2.25749349
+2025-02-19 21:58:05,321 DEBUG: [TestReference] First element of structure factors: [  1.74714526  -8.79754584j   2.40243424 -12.09717694j
    2.47457679 -12.46044231j -35.39829553-286.87689099j
  -44.07368853+295.96113747j  67.78132869 -84.78684974j]
-2025-02-18 21:37:12,971 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:12,989 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:13,043 DEBUG: [TestReference] First element of structure factors: [  -8.10334698  -2.86404238j  -11.14261001  -3.93823779j
+2025-02-19 21:58:05,342 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:05,362 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:05,417 DEBUG: [TestReference] First element of structure factors: [  -8.10334698  -2.86404238j  -11.14261001  -3.93823779j
   -11.34528879  -4.00987246j  427.79317451+125.25409615j
  -335.78097849 -93.76099823j   24.23208139  +2.62354143j]
-2025-02-18 21:37:13,044 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:13,064 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:13,118 DEBUG: [TestReference] First element of structure factors: [ -1.37423708  +1.350571j    -1.88966213  +1.85711977j
+2025-02-19 21:58:05,419 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:05,440 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:05,494 DEBUG: [TestReference] First element of structure factors: [ -1.37423708  +1.350571j    -1.88966213  +1.85711977j
   -1.92403418  +1.8908999j   35.44707201-107.65047633j
  -42.04095684 +24.93168538j  15.97192154 +52.40281907j]
-2025-02-18 21:37:13,119 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:13,139 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:13,192 DEBUG: [TestReference] First element of structure factors: [  -3.6719944   +1.37686774j   -5.04922246  +1.89327944j
+2025-02-19 21:58:05,496 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:05,517 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:05,572 DEBUG: [TestReference] First element of structure factors: [  -3.6719944   +1.37686774j   -5.04922246  +1.89327944j
    -5.14106542  +1.92771729j -246.74254047+125.89881392j
   208.89672421-107.2612478j   -28.92956849 +15.42212654j]
-2025-02-18 21:37:13,194 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:13,214 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:13,267 DEBUG: [TestReference] First element of structure factors: [-5.77519787e-02  -8.95918738j -7.94125905e-02 -12.3194442j
+2025-02-19 21:58:05,574 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:05,595 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:05,649 DEBUG: [TestReference] First element of structure factors: [-5.77519787e-02  -8.95918738j -7.94125905e-02 -12.3194442j
  -8.08570678e-02 -12.54352903j -1.20389769e+02-278.88036108j
   1.51626092e+01+298.77912717j  7.10963857e+01 -94.25189434j]
-2025-02-18 21:37:13,285 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:13,306 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:13,360 DEBUG: [TestReference] First element of structure factors: [   7.47048525  -6.11433057j   10.27238546  -8.40758777j
+2025-02-19 21:58:05,669 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:05,690 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:05,746 DEBUG: [TestReference] First element of structure factors: [   7.47048525  -6.11433057j   10.27238546  -8.40758777j
    10.33761625  -8.46097689j -382.61300713+326.20775999j
   288.336891  -257.39704755j  -10.02192937 +20.03860694j]
-2025-02-18 21:37:13,362 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:13,382 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:13,436 DEBUG: [TestReference] First element of structure factors: [ -2.58568527 -2.50585995j  -3.55547931 -3.44571449j
+2025-02-19 21:58:05,748 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:05,769 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:05,825 DEBUG: [TestReference] First element of structure factors: [ -2.58568527 -2.50585995j  -3.55547931 -3.44571449j
   -3.578057   -3.46759516j 144.69821678+59.37573389j
  -70.99583989-86.80730423j -34.0184093 +43.35163296j]
-2025-02-18 21:37:13,438 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:13,459 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:13,513 DEBUG: [TestReference] First element of structure factors: [  -3.0358129   -6.02161891j   -4.17443302  -8.28010343j
+2025-02-19 21:58:05,826 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:05,848 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:05,903 DEBUG: [TestReference] First element of structure factors: [  -3.0358129   -6.02161891j   -4.17443302  -8.28010343j
    -4.20094113  -8.33268301j -241.4746954 -279.13808982j
   187.22716575+220.95755148j  -11.54390545 -17.84397403j]
-2025-02-18 21:37:13,514 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:13,535 DEBUG: [TestReference] Mean of form factors: 2.26807076
-2025-02-18 21:37:13,589 DEBUG: [TestReference] First element of structure factors: [  -1.94592204  -9.38096085j   -2.67576477 -12.89940915j
+2025-02-19 21:58:05,905 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
+2025-02-19 21:58:05,927 DEBUG: [TestReference] Mean of form factors: 2.26807076
+2025-02-19 21:58:05,982 DEBUG: [TestReference] First element of structure factors: [  -1.94592204  -9.38096085j   -2.67576477 -12.89940915j
    -2.69275618 -12.98132184j -206.72864221-284.952612j
    76.8488601 +311.39468099j   73.02865004-103.50857315j]
-2025-02-18 21:37:13,956 DEBUG: [OnePhonon.apply_disorder] Return array shape: (450625,), first few values: [12.76820455 38.82012753 45.01087587 12.60945806 47.40995483]
-2025-02-18 21:37:13,956 DEBUG: NP: hkl_grid shape = (450625, 3)
-2025-02-18 21:37:13,956 DEBUG: NP: hkl_grid coordinate ranges:
-2025-02-18 21:37:13,957 DEBUG:   Dimension 0: min = -4.0, max = 4.0
-2025-02-18 21:37:13,957 DEBUG:   Dimension 1: min = -17.0, max = 17.0
-2025-02-18 21:37:13,957 DEBUG:   Dimension 2: min = -29.0, max = 29.0
-2025-02-18 21:37:13,958 DEBUG: NP: q_grid range: min = -6.227867192703222, max = 6.227867192703222
-2025-02-18 21:37:13,960 INFO: NP branch diffuse intensity stats: min=0.0, max=4104.101003470808
-2025-02-18 21:37:13,974 INFO: Starting Torch branch computation
-2025-02-18 21:37:13,975 DEBUG: [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+2025-02-19 21:58:06,350 DEBUG: [OnePhonon.apply_disorder] Return array shape: (450625,), first few values: [12.76820455 38.82012753 45.01087587 12.60945806 47.40995483]
+2025-02-19 21:58:06,350 DEBUG: NP: hkl_grid shape = (450625, 3)
+2025-02-19 21:58:06,350 DEBUG: NP: hkl_grid coordinate ranges:
+2025-02-19 21:58:06,351 DEBUG:   Dimension 0: min = -4.0, max = 4.0
+2025-02-19 21:58:06,351 DEBUG:   Dimension 1: min = -17.0, max = 17.0
+2025-02-19 21:58:06,351 DEBUG:   Dimension 2: min = -29.0, max = 29.0
+2025-02-19 21:58:06,352 DEBUG: NP: q_grid range: min = -6.227867192703222, max = 6.227867192703222
+2025-02-19 21:58:06,354 INFO: NP branch diffuse intensity stats: min=0.0, max=4104.101003470808
+2025-02-19 21:58:06,364 INFO: Starting Torch branch computation
+2025-02-19 21:58:06,365 DEBUG: [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
        [0., 1., 0.],
        [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
        [ 0., -1.,  0.],
@@ -665,17 +665,17 @@
        [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
        [ 0.    , -1.    ,  0.    ,  8.5755],
        [ 0.    ,  0.    , -1.    ,  0.    ]])})
-2025-02-18 21:37:13,975 DEBUG: [Array Shape] xyz initial is None
-2025-02-18 21:37:14,008 DEBUG: q_grid consistent: max diff 2.3549962069324692e-07
-2025-02-18 21:37:14,009 DEBUG: q_grid shape (torch): torch.Size([450625, 3])
-2025-02-18 21:37:14,011 DEBUG: q_grid values (torch): tensor([[-5.2218, -6.2279, -6.1633],
+2025-02-19 21:58:06,365 DEBUG: [Array Shape] xyz initial is None
+2025-02-19 21:58:06,391 DEBUG: q_grid consistent: max diff 2.3549962069324692e-07
+2025-02-19 21:58:06,391 DEBUG: q_grid shape (torch): torch.Size([450625, 3])
+2025-02-19 21:58:06,393 DEBUG: q_grid values (torch): tensor([[-5.2218, -6.2279, -6.1633],
         [-5.2218, -6.2279, -6.0925],
         [-5.2218, -6.2279, -6.0216],
         ...,
         [ 5.2218,  6.2279,  6.0216],
         [ 5.2218,  6.2279,  6.0925],
         [ 5.2218,  6.2279,  6.1633]])
-2025-02-18 21:37:14,013 DEBUG: [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
+2025-02-19 21:58:06,395 DEBUG: [AtomicModel._get_sym_ops] Return value: ({0: array([[1., 0., 0.],
        [0., 1., 0.],
        [0., 0., 1.]]), 1: array([[-1.,  0.,  0.],
        [ 0., -1.,  0.],
@@ -692,215 +692,20 @@
        [ 0.    ,  0.    , -1.    , 14.782 ]]), 3: array([[ 1.    ,  0.    ,  0.    ,  2.4065],
        [ 0.    , -1.    ,  0.    ,  8.5755],
        [ 0.    ,  0.    , -1.    ,  0.    ]])})
-2025-02-18 21:37:14,013 DEBUG: [Array Shape] xyz initial is None
-2025-02-18 21:37:14,130 DEBUG: Torch: hkl_grid shape = (450625, 3)
-2025-02-18 21:37:14,130 DEBUG: Torch: hkl_grid coordinate ranges:
-2025-02-18 21:37:14,130 DEBUG:   Dimension 0: min = -4.0, max = 4.0
-2025-02-18 21:37:14,130 DEBUG:   Dimension 1: min = -17.0, max = 17.0
-2025-02-18 21:37:14,131 DEBUG:   Dimension 2: min = -29.0, max = 29.0
-2025-02-18 21:37:14,131 DEBUG: Torch: q_grid shape (torch) = torch.Size([450625, 3])
-2025-02-18 21:37:14,136 DEBUG: Torch: q_grid range: min = -6.227867126464844, max = 6.227867126464844
-2025-02-18 21:37:14,150 DEBUG: DEBUG_HYP_TORCH: hkl_grid shape from Torch branch: (450625, 3)
-2025-02-18 21:37:14,187 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:14,197 DEBUG: [TestReference] Mean of form factors: 1.75305589
-2025-02-18 21:37:14,227 DEBUG: [TestReference] Mean of form factors: 1.68973443
-2025-02-18 21:37:14,257 DEBUG: [TestReference] Mean of form factors: 1.89711599
-2025-02-18 21:37:14,287 DEBUG: [TestReference] Mean of form factors: 1.70267906
-2025-02-18 21:37:14,317 DEBUG: [TestReference] Mean of form factors: 2.02445981
-2025-02-18 21:37:14,347 DEBUG: [TestReference] Mean of form factors: 1.76585712
-2025-02-18 21:37:14,377 DEBUG: [TestReference] Mean of form factors: 2.10075743
-2025-02-18 21:37:14,407 DEBUG: [TestReference] Mean of form factors: 1.91860952
-2025-02-18 21:37:14,437 DEBUG: [TestReference] Mean of form factors: 2.09785553
-2025-02-18 21:37:14,467 DEBUG: [TestReference] Mean of form factors: 2.18235876
-2025-02-18 21:37:14,498 DEBUG: [TestReference] Mean of form factors: 2.02963263
-2025-02-18 21:37:14,529 DEBUG: [TestReference] Mean of form factors: 2.49350066
-2025-02-18 21:37:14,560 DEBUG: [TestReference] Mean of form factors: 1.97353041
-2025-02-18 21:37:14,591 DEBUG: [TestReference] Mean of form factors: 2.73443186
-2025-02-18 21:37:14,622 DEBUG: [TestReference] Mean of form factors: 2.03195986
-2025-02-18 21:37:14,653 DEBUG: [TestReference] Mean of form factors: 2.83001689
-2025-02-18 21:37:14,684 DEBUG: [TestReference] Mean of form factors: 2.28441029
-2025-02-18 21:37:14,714 DEBUG: [TestReference] Mean of form factors: 2.71294209
-2025-02-18 21:37:14,744 DEBUG: [TestReference] Mean of form factors: 2.71350130
-2025-02-18 21:37:14,775 DEBUG: [TestReference] Mean of form factors: 2.42502428
-2025-02-18 21:37:14,806 DEBUG: [TestReference] Mean of form factors: 3.10888898
-2025-02-18 21:37:14,837 DEBUG: [TestReference] Mean of form factors: 2.18735803
-2025-02-18 21:37:14,868 DEBUG: [TestReference] Mean of form factors: 3.28319311
-2025-02-18 21:37:14,899 DEBUG: [TestReference] Mean of form factors: 2.14832073
-2025-02-18 21:37:14,931 DEBUG: [TestReference] Mean of form factors: 3.18125494
-2025-02-18 21:37:14,962 DEBUG: [TestReference] Mean of form factors: 2.33190913
-2025-02-18 21:37:14,993 DEBUG: [TestReference] Mean of form factors: 2.82293955
-2025-02-18 21:37:15,025 DEBUG: [TestReference] Mean of form factors: 2.60024303
-2025-02-18 21:37:15,056 DEBUG: [TestReference] Mean of form factors: 2.38371688
-2025-02-18 21:37:15,087 DEBUG: [TestReference] Mean of form factors: 2.76817732
-2025-02-18 21:37:15,118 DEBUG: [TestReference] Mean of form factors: 2.07678749
-2025-02-18 21:37:15,149 DEBUG: [TestReference] Mean of form factors: 2.73344529
-2025-02-18 21:37:15,181 DEBUG: [TestReference] Mean of form factors: 1.96074773
-2025-02-18 21:37:15,212 DEBUG: [TestReference] Mean of form factors: 2.52909785
-2025-02-18 21:37:15,243 DEBUG: [TestReference] Mean of form factors: 1.98186997
-2025-02-18 21:37:15,275 DEBUG: [TestReference] Mean of form factors: 2.24280283
-2025-02-18 21:37:15,306 DEBUG: [TestReference] Mean of form factors: 2.04534912
-2025-02-18 21:37:15,337 DEBUG: [TestReference] Mean of form factors: 1.96741055
-2025-02-18 21:37:15,369 DEBUG: [TestReference] Mean of form factors: 2.07550713
-2025-02-18 21:37:15,400 DEBUG: [TestReference] Mean of form factors: 1.78531393
-2025-02-18 21:37:15,432 DEBUG: [TestReference] Mean of form factors: 2.02156753
-2025-02-18 21:37:15,463 DEBUG: [TestReference] Mean of form factors: 1.69934547
-2025-02-18 21:37:15,494 DEBUG: [TestReference] Mean of form factors: 1.91133899
-2025-02-18 21:37:15,526 DEBUG: [TestReference] Mean of form factors: 1.67453735
-2025-02-18 21:37:15,558 DEBUG: [TestReference] Mean of form factors: 1.76256482
-2025-02-18 21:37:15,580 DEBUG: [TestReference] First element of structure factors: (1.2229186015783016-1.9565293130875385j)
-2025-02-18 21:37:15,584 DEBUG: DEBUG_HYP_TORCH: ASU 0 structure factors amplitude: min=0.013692, max=184.955800, mean=6.082541
-2025-02-18 21:37:15,585 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:15,596 DEBUG: [TestReference] Mean of form factors: 1.75305589
-2025-02-18 21:37:15,627 DEBUG: [TestReference] Mean of form factors: 1.68973443
-2025-02-18 21:37:15,658 DEBUG: [TestReference] Mean of form factors: 1.89711599
-2025-02-18 21:37:15,687 DEBUG: [TestReference] Mean of form factors: 1.70267906
-2025-02-18 21:37:15,717 DEBUG: [TestReference] Mean of form factors: 2.02445981
-2025-02-18 21:37:15,747 DEBUG: [TestReference] Mean of form factors: 1.76585712
-2025-02-18 21:37:15,776 DEBUG: [TestReference] Mean of form factors: 2.10075743
-2025-02-18 21:37:15,806 DEBUG: [TestReference] Mean of form factors: 1.91860952
-2025-02-18 21:37:15,836 DEBUG: [TestReference] Mean of form factors: 2.09785553
-2025-02-18 21:37:15,866 DEBUG: [TestReference] Mean of form factors: 2.18235876
-2025-02-18 21:37:15,896 DEBUG: [TestReference] Mean of form factors: 2.02963263
-2025-02-18 21:37:15,926 DEBUG: [TestReference] Mean of form factors: 2.49350066
-2025-02-18 21:37:15,956 DEBUG: [TestReference] Mean of form factors: 1.97353041
-2025-02-18 21:37:15,985 DEBUG: [TestReference] Mean of form factors: 2.73443186
-2025-02-18 21:37:16,015 DEBUG: [TestReference] Mean of form factors: 2.03195986
-2025-02-18 21:37:16,045 DEBUG: [TestReference] Mean of form factors: 2.83001689
-2025-02-18 21:37:16,075 DEBUG: [TestReference] Mean of form factors: 2.28441029
-2025-02-18 21:37:16,105 DEBUG: [TestReference] Mean of form factors: 2.71294209
-2025-02-18 21:37:16,135 DEBUG: [TestReference] Mean of form factors: 2.71350130
-2025-02-18 21:37:16,164 DEBUG: [TestReference] Mean of form factors: 2.42502428
-2025-02-18 21:37:16,194 DEBUG: [TestReference] Mean of form factors: 3.10888898
-2025-02-18 21:37:16,224 DEBUG: [TestReference] Mean of form factors: 2.18735803
-2025-02-18 21:37:16,254 DEBUG: [TestReference] Mean of form factors: 3.28319311
-2025-02-18 21:37:16,284 DEBUG: [TestReference] Mean of form factors: 2.14832073
-2025-02-18 21:37:16,314 DEBUG: [TestReference] Mean of form factors: 3.18125494
-2025-02-18 21:37:16,343 DEBUG: [TestReference] Mean of form factors: 2.33190913
-2025-02-18 21:37:16,374 DEBUG: [TestReference] Mean of form factors: 2.82293955
-2025-02-18 21:37:16,404 DEBUG: [TestReference] Mean of form factors: 2.60024303
-2025-02-18 21:37:16,434 DEBUG: [TestReference] Mean of form factors: 2.38371688
-2025-02-18 21:37:16,463 DEBUG: [TestReference] Mean of form factors: 2.76817732
-2025-02-18 21:37:16,493 DEBUG: [TestReference] Mean of form factors: 2.07678749
-2025-02-18 21:37:16,523 DEBUG: [TestReference] Mean of form factors: 2.73344529
-2025-02-18 21:37:16,553 DEBUG: [TestReference] Mean of form factors: 1.96074773
-2025-02-18 21:37:16,583 DEBUG: [TestReference] Mean of form factors: 2.52909785
-2025-02-18 21:37:16,612 DEBUG: [TestReference] Mean of form factors: 1.98186997
-2025-02-18 21:37:16,642 DEBUG: [TestReference] Mean of form factors: 2.24280283
-2025-02-18 21:37:16,672 DEBUG: [TestReference] Mean of form factors: 2.04534912
-2025-02-18 21:37:16,702 DEBUG: [TestReference] Mean of form factors: 1.96741055
-2025-02-18 21:37:16,732 DEBUG: [TestReference] Mean of form factors: 2.07550713
-2025-02-18 21:37:16,762 DEBUG: [TestReference] Mean of form factors: 1.78531393
-2025-02-18 21:37:16,792 DEBUG: [TestReference] Mean of form factors: 2.02156753
-2025-02-18 21:37:16,821 DEBUG: [TestReference] Mean of form factors: 1.69934547
-2025-02-18 21:37:16,851 DEBUG: [TestReference] Mean of form factors: 1.91133899
-2025-02-18 21:37:16,881 DEBUG: [TestReference] Mean of form factors: 1.67453735
-2025-02-18 21:37:16,912 DEBUG: [TestReference] Mean of form factors: 1.76256482
-2025-02-18 21:37:16,934 DEBUG: [TestReference] First element of structure factors: (-0.5994651794897929+0.5444209219584644j)
-2025-02-18 21:37:16,939 DEBUG: DEBUG_HYP_TORCH: ASU 1 structure factors amplitude: min=0.013692, max=184.955800, mean=6.082541
-2025-02-18 21:37:16,939 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:16,950 DEBUG: [TestReference] Mean of form factors: 1.75305589
-2025-02-18 21:37:16,981 DEBUG: [TestReference] Mean of form factors: 1.68973443
-2025-02-18 21:37:17,013 DEBUG: [TestReference] Mean of form factors: 1.89711599
-2025-02-18 21:37:17,046 DEBUG: [TestReference] Mean of form factors: 1.70267906
-2025-02-18 21:37:17,078 DEBUG: [TestReference] Mean of form factors: 2.02445981
-2025-02-18 21:37:17,110 DEBUG: [TestReference] Mean of form factors: 1.76585712
-2025-02-18 21:37:17,142 DEBUG: [TestReference] Mean of form factors: 2.10075743
-2025-02-18 21:37:17,174 DEBUG: [TestReference] Mean of form factors: 1.91860952
-2025-02-18 21:37:17,207 DEBUG: [TestReference] Mean of form factors: 2.09785553
-2025-02-18 21:37:17,239 DEBUG: [TestReference] Mean of form factors: 2.18235876
-2025-02-18 21:37:17,271 DEBUG: [TestReference] Mean of form factors: 2.02963263
-2025-02-18 21:37:17,303 DEBUG: [TestReference] Mean of form factors: 2.49350066
-2025-02-18 21:37:17,335 DEBUG: [TestReference] Mean of form factors: 1.97353041
-2025-02-18 21:37:17,367 DEBUG: [TestReference] Mean of form factors: 2.73443186
-2025-02-18 21:37:17,400 DEBUG: [TestReference] Mean of form factors: 2.03195986
-2025-02-18 21:37:17,432 DEBUG: [TestReference] Mean of form factors: 2.83001689
-2025-02-18 21:37:17,464 DEBUG: [TestReference] Mean of form factors: 2.28441029
-2025-02-18 21:37:17,497 DEBUG: [TestReference] Mean of form factors: 2.71294209
-2025-02-18 21:37:17,529 DEBUG: [TestReference] Mean of form factors: 2.71350130
-2025-02-18 21:37:17,562 DEBUG: [TestReference] Mean of form factors: 2.42502428
-2025-02-18 21:37:17,594 DEBUG: [TestReference] Mean of form factors: 3.10888898
-2025-02-18 21:37:17,626 DEBUG: [TestReference] Mean of form factors: 2.18735803
-2025-02-18 21:37:17,658 DEBUG: [TestReference] Mean of form factors: 3.28319311
-2025-02-18 21:37:17,691 DEBUG: [TestReference] Mean of form factors: 2.14832073
-2025-02-18 21:37:17,723 DEBUG: [TestReference] Mean of form factors: 3.18125494
-2025-02-18 21:37:17,755 DEBUG: [TestReference] Mean of form factors: 2.33190913
-2025-02-18 21:37:17,788 DEBUG: [TestReference] Mean of form factors: 2.82293955
-2025-02-18 21:37:17,820 DEBUG: [TestReference] Mean of form factors: 2.60024303
-2025-02-18 21:37:17,852 DEBUG: [TestReference] Mean of form factors: 2.38371688
-2025-02-18 21:37:17,884 DEBUG: [TestReference] Mean of form factors: 2.76817732
-2025-02-18 21:37:17,917 DEBUG: [TestReference] Mean of form factors: 2.07678749
-2025-02-18 21:37:17,949 DEBUG: [TestReference] Mean of form factors: 2.73344529
-2025-02-18 21:37:17,982 DEBUG: [TestReference] Mean of form factors: 1.96074773
-2025-02-18 21:37:18,014 DEBUG: [TestReference] Mean of form factors: 2.52909785
-2025-02-18 21:37:18,046 DEBUG: [TestReference] Mean of form factors: 1.98186997
-2025-02-18 21:37:18,079 DEBUG: [TestReference] Mean of form factors: 2.24280283
-2025-02-18 21:37:18,111 DEBUG: [TestReference] Mean of form factors: 2.04534912
-2025-02-18 21:37:18,143 DEBUG: [TestReference] Mean of form factors: 1.96741055
-2025-02-18 21:37:18,176 DEBUG: [TestReference] Mean of form factors: 2.07550713
-2025-02-18 21:37:18,208 DEBUG: [TestReference] Mean of form factors: 1.78531393
-2025-02-18 21:37:18,241 DEBUG: [TestReference] Mean of form factors: 2.02156753
-2025-02-18 21:37:18,273 DEBUG: [TestReference] Mean of form factors: 1.69934547
-2025-02-18 21:37:18,306 DEBUG: [TestReference] Mean of form factors: 1.91133899
-2025-02-18 21:37:18,338 DEBUG: [TestReference] Mean of form factors: 1.67453735
-2025-02-18 21:37:18,371 DEBUG: [TestReference] Mean of form factors: 1.76256482
-2025-02-18 21:37:18,395 DEBUG: [TestReference] First element of structure factors: (0.22691767418476425-0.2265325839490669j)
-2025-02-18 21:37:18,398 DEBUG: DEBUG_HYP_TORCH: ASU 2 structure factors amplitude: min=0.013692, max=184.955800, mean=6.082541
-2025-02-18 21:37:18,398 DEBUG: Debug mode ON: overriding n_processes to 1 (disabling multithreading).
-2025-02-18 21:37:18,410 DEBUG: [TestReference] Mean of form factors: 1.75305589
-2025-02-18 21:37:18,441 DEBUG: [TestReference] Mean of form factors: 1.68973443
-2025-02-18 21:37:18,472 DEBUG: [TestReference] Mean of form factors: 1.89711599
-2025-02-18 21:37:18,503 DEBUG: [TestReference] Mean of form factors: 1.70267906
-2025-02-18 21:37:18,533 DEBUG: [TestReference] Mean of form factors: 2.02445981
-2025-02-18 21:37:18,564 DEBUG: [TestReference] Mean of form factors: 1.76585712
-2025-02-18 21:37:18,595 DEBUG: [TestReference] Mean of form factors: 2.10075743
-2025-02-18 21:37:18,626 DEBUG: [TestReference] Mean of form factors: 1.91860952
-2025-02-18 21:37:18,657 DEBUG: [TestReference] Mean of form factors: 2.09785553
-2025-02-18 21:37:18,687 DEBUG: [TestReference] Mean of form factors: 2.18235876
-2025-02-18 21:37:18,718 DEBUG: [TestReference] Mean of form factors: 2.02963263
-2025-02-18 21:37:18,749 DEBUG: [TestReference] Mean of form factors: 2.49350066
-2025-02-18 21:37:18,780 DEBUG: [TestReference] Mean of form factors: 1.97353041
-2025-02-18 21:37:18,811 DEBUG: [TestReference] Mean of form factors: 2.73443186
-2025-02-18 21:37:18,841 DEBUG: [TestReference] Mean of form factors: 2.03195986
-2025-02-18 21:37:18,872 DEBUG: [TestReference] Mean of form factors: 2.83001689
-2025-02-18 21:37:18,903 DEBUG: [TestReference] Mean of form factors: 2.28441029
-2025-02-18 21:37:18,934 DEBUG: [TestReference] Mean of form factors: 2.71294209
-2025-02-18 21:37:18,965 DEBUG: [TestReference] Mean of form factors: 2.71350130
-2025-02-18 21:37:18,995 DEBUG: [TestReference] Mean of form factors: 2.42502428
-2025-02-18 21:37:19,025 DEBUG: [TestReference] Mean of form factors: 3.10888898
-2025-02-18 21:37:19,055 DEBUG: [TestReference] Mean of form factors: 2.18735803
-2025-02-18 21:37:19,085 DEBUG: [TestReference] Mean of form factors: 3.28319311
-2025-02-18 21:37:19,114 DEBUG: [TestReference] Mean of form factors: 2.14832073
-2025-02-18 21:37:19,144 DEBUG: [TestReference] Mean of form factors: 3.18125494
-2025-02-18 21:37:19,173 DEBUG: [TestReference] Mean of form factors: 2.33190913
-2025-02-18 21:37:19,203 DEBUG: [TestReference] Mean of form factors: 2.82293955
-2025-02-18 21:37:19,232 DEBUG: [TestReference] Mean of form factors: 2.60024303
-2025-02-18 21:37:19,262 DEBUG: [TestReference] Mean of form factors: 2.38371688
-2025-02-18 21:37:19,292 DEBUG: [TestReference] Mean of form factors: 2.76817732
-2025-02-18 21:37:19,322 DEBUG: [TestReference] Mean of form factors: 2.07678749
-2025-02-18 21:37:19,351 DEBUG: [TestReference] Mean of form factors: 2.73344529
-2025-02-18 21:37:19,381 DEBUG: [TestReference] Mean of form factors: 1.96074773
-2025-02-18 21:37:19,411 DEBUG: [TestReference] Mean of form factors: 2.52909785
-2025-02-18 21:37:19,441 DEBUG: [TestReference] Mean of form factors: 1.98186997
-2025-02-18 21:37:19,470 DEBUG: [TestReference] Mean of form factors: 2.24280283
-2025-02-18 21:37:19,500 DEBUG: [TestReference] Mean of form factors: 2.04534912
-2025-02-18 21:37:19,529 DEBUG: [TestReference] Mean of form factors: 1.96741055
-2025-02-18 21:37:19,559 DEBUG: [TestReference] Mean of form factors: 2.07550713
-2025-02-18 21:37:19,589 DEBUG: [TestReference] Mean of form factors: 1.78531393
-2025-02-18 21:37:19,618 DEBUG: [TestReference] Mean of form factors: 2.02156753
-2025-02-18 21:37:19,648 DEBUG: [TestReference] Mean of form factors: 1.69934547
-2025-02-18 21:37:19,677 DEBUG: [TestReference] Mean of form factors: 1.91133899
-2025-02-18 21:37:19,707 DEBUG: [TestReference] Mean of form factors: 1.67453735
-2025-02-18 21:37:19,737 DEBUG: [TestReference] Mean of form factors: 1.76256482
-2025-02-18 21:37:19,759 DEBUG: [TestReference] First element of structure factors: (-0.4212090048438451+1.228290313538183j)
-2025-02-18 21:37:19,763 DEBUG: DEBUG_HYP_TORCH: ASU 3 structure factors amplitude: min=0.013692, max=184.955800, mean=6.082541
-2025-02-18 21:37:19,769 DEBUG: Computed structure factors for 4 ASUs with shapes: [torch.Size([450625]), torch.Size([450625]), torch.Size([450625]), torch.Size([450625])]
-2025-02-18 21:37:19,930 DEBUG: DEBUG_HYP_TORCH_V1: ravel_np generated; map_shape_ravel = (25, 103, 175)
-2025-02-18 21:37:19,937 DEBUG: DEBUG_HYP_TORCH_V1: Full ravel map generated with shape (450625,)
-2025-02-18 21:37:19,938 DEBUG: DEBUG_HYP_TORCH_V1: Ravel map stats – min: 0, max: 450624, mean: 225312.0, coverage: 100.00%
-2025-02-18 21:37:19,939 DEBUG: DEBUG_HYP_TORCH_V1: Original sampling: [(-4, 4, 3), (-17, 17, 3), (-29, 29, 3)]; sampling_ravel: [(-4.0, 4.0, 3), (-17.0, 17.0, 3), (-29.0, 29.0, 3)]
-2025-02-18 21:37:19,940 DEBUG: DEBUG_HYP_TORCH_V1: After resize_map, I_full_np stats – shape: (25, 103, 175), min: 0.000000, max: 547338.312500, mean: 166.399200
-2025-02-18 21:37:19,941 DEBUG: Id (diffuse intensity) shape: torch.Size([450625]), device: cpu
-2025-02-18 21:37:19,941 DEBUG: Id (diffuse intensity) values: tensor([ 0.1842,  0.0984, 11.5269,  ..., 11.5269,  0.0984,  0.1842])
-2025-02-18 21:37:19,941 DEBUG: [OnePhononTorch.apply_disorder] Return value: tensor([ 0.1842,  0.0984, 11.5269,  ..., 11.5269,  0.0984,  0.1842])
-2025-02-18 21:37:19,941 INFO: Torch branch diffuse intensity stats: min=0.0, max=547338.3125
-2025-02-18 21:37:19,946 INFO: Completed debug run. Please check debug_output.log, np_diffuse_intensity.npy and torch_diffuse_intensity.npy
+2025-02-19 21:58:06,395 DEBUG: [Array Shape] xyz initial is None
+2025-02-19 21:58:06,542 INFO: Initialized phonon modes via gnm_torch.compute_gnm_phonons_torch()
+2025-02-19 21:58:06,542 DEBUG: Torch: hkl_grid shape = (450625, 3)
+2025-02-19 21:58:06,542 DEBUG: Torch: hkl_grid coordinate ranges:
+2025-02-19 21:58:06,542 DEBUG:   Dimension 0: min = -4.0, max = 4.0
+2025-02-19 21:58:06,543 DEBUG:   Dimension 1: min = -17.0, max = 17.0
+2025-02-19 21:58:06,543 DEBUG:   Dimension 2: min = -29.0, max = 29.0
+2025-02-19 21:58:06,543 DEBUG: Torch: q_grid shape (torch) = torch.Size([450625, 3])
+2025-02-19 21:58:06,550 DEBUG: Torch: q_grid range: min = -6.227867126464844, max = 6.227867126464844
+2025-02-19 21:58:06,550 INFO: Computed covariance matrix with shape: torch.Size([112, 112])
+2025-02-19 21:58:08,386 DEBUG: Id (diffuse intensity) shape: torch.Size([450625]), device: cpu
+2025-02-19 21:58:08,387 DEBUG: Id (diffuse intensity) values: tensor([4834.5991, 4361.9927, 4445.1201,  ..., 3863.8538, 4445.1206,
+        4361.9941])
+2025-02-19 21:58:08,387 DEBUG: Applied covariance weighting: cov_avg=5088841010828.931, weighting factor=0.0
+2025-02-19 21:58:08,394 DEBUG: [OnePhononTorch.apply_disorder] Return value: tensor([0., 0., 0.,  ..., 0., 0., 0.], grad_fn=<MulBackward0>)
+2025-02-19 21:58:08,394 INFO: Torch branch diffuse intensity stats: min=0.0, max=0.0
+2025-02-19 21:58:08,402 INFO: Completed debug run. Please check debug_output.log, np_diffuse_intensity.npy and torch_diffuse_intensity.npy
