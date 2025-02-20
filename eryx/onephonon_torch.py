@@ -235,6 +235,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
             (int(self.hkl_grid[:, 1].min()), int(self.hkl_grid[:, 1].max()), self.ksampling[2]),
             (int(self.hkl_grid[:, 2].min()), int(self.hkl_grid[:, 2].max()), self.lsampling[2])
         ]
+        sampling_ravel = get_centered_sampling(map_shape_ravel, (self.hsampling[2], self.ksampling[2], self.lsampling[2]))
         logging.debug(f"Original sampling: {sampling_original}; sampling_ravel: {sampling_ravel}")
         
         print("AGGRESSIVE_DEBUG_HYP_TORCH: BEFORE resize_map: I_full shape =", I_full.shape, 
