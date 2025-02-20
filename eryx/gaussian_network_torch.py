@@ -128,7 +128,7 @@ class GaussianNetworkModelTorch(nn.Module):
         print("Hessian dtype: ", hessian.dtype)
         print(f"Actual hessian shape: {hessian.shape}")
         print(f"Hessian dtype: {hessian.dtype}")
-        return hessian
+        return hessian.detach()
 
     def compute_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
         print("\n=== Computing K Matrix ===")
@@ -221,7 +221,7 @@ class GaussianNetworkModelTorch(nn.Module):
             eikr = torch.exp(1j * phase)
             Kmat += hessian[:, :, i_cell, :, :] * eikr
         n_total = shape[0] * shape[1]
-        return Kmat.reshape(n_total, n_total)
+        return Kmat.reshape(n_total, n_total).detach()
 
     def compute_gnm_phonons_torch(self):
         # Compute the Hessian and corresponding K matrix at k=0 (or other chosen k-vector)
