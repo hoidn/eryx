@@ -12,11 +12,12 @@ class GaussianNetworkModelTorch(nn.Module):
         Initialize the torch-based Gaussian Network Model.
         Loads the atomic model (using existing numpy code) and converts key arrays to torch tensors.
         """
-        super(GaussianNetworkModelTorch, self).__init__()
+        super().__init__()
         self.device = torch.device(device.type)
-        # Convert input gamma constants to learnable parameters:
+        # Register learnable physics parameters
         self.gamma_intra = nn.Parameter(torch.tensor(gamma_intra, dtype=torch.float64, device=self.device))
         self.gamma_inter = nn.Parameter(torch.tensor(gamma_inter, dtype=torch.float64, device=self.device))
+        self.enm_cutoff = nn.Parameter(torch.tensor(enm_cutoff, dtype=torch.float64, device=self.device))  # optional
         # Load and set up the atomic model (using existing numpy routines)
         self.atomic_model = AtomicModel(pdb_path, expand_p1=True)
         self.crystal = Crystal(self.atomic_model)
@@ -26,7 +27,6 @@ class GaussianNetworkModelTorch(nn.Module):
         self.n_asu = self.crystal.model.n_asu
         self.n_atoms_per_asu = self.crystal.get_asu_xyz().shape[0]
         self.n_dof_per_asu_actual = self.n_atoms_per_asu * 3
-        self.enm_cutoff = enm_cutoff
 
         self.build_gamma()
         self.build_neighbor_list()
@@ -39,8 +39,8 @@ class GaussianNetworkModelTorch(nn.Module):
         gamma_tensor = self.gamma_inter * torch.ones((self.n_cell, self.n_asu, self.n_asu),
                                                      device=self.device, dtype=torch.float64)
         # In the reference cell and on the diagonal, use gamma_intra:
-        for i_asu in range(self.n_asu):
-            gamma_tensor[self.id_cell_ref, i_asu, i_asu] = self.gamma_intra
+        idx = torch.arange(self.n_asu, device=self.device)
+        gamma_tensor[self.id_cell_ref, idx, idx] = self.gamma_intra
         self.gamma = gamma_tensor
 
     def build_neighbor_list(self) -> None:
@@ -125,17 +125,13 @@ class GaussianNetworkModelTorch(nn.Module):
         for j_cell in range(self.n_cell):
             if j_cell == self.id_cell_ref:
                 continue
-            logging.debug(f"[DEBUG compute_K] Processing j_cell={j_cell}")
-            # Get the cell origin (from the numpy Crystal object) and convert to torch tensor
+            # Get cell origin and compute phase factor
             r_cell_np = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
             r_cell = torch.tensor(r_cell_np, device=self.device, dtype=torch.float64)
             phase = torch.dot(kvec, r_cell)
-            eikr = torch.cos(phase) + 1j * torch.sin(phase)
-            logging.debug(f"[DEBUG compute_K] j_cell={j_cell}, r_cell={r_cell.cpu().numpy()}, phase={phase.item():.8f}, eikr={eikr}")
-            for i_asu in range(self.n_asu):
-                for j_asu in range(self.n_asu):
-                    Kmat[i_asu, :, j_asu, :] += hessian[i_asu, :, j_cell, j_asu, :] * eikr
-            logging.debug(f"[DEBUG compute_K] After j_cell={j_cell} update, Kmat norm={torch.norm(Kmat).item():.8f}")
+            eikr = torch.exp(1j * phase)
+            # Add contribution from cell j_cell (batch over asu indices)
+            Kmat += hessian[:, :, j_cell, :, :] * eikr
         # logging.debug(f"Kmat shape: {Kmat.shape}")
         return Kmat
 
@@ -196,13 +192,16 @@ class GaussianNetworkModelTorch(nn.Module):
         return Kmat.reshape(n_total, n_total)
 
     def compute_gnm_phonons_torch(self):
-        # For each k–point (e.g. on a small grid), compute the K matrix using compute_K_torch().
-        # Then form the mass–weighted dynamical matrix and use
-        #   U, S, _ = torch.linalg.svd(Dmat)
-        # to compute eigenvalues/vectors with gradient support.
-        # Store self.V and self.Winv (ensure no .detach() is used).
-        # (Retain the loop structure if necessary but make sure every operation is differentiable.)
-        pass
+        # Compute the Hessian and corresponding K matrix at k=0 (or other chosen k-vector)
+        hessian = self.compute_hessian()
+        kvec = torch.zeros(3, device=self.device, dtype=torch.float64)
+        Kmat = self.compute_K(hessian, kvec)
+        # Apply mass weighting (this helper already uses torch operations)
+        Dmat = self._mass_weight_dynamical_matrix(Kmat)
+        # Compute the SVD for eigendecomposition with gradient flow
+        U, S, Vh = torch.linalg.svd(Dmat)
+        self.V = U  # store eigenvectors
+        self.Winv = 1.0 / S  # inverse singular values (ensure no detach)
 
     def _mass_weight_dynamical_matrix(self, Kmat: torch.Tensor) -> torch.Tensor:
         """
@@ -234,3 +233,15 @@ class GaussianNetworkModelTorch(nn.Module):
         """
         w_processed = torch.where(w < epsilon, torch.tensor(epsilon, device=self.device, dtype=w.dtype), w)
         return v, w_processed
+    def forward(self):
+        # Compute hessian → K matrix → mass–weighted dynamical matrix → SVD
+        hessian = self.compute_hessian()
+        # For demonstration, use kvec=0; you may later parameterize kvec if needed
+        kvec = torch.zeros(3, device=self.device, dtype=torch.float64)
+        Kmat = self.compute_K(hessian, kvec)
+        Dmat = self._mass_weight_dynamical_matrix(Kmat)
+        U, S, Vh = torch.linalg.svd(Dmat)
+        self.V = U
+        self.Winv = 1.0 / S
+        # Return computed modes (or any quantities needed for the loss)
+        return self.V, self.Winv
