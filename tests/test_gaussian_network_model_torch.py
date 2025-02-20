@@ -73,7 +73,7 @@ def test_k_matrix_computation_torch(gnm_model_torch, device):
     Test the K-matrix computed by the Torch implementation.
     Compare its shape and values with the reference K matrix.
     """
-    kvec = torch.tensor([1.0, 0.0, 0.0], device=device)
+    kvec = torch.tensor([1.0, 0.0, 0.0], device=device, dtype=torch.float64)
     hessian = gnm_model_torch.compute_hessian()
     Kmat = gnm_model_torch.compute_K(hessian, kvec=kvec)
     expected_shape = (
@@ -92,7 +92,7 @@ def test_inversion_stability_torch(gnm_model_torch, device):
     Verify that the inversion of the K-matrix is stable.
     Compute the contracted identity and for each block, ensure it equals the identity.
     """
-    kvec = torch.tensor([1.0, 0.0, 0.0], device=device)
+    kvec = torch.tensor([1.0, 0.0, 0.0], device=device, dtype=torch.float64)
     hessian = gnm_model_torch.compute_hessian()
     Kmat = gnm_model_torch.compute_K(hessian, kvec=kvec)
     Kinv = gnm_model_torch.compute_Kinv(hessian, kvec=kvec)
