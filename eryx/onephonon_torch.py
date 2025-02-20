@@ -251,10 +251,10 @@ class OnePhononTorch(nn.Module, ModelRunner):
         hkl_sym = torch.tensor(get_symmetry_equivalents(self.hkl_grid, sym_ops),
                                  device=self.device, dtype=torch.long)
         hkl_grid_tensor = torch.tensor(self.hkl_grid, device=self.device, dtype=torch.long)
-        lbounds = torch.min(hkl_grid_tensor, dim=0)[0]
-        hkl_sym_adj = hkl_sym - lbounds.unsqueeze(0).unsqueeze(0)
-        ubounds = torch.max(hkl_grid_tensor, dim=0)[0]
-        map_shape_ravel = (ubounds - lbounds + 1).tolist()
+        # Use the originally set grid shape (from generate_grid) for proper output dimensions.
+        map_shape_ravel = list(self.map_shape)
+        lbounds = None  # (no longer needed)
+        hkl_sym_adj = hkl_sym  # (or adjust any subsequent use if necessary)
         multipliers = torch.tensor([map_shape_ravel[1]*map_shape_ravel[2],
                                     map_shape_ravel[2], 1],
                                      device=self.device, dtype=torch.long)
@@ -394,7 +394,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         # Compute covariance as V @ diag(Winv) @ V.T
         cov = torch.matmul(V * Winv.unsqueeze(-2), V.transpose(-2, -1))
         
-        return cov
+        return cov.real
     @staticmethod
     def structure_factors_torch(q_grid: torch.Tensor,
                                 xyz: torch.Tensor,
