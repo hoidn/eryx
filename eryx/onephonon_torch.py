@@ -490,6 +490,9 @@ class OnePhononTorch(nn.Module, ModelRunner):
                                   dtype=torch.float64)
         scale = torch.mean(exp_adps) / (8 * torch.pi * torch.pi * torch.mean(kinv_diag))
         logging.debug(f"[DEBUG] ADP scale factor computed: {scale.item()}")
+        if scale.is_complex():
+            logging.error("Computed ADP scale factor is complex; converting to real.")
+            scale = scale.real
         # TEMP: Ensure gradient flow through scale factor computation; remove assert in production.
         assert scale.requires_grad, "Scale factor tensor does not require grad."
         return scale
@@ -535,8 +538,10 @@ class OnePhononTorch(nn.Module, ModelRunner):
         For complex tensors, logs separate statistics for real and imaginary parts.
         """
         if tensor.is_complex():
-            logging.debug(f"[DEBUG] {tag} real stats: min={tensor.real.min().item()}, max={tensor.real.max().item()}, mean={tensor.real.mean().item()}")
-            logging.debug(f"[DEBUG] {tag} imag stats: min={tensor.imag.min().item()}, max={tensor.imag.max().item()}, mean={tensor.imag.mean().item()}")
+            real_tensor = tensor.real
+            imag_tensor = tensor.imag
+            logging.debug(f"[DEBUG] {tag} (real part): min={real_tensor.min().item()}, max={real_tensor.max().item()}, mean={real_tensor.mean().item()}")
+            logging.debug(f"[DEBUG] {tag} (imag part): min={imag_tensor.min().item()}, max={imag_tensor.max().item()}, mean={imag_tensor.mean().item()}")
         else:
             logging.debug(f"[DEBUG] {tag} stats: min={tensor.min().item()}, max={tensor.max().item()}, mean={tensor.mean().item()}")
 
@@ -565,8 +570,11 @@ class OnePhononTorch(nn.Module, ModelRunner):
         if not mat.is_complex():
             logging.debug("Matrix is not complex.")
             return
-        hermitian_diff = torch.norm(mat - mat.transpose(-2, -1).conj(), p='fro')
-        is_hermitian = hermitian_diff < tol
-        logging.debug(f"[DEBUG] Complex matrix Hermitian check: {is_hermitian}, Frobenius norm difference: {hermitian_diff.item()}")
-        logging.debug(f"[DEBUG] Real part stats: min={mat.real.min().item()}, max={mat.real.max().item()}, mean={mat.real.mean().item()}")
-        logging.debug(f"[DEBUG] Imag part stats: min={mat.imag.min().item()}, max={mat.imag.max().item()}, mean={mat.imag.mean().item()}")
+        real_tensor = mat.real
+        imag_tensor = mat.imag
+        is_real_symmetric = torch.allclose(real_tensor, real_tensor.transpose(-2, -1), rtol=tol)
+        is_imag_antisymmetric = torch.allclose(imag_tensor, -imag_tensor.transpose(-2, -1), rtol=tol)
+        is_hermitian = is_real_symmetric and is_imag_antisymmetric
+        logging.debug("[DEBUG] Complex matrix validation:")
+        logging.debug(f"  Is Hermitian: {is_hermitian}")
+        logging.debug(f"  Real part diagonal mean: {real_tensor.diagonal(dim1=-2, dim2=-1).mean().item()}")

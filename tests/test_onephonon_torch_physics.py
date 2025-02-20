@@ -138,3 +138,27 @@ def test_scaled_variances():
         exp_vars_tensor,
         rtol=1e-4
     ), f"Scaled variances differ: model_vars={model_vars.cpu()}, experimental={exp_vars_tensor}"
+# Additional tests for complex tensor handling and Hermitian property validation
+
+def test_adp_scale_factor_real():
+    from eryx.onephonon_torch import OnePhononTorch
+    import torch
+    pdb_path = "tests/pdbs/5zck.pdb"
+    hsampling = [-1, 2, 10]
+    ksampling = [-1, 2, 10]
+    lsampling = [-1, 2, 10]
+    model_torch = OnePhononTorch(pdb_path, hsampling, ksampling, lsampling, device=torch.device("cpu"))
+    scale = model_torch._compute_adp_scale_factor()
+    assert not scale.is_complex(), "ADP scale factor should be real."
+
+def test_covariance_matrix_hermitian():
+    from eryx.onephonon_torch import OnePhononTorch
+    import torch
+    pdb_path = "tests/pdbs/5zck.pdb"
+    hsampling = [-1, 2, 10]
+    ksampling = [-1, 2, 10]
+    lsampling = [-1, 2, 10]
+    model_torch = OnePhononTorch(pdb_path, hsampling, ksampling, lsampling, device=torch.device("cpu"))
+    cov = model_torch.compute_covariance_matrix_torch()
+    is_hermitian = torch.allclose(cov, cov.transpose(-2, -1).conj(), rtol=1e-5)
+    assert is_hermitian, "Covariance matrix is not Hermitian."
