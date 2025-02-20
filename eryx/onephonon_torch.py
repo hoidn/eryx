@@ -61,7 +61,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         self.res_limit = res_limit
         self.batch_size = batch_size
         self.n_processes = n_processes
-        self.device = device
+        self.device = torch.device(device)
         if self.device.type == 'cuda':
             self.n_processes = 1  # Avoid CUDA re-init issues in forked subprocesses.
 
@@ -184,7 +184,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         return torch.from_numpy(full_ravel).to(self.device, dtype=torch.long)
 
     @log_method_call
-    def apply_disorder(self, use_exp_adp: bool = True) -> torch.Tensor:
+    def apply_disorder(self, use_data_adp: bool = True) -> torch.Tensor:
         """Compute diffuse intensity using a torch-based one-phonon model.
 
         This routine performs the following:
@@ -215,7 +215,7 @@ class OnePhononTorch(nn.Module, ModelRunner):
         logging.debug(f"Id (diffuse intensity) values: {Id}")
         # Remove the problematic exponential weighting.
         # Instead, apply the correct intensity normalization matching the numpy reference.
-        Id = self._apply_correct_scaling(Id, use_exp_adp)
+        Id = self._apply_correct_scaling(Id, use_data_adp)
         self._validate_final_output(Id)
         return Id
     def _compute_crystal_transform_torch(self, q_grid_torch: torch.Tensor) -> torch.Tensor:

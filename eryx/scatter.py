@@ -36,6 +36,8 @@ def compute_form_factors(q_grid, ff_a, ff_b, ff_c):
     fj : numpy.ndarray, shape (n_points, n_atoms)
         atomic form factors 
     """
+    if hasattr(q_grid, "cpu"):
+        q_grid = q_grid.cpu().numpy()
     Q = np.square(np.linalg.norm(q_grid, axis=1) / (4*np.pi))
     fj = ff_a[:,:,np.newaxis] * np.exp(-1 * ff_b[:,:,None] * Q[:,np.newaxis].T)
     fj = np.sum(fj, axis=1) + ff_c[:,np.newaxis]
