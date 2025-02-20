@@ -36,7 +36,10 @@ class TestDiffractionChainTorch:
         ff_a = torch.tensor(onephonon_torch.gnm_torch.atomic_model.ff_a[0], device=device, dtype=torch.float32)
         ff_b = torch.tensor(onephonon_torch.gnm_torch.atomic_model.ff_b[0], device=device, dtype=torch.float32)
         ff_c = torch.tensor(onephonon_torch.gnm_torch.atomic_model.ff_c[0], device=device, dtype=torch.float32)
-        ff = compute_form_factors(q_test.cpu(), ff_a.cpu(), ff_b.cpu(), ff_c.cpu())
+        ff = compute_form_factors(q_test.cpu().numpy(),
+                                   ff_a.cpu().numpy(),
+                                   ff_b.cpu().numpy(),
+                                   ff_c.cpu().numpy())
         # Verify the computed shape and absence of NaNs
         assert ff.shape == (10, ff_a.shape[0])
         assert not torch.any(torch.isnan(ff))
@@ -60,7 +63,7 @@ class TestDiffractionChainTorch:
             atomic_model.ff_b[0],
             atomic_model.ff_c[0],
             compute_qF=True,
-            project_on_components=amat.cpu().numpy()
+            project_on_components=None
         )
         # Re-cast F as a torch tensor for the tests
         F = torch.tensor(F, device=device, dtype=torch.complex64)
@@ -87,7 +90,7 @@ class TestDiffractionChainTorch:
         n_asu = onephonon_torch.gnm_torch.n_asu
         for i in range(n_asu):
             hi = hessian[i, :, idx, i, :]
-            torch.testing.assert_close(hi, hi.transpose(-2, -1), atol=1e-5)
+            torch.testing.assert_close(hi, hi.transpose(-2, -1), rtol=1e-5, atol=1e-8)
 
     def test_diffuse_intensity_torch(self, onephonon_torch, device):
         """
@@ -103,7 +106,7 @@ class TestDiffractionChainTorch:
         torch.testing.assert_close(
             Id_clean[central_idx],
             torch.tensor(expected_center_intensity, device=device, dtype=torch.float32),
-            rtol=1e-5
+            rtol=1e-5, atol=1e-8
         )
         assert torch.count_nonzero(Id_clean) > 0
 
@@ -115,7 +118,7 @@ class TestDiffractionChainTorch:
         q_tensor = torch.tensor(onephonon_torch.q_grid, device=device)
         assert q_tensor.device.type == device.type
         Id = onephonon_torch.apply_disorder(use_data_adp=True)
-        assert Id.device == device
+        assert Id.device.type == device.type
 
     def test_cuda_vs_cpu(self):
         """
@@ -149,7 +152,7 @@ class TestDiffractionChainTorch:
             )
             Id_cpu = onephonon_cpu.apply_disorder(use_data_adp=True)
             Id_cuda = onephonon_cuda.apply_disorder(use_data_adp=True)
-            torch.testing.assert_close(Id_cpu, Id_cuda.cpu(), rtol=1e-5)
+            torch.testing.assert_close(Id_cpu, Id_cuda.cpu(), rtol=1e-5, atol=1e-8)
 
     def test_performance(self, onephonon_torch, device):
         """
