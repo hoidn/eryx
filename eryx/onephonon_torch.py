@@ -263,20 +263,6 @@ class OnePhononTorch(nn.Module, ModelRunner):
         # I_full_np = I_full_np  # No extra scaling here
         
         # Test the hypothesis: apply the tentative normalization factor
-        test_scale = 2.5e-4  # Use 2.5e-4 (adjust as needed)
-        I_full_np_scaled = I_full_np * test_scale
-        # Print statistics for the scaled result
-
-        primary_indices = np.array(ravel_np[0])
-        all_indices = np.concatenate(ravel_np, axis=0)
-        unique_indices = np.unique(all_indices)
-        print("AGGRESSIVE_DEBUG_HYP_TORCH: Total indices in primary group =", primary_indices.size, 
-              "Total indices after symmetry expansion =", all_indices.size, 
-              "Unique indices =", unique_indices.size)
-        I_sum_unique = I_full.flatten()[unique_indices].sum().item()
-        I_sum_total = I_full.sum().item()
-        print("AGGRESSIVE_DEBUG_HYP_TORCH: Sum over unique indices =", I_sum_unique, 
-              "vs. total sum =", I_sum_total)
 
         I_full = torch.tensor(I_full_np, device=self.device, dtype=torch.float32)
         return I_full.flatten()
