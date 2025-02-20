@@ -138,7 +138,7 @@ class GaussianNetworkModelTorch(nn.Module):
         print(f"Input hessian shape: {hessian.shape}")
         print(f"kvec: {kvec}")
         if kvec is None:
-            kvec = torch.zeros(3, device=self.device, dtype=torch.float64)
+            kvec = torch.tensor([1.0, 0.0, 0.0], device=self.device, dtype=torch.float64)
         # Gather unit cell origins for all cells in a vectorized manner.
         all_r = torch.stack([torch.tensor(self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j)),
                                             device=self.device, dtype=torch.float64)
