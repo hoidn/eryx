@@ -244,11 +244,15 @@ class GaussianNetworkModelTorch(nn.Module):
         print(f"Input Kmat ndim: {Kmat.ndim}")
         if Kmat.ndim > 2:
             print(f"Non-zero elements in first dim: {Kmat[0].nonzero().shape}")
-        n = Kmat.shape[0]
-        L_inv = torch.eye(n, device=self.device, dtype=Kmat.dtype)
-        print(f"L_inv shape: {L_inv.shape}")
+        # Compute the total number of degrees of freedom (n_asu * n_atoms_per_asu)
+        n_total = self.n_asu * self.n_atoms_per_asu
+        print(f"Reshaping Kmat from {Kmat.shape} to ({n_total}, {n_total})")
+        # Reshape Kmat to a 2D matrix
+        Kmat = Kmat.reshape(n_total, n_total)
+        # Create a properly sized L_inv
+        L_inv = torch.eye(n_total, device=self.device, dtype=Kmat.dtype)
+        print(f"Creating L_inv with shape {L_inv.shape}")
         print("About to compute: L_inv @ Kmat @ L_inv.T")
-        L_inv = torch.eye(n, device=self.device, dtype=Kmat.dtype)
         return L_inv @ Kmat @ L_inv.T
 
     def _process_eigensystem(self, v: torch.Tensor, w: torch.Tensor, epsilon: float = 1e-6) -> (torch.Tensor, torch.Tensor):
