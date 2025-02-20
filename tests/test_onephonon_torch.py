@@ -152,3 +152,10 @@ def test_gradient_flow(onephonon_torch, device):
     # Verify that gradients propagate to the learnable parameters in the torch GNM.
     assert onephonon_torch.gnm_torch.gamma_intra.grad is not None, "gamma_intra did not receive gradients"
     assert onephonon_torch.gnm_torch.gamma_inter.grad is not None, "gamma_inter did not receive gradients"
+def test_performance_torch(onephonon_torch):
+    import time
+    start_time = time.time()
+    I = onephonon_torch.forward()
+    elapsed = time.time() - start_time
+    # Expect forward pass to complete within 5 seconds on CPU
+    assert elapsed < 5.0, f"Forward pass took too long: {elapsed} seconds"

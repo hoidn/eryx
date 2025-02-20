@@ -47,8 +47,6 @@ class OnePhononTorch(nn.Module, ModelRunner):
 
         # Use torch routines to set up the grid and q_grid
         atomic_model = AtomicModel(pdb_path, expand_p1=expand_p1, frame=-1)
-        print("DEBUG: Initial ff_a shape:", atomic_model.ff_a.shape)
-        print("DEBUG: Initial xyz shape:", atomic_model.xyz.shape)
         self.hkl_grid, self.map_shape = generate_grid(atomic_model.A_inv,
                                                       self.hsampling,
                                                       self.ksampling,
@@ -66,8 +64,6 @@ class OnePhononTorch(nn.Module, ModelRunner):
         logging.debug(f"q_grid values (torch): {self.q_grid}")
 
         # Initialize the torch-based GNM
-        print("DEBUG: Before compute_multiplicity, ff_a shape:", atomic_model.ff_a[0].shape)
-        print("DEBUG: Before compute_multiplicity, xyz shape:", atomic_model.xyz[0].shape)
         self.gnm_torch = GaussianNetworkModelTorch(pdb_path, gnm_cutoff, gamma_intra, gamma_inter, device=device)
         # Ensure full symmetry matrices in atomic_model.
         sym_ops = self.gnm_torch.atomic_model.sym_ops
@@ -199,14 +195,6 @@ class OnePhononTorch(nn.Module, ModelRunner):
         from each asymmetric unit in a manner equivalent to NP’s incoherent_sum_real().
         """
         # Print debug info about symmetry operations and grid before further processing.
-        sym_ops_rot = self.gnm_torch.atomic_model.sym_ops[0]
-        print("DEBUG: In _incoherent_sum_torch, sym_ops_rot:", sym_ops_rot)
-        print("DEBUG: In _incoherent_sum_torch, q_grid values:", self.q_grid)
-        print("DEBUG: In _incoherent_sum_torch, input hkl_grid shape:", self.hkl_grid.shape)
-        print("DEBUG: In _incoherent_sum_torch, input hkl_grid values:", self.hkl_grid)
-        atomic_model = self.gnm_torch.atomic_model
-        print("DEBUG: atomic_model.sym_ops[0]:", atomic_model.sym_ops[0])
-        print("DEBUG: atomic_model.sym_ops[1]:", atomic_model.sym_ops[1])
         
         hkl_sym = get_symmetry_equivalents(self.hkl_grid, sym_ops_rot)
         hs_shape = np.array(hkl_sym).shape
@@ -260,11 +248,6 @@ class OnePhononTorch(nn.Module, ModelRunner):
             (int(self.hkl_grid[:, 2].min()), int(self.hkl_grid[:, 2].max()), self.lsampling[2])
         ]
         logging.debug(f"Original sampling: {sampling_original}; sampling_ravel: {sampling_ravel}")
-        print("DEBUG: self.hkl_grid.shape =", self.hkl_grid.shape)
-        print("DEBUG: self.map_shape =", self.map_shape)
-        print("DEBUG: sampling_original =", sampling_original)
-        print("DEBUG: sampling_ravel =", sampling_ravel)
-        print("DEBUG: np.prod(map_shape_ravel) =", np.prod(map_shape_ravel))
         
         print("AGGRESSIVE_DEBUG_HYP_TORCH: BEFORE resize_map: I_full shape =", I_full.shape, 
               "min =", I_full.min().item(), "max =", I_full.max().item(), "mean =", I_full.mean().item())
@@ -283,9 +266,6 @@ class OnePhononTorch(nn.Module, ModelRunner):
         test_scale = 2.5e-4  # Use 2.5e-4 (adjust as needed)
         I_full_np_scaled = I_full_np * test_scale
         # Print statistics for the scaled result
-        print("TEST_HYP: scaled diffuse intensity stats -- min: {:.6f}, max: {:.6f}, mean: {:.6f}".
-              format(np.nanmin(I_full_np_scaled), np.nanmax(I_full_np_scaled), np.nanmean(I_full_np_scaled)))
-        print("TEST_HYP: first 10 elements of scaled map:", I_full_np_scaled.flatten()[:10])
 
         primary_indices = np.array(ravel_np[0])
         all_indices = np.concatenate(ravel_np, axis=0)
