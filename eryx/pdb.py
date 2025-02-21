@@ -1,6 +1,7 @@
 import numpy as np
 import gemmi
 from scipy.spatial import KDTree
+from eryx.logging_utils import log_method_call, TimedOperation, log_property_access, log_array_shape
 
 def sym_str_as_matrix(sym_str):
     """
@@ -120,12 +121,14 @@ def get_unit_cell_axes(cell):
 
 class AtomicModel:
     
+    @log_method_call
     def __init__(self, pdb_file, expand_p1=False, frame=0, clean_pdb=True):
         self._get_gemmi_structure(pdb_file, clean_pdb)
         self._extract_cell()
         self.sym_ops, self.transformations = self._get_sym_ops(pdb_file)
         self.extract_frame(frame=frame, expand_p1=expand_p1)
 
+    @log_method_call
     def _get_gemmi_structure(self, pdb_file, clean_pdb):
         """
         Retrieve Gemmi structure from PDB file.
@@ -142,6 +145,7 @@ class AtomicModel:
                 print(e)
             self.structure.remove_empty_chains()
 
+    @log_method_call
     def _extract_cell(self):
         """
         Extract unit cell information.
@@ -151,6 +155,7 @@ class AtomicModel:
         self.space_group = self.structure.spacegroup_hm
         self.unit_cell_axes = get_unit_cell_axes(self.cell)
         
+    @log_method_call
     def _get_sym_ops(self, pdb_file):
         """
         Extract symmetry operations, preferably from the PDB
@@ -166,16 +171,17 @@ class AtomicModel:
         sym_ops = extract_sym_ops(pdb_file)
         transformations = extract_transformations(pdb_file)
         
-        if len(sym_ops) == 0:
-            print(""""Warning: gathering symmetry operations from
-            Gemmi rather than the PDB header. This may be incorrect
-            for non-orthogonal unit cells.""")
+        if len(sym_ops) < 4:
+            print("Warning: falling back to Gemmi for symmetry operations.")
+            from gemmi import SpaceGroup
+            sg = SpaceGroup(self.space_group)
             sym_ops = {}
-            sg = gemmi.SpaceGroup(self.space_group) 
-            for i,op in enumerate(sg.operations()):
-                r = np.array(op.rot) / op.DEN 
-                t = np.array(op.tran) / op.DEN
-                sym_ops[i] = np.hstack((r, t[:,np.newaxis]))
+            transformations = {}
+            for i, op in enumerate(sg.operations()):
+                r = np.array(op.rot, dtype=float).reshape(3,3) / op.DEN
+                t = np.array(op.tran, dtype=float) / op.DEN
+                sym_ops[i] = r  # only rotation part
+                transformations[i] = np.hstack((r, t.reshape(3,1)))
 
         if len(transformations) == 0:
             transformations = sym_ops
@@ -183,6 +189,7 @@ class AtomicModel:
         self.n_asu = len(transformations)
         return sym_ops, transformations
     
+    @log_method_call
     def extract_frame(self, expand_p1=False, frame=0):
         """
         Extract the form factors and atomic coordinates for the
@@ -200,6 +207,7 @@ class AtomicModel:
         self.adp = None
         self.elements = []
         self.xyz = None
+        log_array_shape(self.xyz, "xyz initial")
 
         if frame == -1:
             frange = range(len(self.structure))
@@ -474,6 +482,7 @@ class Crystal:
         return xyz
 
 class GaussianNetworkModel:
+    @log_method_call
     def __init__(self, pdb_path, enm_cutoff, gamma_intra, gamma_inter):
         self._setup_atomic_model(pdb_path)
         self.enm_cutoff = enm_cutoff
@@ -481,6 +490,7 @@ class GaussianNetworkModel:
         self.gamma_intra = gamma_intra
         self._setup_gaussian_network_model()
 
+    @log_method_call
     def _setup_atomic_model(self, pdb_path):
         """
         Build unit cell and its nearest neighbors while
@@ -500,6 +510,7 @@ class GaussianNetworkModel:
         self.n_atoms_per_asu = self.crystal.get_asu_xyz().shape[0]
         self.n_dof_per_asu_actual = self.n_atoms_per_asu * 3
 
+    @log_method_call
     def _setup_gaussian_network_model(self):
         """
         Build interaction pair list and spring constant.
@@ -507,6 +518,7 @@ class GaussianNetworkModel:
         self.build_gamma()
         self.build_neighbor_list()
 
+    @log_method_call
     def build_gamma(self):
         """
         The spring constant gamma dictates the interaction strength
@@ -524,6 +536,7 @@ class GaussianNetworkModel:
                     if (i_cell == self.id_cell_ref) and (j_asu == i_asu):
                         self.gamma[i_cell, i_asu, j_asu] = self.gamma_intra
 
+    @log_method_call
     def build_neighbor_list(self):
         """
         Returns the list asu_neighbors[i_asu][i_cell][j_asu]
@@ -549,24 +562,26 @@ class GaussianNetworkModel:
 
                     self.asu_neighbors[i_asu][i_cell][j_asu] = kd_tree1.query_ball_tree(kd_tree2, r=self.enm_cutoff)
 
+    @log_method_call
     def compute_hessian(self):
         """
-        For a pair of atoms the Hessian in a GNM is defined as:
-        1. i not j and dij =< cutoff: -gamma_ij
-        2. i not j and dij > cutoff: 0
-        3. i=j: -sum_{j not i} hessian_ij
+        Compute the Hessian matrix for the GNM.
+
+        For a pair of atoms i,j the Hessian is defined as:
+        - If i != j and d_ij <= cutoff: H_ij = -gamma_ij 
+        - If i != j and d_ij > cutoff: H_ij = 0
+        - If i = j: H_ii = -sum_{j != i} H_ij
 
         Returns
         -------
-        hessian: numpy.ndarray,
-                 shape (n_asu, n_atoms_per_asu,
-                        n_cell, n_asu, n_atoms_per_asu)
-                 type 'complex'
-            - dimension 0: index ASUs in reference cell
-            - dimension 1: index their atoms
-            - dimension 2: index neighbor cells
-            - dimension 3: index ASUs in neighbor cell
-            - dimension 4: index atoms in neighbor ASU
+        hessian : numpy.ndarray
+            Shape (n_asu, n_atoms_per_asu, n_cell, n_asu, n_atoms_per_asu)
+            Complex-valued Hessian matrix where:
+            - dim 0: ASUs in reference cell
+            - dim 1: atoms in reference ASU  
+            - dim 2: neighbor cells
+            - dim 3: ASUs in neighbor cell
+            - dim 4: atoms in neighbor ASU
         """
         hessian = np.zeros((self.n_asu, self.n_atoms_per_asu,
                             self.n_cell, self.n_asu, self.n_atoms_per_asu),
@@ -594,27 +609,29 @@ class GaussianNetworkModel:
 
     def compute_K(self, hessian, kvec=None):
         """
-        Noting H(d) the block of the hessian matrix
-        corresponding the the d-th reference cell
-        whose origin is located at r_d, then:
-        K(kvec) = \sum_d H(d) exp(i kvec. r_d)
+        Compute the dynamical matrix K(k).
+
+        For H(d) being the block of the Hessian matrix corresponding to 
+        the d-th reference cell at position r_d:
+        K(k) = sum_d H(d) exp(i k·r_d)
 
         Parameters
         ----------
-        hessian : numpy.ndarray, see compute_hessian()
+        hessian : numpy.ndarray
+            The Hessian matrix, see compute_hessian()
         kvec : numpy.ndarray, shape (3,)
-            phonon wavevector, default array([0.,0.,0.])
+            Phonon wavevector, defaults to [0,0,0]
 
         Returns
         -------
-        Kmat : numpy.ndarray,
-               shape (n_asu, n_atoms_per_asu,
-                      n_asu, n_atoms_per_asu)
-               type 'complex'
+        Kmat : numpy.ndarray
+            Shape (n_asu, n_atoms_per_asu, n_asu, n_atoms_per_asu)
+            Complex-valued dynamical matrix
         """
         if kvec is None:
             kvec = np.zeros(3)
         Kmat = np.copy(hessian[:, :, self.id_cell_ref, :, :])
+        log_array_shape(Kmat, "Kmat")
 
         for j_cell in range(self.n_cell):
             if j_cell == self.id_cell_ref:
@@ -629,21 +646,24 @@ class GaussianNetworkModel:
 
     def compute_Kinv(self, hessian, kvec=None, reshape=True):
         """
-        Compute the inverse of K(kvec)
-        (see compute_K() for the relationship between K and the hessian).
+        Compute the inverse of the dynamical matrix K(k).
+        
+        See compute_K() for details on K(k).
 
         Parameters
         ----------
-        hessian : numpy.ndarray, see compute_hessian()
+        hessian : numpy.ndarray
+            The Hessian matrix, see compute_hessian()
         kvec : numpy.ndarray, shape (3,)
-            phonon wavevector, default array([0.,0.,0.])
+            Phonon wavevector, defaults to [0,0,0]
+        reshape : bool
+            Whether to reshape the output matrix
 
         Returns
         -------
-        Kinv : numpy.ndarray,
-               shape (n_asu, n_atoms_per_asu,
-                      n_asu, n_atoms_per_asu)
-               type 'complex'
+        Kinv : numpy.ndarray
+            Shape (n_asu, n_atoms_per_asu, n_asu, n_atoms_per_asu) if reshape=True
+            Complex-valued inverse dynamical matrix
         """
         if kvec is None:
             kvec = np.zeros(3)

@@ -10,6 +10,7 @@ from .map_utils import *
 from .scatter import structure_factors
 from .stats import compute_cc
 from .base import compute_molecular_transform, compute_crystal_transform
+from eryx.logging_utils import log_method_call, TimedOperation, log_array_shape
 
 class RigidBodyTranslations:
     
@@ -66,7 +67,7 @@ class RigidBodyTranslations:
         ccs = np.array(self.scan_ccs)
         plt.scatter(sigmas, ccs, c='black')
         plt.plot(sigmas, ccs, c='black')
-        plt.xlabel("$\sigma$ ($\mathrm{\AA}$)", fontsize=14)
+        plt.xlabel(r"$\sigma$ ($\mathrm{\AA}$)", fontsize=14)
         plt.ylabel("CC", fontsize=14)
 
         if output is not None:
@@ -77,17 +78,27 @@ class RigidBodyTranslations:
         Compute the diffuse map(s) from the molecular transform:
         I_diffuse = I_transform * (1 - q^2 * sigma^2)
         for a single sigma or set of (an)isotropic sigmas.
-
+        
         Parameters
         ----------
         sigma : float or array of shape (n_sigma,) or (n_sigma, 3)
             (an)isotropic displacement parameter for asymmetric unit 
-
+            
         Returns
         -------
         Id : numpy.ndarray, (n_sigma, q_grid.shape[0])
             diffuse intensity maps for the corresponding sigma(s)
         """
+        if not hasattr(self, "transform") or self.transform is None:
+            from .base import compute_crystal_transform
+            _, self.transform = compute_crystal_transform(self.pdb_path,
+                                                          self.hsampling,
+                                                          self.ksampling,
+                                                          self.lsampling,
+                                                          expand_p1=self.expand_p1,
+                                                          res_limit=self.res_limit,
+                                                          batch_size=self.batch_size,
+                                                          n_processes=self.n_processes)
         if type(sigmas) == float:
             sigmas = np.array([sigmas])
 
@@ -97,6 +108,9 @@ class RigidBodyTranslations:
             wilson = np.sum(self.q_grid.T * np.dot(np.square(sigmas)[:,np.newaxis] * np.eye(3), self.q_grid.T), axis=1)
 
         Id = self.transform.flatten() * (1 - np.exp(-1 * wilson))
+        print("DEBUG: Finished loops. Id stats after computation:", "min =", np.nanmin(Id), "max =", np.nanmax(Id))
+        print("DEBUG_HYP_NP: I_full AFTER scaling: sum =", np.nansum(Id), 
+              ", first 10 elements =", Id.flatten()[:10])
         return Id
     
     def optimize(self, target, sigmas_min, sigmas_max, n_search=20):
@@ -106,7 +120,7 @@ class RigidBodyTranslations:
         
         Parameters
         ----------
-        target : numpy.ndarray, 3d
+        target : numpy.ndarray, with 3 dimensions
             target map, of shape self.map_shape
         sigmas_min : float or tuple of shape (3,)
             lower bound of (an)isotropic sigmas
@@ -242,9 +256,9 @@ class LiquidLikeMotions:
 
         Parameters
         ----------
-        transform : numpy.ndarray, 3d
+        transform : numpy.ndarray, shape (n_x, n_y, n_z)
             crystal or molecular transform map
-        kernel : numpy.ndarray, 3d
+        kernel : numpy.ndarray, shape (n_x, n_y, n_z) 
             disorder kernel, same shape as transform
 
         Returns
@@ -277,8 +291,8 @@ class LiquidLikeMotions:
         zi = scipy.interpolate.griddata((sigmas, gammas), ccs, (xi[None,:], yi[:,None]), method='cubic')
 
         plt.contourf(xi,yi,zi,25,linewidths=0.5)
-        plt.xlabel("$\sigma$ ($\mathrm{\AA}$)", fontsize=14)
-        plt.ylabel("$\gamma$ ($\mathrm{\AA}$)", fontsize=14)
+        plt.xlabel(r"$\sigma$ ($\mathrm{\AA}$)", fontsize=14)
+        plt.ylabel(r"$\gamma$ ($\mathrm{\AA}$)", fontsize=14)
         cb = plt.colorbar()
         cb.ax.set_ylabel("CC", fontsize=14)
 
@@ -342,7 +356,7 @@ class LiquidLikeMotions:
         
         Parameters
         ----------
-        target : numpy.ndarray, 3d
+        target : numpy.ndarray, with 3 dimensions
             target map, of shape self.map_shape
         sigmas_min : float or tuple of shape (3,)
             lower bound of (an)isotropic sigmas
@@ -524,7 +538,7 @@ class RigidBodyRotations:
         
         Parameters
         ----------
-        target : numpy.ndarray, 3d
+        target : numpy.ndarray, with 3 dimensions
             target map, of shape self.map_shape
         sigma_min : float 
             lower bound of sigma
@@ -802,7 +816,9 @@ class NonInteractingDeformableMolecules:
         """
         Id = np.zeros((self.q_grid.shape[0]))
         for i_asu in range(self.model.n_asu):
-            if rank == -1:
+            print("DEBUG: Reshaped F shape:", F.shape)
+            if F.shape[0] == 0:
+                print(f"WARNING: No valid q_indices for dh,dk,dl=({dh},{dk},{dl})")
                 Id[self.res_mask] += np.dot(np.square(np.abs(structure_factors(self.q_grid[self.res_mask],
                                                                                self.model.xyz[i_asu],
                                                                                self.model.ff_a[i_asu],
@@ -827,6 +843,9 @@ class NonInteractingDeformableMolecules:
         Id = np.multiply(self.q2_unique[self.q2_unique_inverse], Id)
         if outdir is not None:
             np.save(os.path.join(outdir, f"rank_{rank:05}.npy"), Id)
+        elapsed = time.time() - start_time
+        logging.debug("[OnePhonon.apply_disorder] Completed disorder computation in %.2f s. Id stats: min=%.3f, max=%.3f", 
+                      elapsed, np.nanmin(Id), np.nanmax(Id))
         return Id
 
     def compute_intensity_naive(self):
@@ -841,6 +860,7 @@ class NonInteractingDeformableMolecules:
         I(q) = \sum_ij F_i(q) (T_ij(q) - 1.) F_j(q)
         The diffuse intensity is an incoherent sum over ASUs.
         """
+        print("DEBUG: ADP value =", ADP)
         Id = np.zeros((self.q_grid.shape[0]), dtype='complex')
 
         self.compute_covariance_matrix()
@@ -896,18 +916,48 @@ class NonInteractingDeformableMolecules:
         Id[~self.res_mask] = np.nan
         return Id
 
-class OnePhonon:
+class ModelRunner:
+    """Base class for handling model execution and error formatting"""
+    
+    def run_model(self, func, *args, **kwargs):
+        """
+        Executes a model function with proper error handling and logging
+        
+        Parameters
+        ----------
+        func : callable
+            The model function to execute
+        args, kwargs : 
+            Arguments to pass to the function
+            
+        Returns
+        -------
+        The result of func(*args, **kwargs)
+        """
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logging.error(f"[ModelRunner.run_model] Model run failed: {repr(e)}")
+            raise
+
+class OnePhonon(ModelRunner):
 
     """
     Lattice of interacting rigid bodies in the one-phonon
     approximation (a.k.a small-coupling regime).
     """
 
+    @log_method_call
     def __init__(self, pdb_path, hsampling, ksampling, lsampling,
                  expand_p1=True, group_by='asu',
                  res_limit=0., model='gnm',
                  gnm_cutoff=4., gamma_intra=1., gamma_inter=1.,
                  batch_size=10000, n_processes=8):
+        self.pdb_path = pdb_path
+        self.expand_p1 = expand_p1
+        self.res_limit = res_limit
+        self.batch_size = batch_size
+        self.n_processes = n_processes
         self.hsampling = hsampling
         self.ksampling = ksampling
         self.lsampling = lsampling
@@ -917,6 +967,7 @@ class OnePhonon:
         self._setup_phonons(pdb_path, model,
                             gnm_cutoff, gamma_intra, gamma_inter)
 
+    @log_method_call
     def _setup(self, pdb_path, expand_p1, res_limit, group_by):
         """
         Compute q-vectors to evaluate and build the unit cell
@@ -942,10 +993,21 @@ class OnePhonon:
                                                       self.ksampling,
                                                       self.lsampling,
                                                       return_hkl=True)
-        self.res_mask, res_map = get_resolution_mask(self.model.cell,
-                                                     self.hkl_grid,
-                                                     res_limit)
+        log_array_shape(self.hkl_grid, "hkl_grid")
+        if res_limit <= 0:
+            self.res_mask = np.ones(self.hkl_grid.shape[0], dtype=bool)
+            res_map = None
+        else:
+            self.res_mask, res_map = get_resolution_mask(self.model.cell,
+                                                         self.hkl_grid,
+                                                         res_limit)
         self.q_grid = 2 * np.pi * np.inner(self.model.A_inv.T, self.hkl_grid).T
+        log_array_shape(self.q_grid, "q_grid")
+        print("DEBUG_HYP_NP: In OnePhonon._setup() (NP)")
+        print("DEBUG_HYP_NP:   hkl_grid shape =", self.hkl_grid.shape,
+              ", first 10 rows =", self.hkl_grid[:10])
+        print("DEBUG_HYP_NP:   q_grid shape =", self.q_grid.shape,
+              ", first 10 q_vectors =", self.q_grid[:10])
 
         self.crystal = Crystal(self.model)
         self.crystal.supercell_extent(nx=1, ny=1, nz=1)
@@ -962,6 +1024,7 @@ class OnePhonon:
             self.n_dof_per_asu = 6
         self.n_dof_per_cell = self.n_asu * self.n_dof_per_asu
 
+    @log_method_call
     def _setup_phonons(self, pdb_path, model,
                        gnm_cutoff, gamma_intra, gamma_inter):
         """
@@ -1037,6 +1100,7 @@ class OnePhonon:
                                         gamma_intra=gamma_intra,
                                         gamma_inter=gamma_inter)
 
+    @log_method_call
     def _build_A(self):
         """
         Build the matrix A that projects small rigid-body displacements
@@ -1056,6 +1120,7 @@ class OnePhonon:
         """
         if self.group_by == 'asu':
             self.Amat = np.zeros((self.n_asu, self.n_atoms_per_asu, 3, 6))
+            log_array_shape(self.Amat, "Amat")
             Atmp = np.zeros((3, 3))
             Adiag = np.copy(Atmp)
             np.fill_diagonal(Adiag, 1.)
@@ -1074,6 +1139,7 @@ class OnePhonon:
         else:
             self.Amat = None
 
+    @log_method_call
     def _build_M(self):
         """
         Build the mass matrix M.
@@ -1143,6 +1209,7 @@ class OnePhonon:
         """
         return int(((x - L / 2) % L) - L / 2) / L
 
+    @log_method_call
     def _build_kvec_Brillouin(self):
         """
         Compute all k-vectors and their norm in the first Brillouin zone.
@@ -1208,7 +1275,7 @@ class OnePhonon:
 
         Returns
         -------
-        map : numpy.ndarray, shape (npoints, 1_
+        map : numpy.ndarray, shape (npoints, 1)
         """
         map = np.zeros((self.q_grid.shape[0]))
         for dh in tqdm(range(self.hsampling[2])):
@@ -1232,6 +1299,7 @@ class OnePhonon:
         hessian = np.zeros((self.n_asu, self.n_dof_per_asu,
                             self.n_cell, self.n_asu, self.n_dof_per_asu),
                            dtype='complex')
+        log_array_shape(hessian, "hessian")
 
         hessian_allatoms = self.gnm.compute_hessian()
 
@@ -1327,7 +1395,18 @@ class OnePhonon:
                     u, s, _ = np.linalg.svd(Kmat)
                     self.Winv[dh, dk, dl] = s
                     self.V[dh, dk, dl] = u
+    def _compute_adp_scale(self):
+        """
+        Compute the ADP scale factor for the numpy implementation.
+        Returns:
+            scale (float): scale factor computed as mean(exp_adps)/(8 * pi^2 * mean(kinv_diag))
+        """
+        exp_adps = self.model.adp[0]
+        kinv_diag = np.diag(self.covar[0]) if hasattr(self, 'covar') else np.ones_like(exp_adps)
+        scale = np.mean(exp_adps) / (8 * np.pi * np.pi * np.mean(kinv_diag))
+        return scale
 
+    @log_method_call
     def apply_disorder(self, rank=-1, outdir=None, use_data_adp=False):
         """
         Compute the diffuse intensity in the one-phonon scattering
@@ -1335,22 +1414,50 @@ class OnePhonon:
         representation of the asymmetric units, optionally reduced
         to a set of interacting rigid bodies.
         """
+        import time
+        import logging
+        logging.debug(f"[OnePhonon.apply_disorder] Starting disorder computation with map shape: {self.q_grid.shape}")
+
+        def test_validate_physics_computation(device):
+            pdb_path = "tests/pdbs/5zck.pdb"
+            hsampling = [-1, 2, 10]
+            ksampling = [-1, 2, 10]
+            lsampling = [-1, 2, 10]
+    
+            from eryx.onephonon_torch import OnePhononTorch
+            model_torch = OnePhononTorch(pdb_path, hsampling, ksampling, lsampling, device=device)
+            # This should pass without raising an AssertionError if validation is successful.
+            model_torch.validate_physics_computation()
+        start_time = time.time()
+        logging.debug("[OnePhonon.apply_disorder] Starting disorder computation with rank=%s", rank)
+        print("DEBUG_HYP_NP: In OnePhonon.apply_disorder() (NP)")
+        print("DEBUG_HYP_NP:   q_grid shape =", self.q_grid.shape)
         if use_data_adp:
             ADP = self.model.adp[0] / (8 * np.pi * np.pi)
         else:
             ADP = self.ADP
         Id = np.zeros((self.q_grid.shape[0]), dtype='complex')
+        log_array_shape(Id, "Id")
         for dh in tqdm(range(self.hsampling[2])):
             for dk in range(self.ksampling[2]):
                 for dl in range(self.lsampling[2]):
 
                     q_indices = self._at_kvec_from_miller_points((dh, dk, dl))
                     q_indices = q_indices[self.res_mask[q_indices]]
+                    print(f"DEBUG: dh,dk,dl=({dh},{dk},{dl}), q_indices count: {len(q_indices)}")
+                    print("DEBUG_HYP_NP: For cell (dh,dk,dl)=({},{},{}):".format(dh, dk, dl))
+                    print("DEBUG_HYP_NP:   q_indices shape =", q_indices.shape, 
+                          "first 10 indices =", q_indices[:10])
 
                     F = np.zeros((q_indices.shape[0],
                                   self.n_asu,
                                   self.n_dof_per_asu),
                                  dtype='complex')
+                    for i_asu in range(self.n_asu):
+                        F_shape = F[:, i_asu, :].shape
+                        F_abs = np.nanmin(np.abs(F[:, i_asu, :])), np.nanmax(np.abs(F[:, i_asu, :])), np.nanmean(np.abs(F[:, i_asu, :]))
+                        print("DEBUG_HYP_NP:   asu {}: F shape = {}, abs stats (min,max,mean) = {}, first 10 =", 
+                              i_asu, F_shape, F_abs, F[:, i_asu, :].flatten()[:10])
                     for i_asu in range(self.n_asu):
                         F[:, i_asu, :] = structure_factors(
                             self.q_grid[q_indices],
@@ -1364,21 +1471,50 @@ class OnePhonon:
                             compute_qF=True,
                             project_on_components=self.Amat[i_asu],
                             sum_over_atoms=False)
+                        print(f"DEBUG: For asu {i_asu}, F shape: {F[:, i_asu, :].shape}, "
+                              f"min(abs): {np.nanmin(np.abs(F[:, i_asu, :]))}, "
+                              f"max(abs): {np.nanmax(np.abs(F[:, i_asu, :]))}")
                     F = F.reshape((q_indices.shape[0],
                                    self.n_asu * self.n_dof_per_asu))
+                    # Add aggressive debug prints here:
+                    print(f"DEBUG: For cell (dh,dk,dl)=({dh},{dk},{dl}):")
+                    print("   V[dh,dk,dl] =", self.V[dh, dk, dl])
+                    print("   Winv[dh,dk,dl] =", self.Winv[dh, dk, dl])
+                    with np.errstate(divide='ignore', invalid='ignore'):
+                        eigvals = np.sqrt(1.0 / self.Winv[dh, dk, dl])
+                    print("   Inferred eigenvalues (1/sqrt(Winv)) =", eigvals)
 
                     if rank == -1:
-                        Id[q_indices] += np.dot(
-                            np.square(np.abs(np.dot(F, self.V[dh, dk, dl]))),
-                            self.Winv[dh, dk, dl])
+                        valid = ~np.isnan(self.Winv[dh, dk, dl])
+                        # Only use valid eigen–modes in the dot product.
+                        if np.any(valid):
+                            V_valid = self.V[dh, dk, dl][:, valid]
+                            Winv_valid = self.Winv[dh, dk, dl][valid]
+                            diff_val = np.dot(
+                                np.square(np.abs(np.dot(F, V_valid))),
+                                Winv_valid)
+                            print(f"DEBUG: At (dh,dk,dl)=({dh},{dk},{dl}), diff_val min: {np.nanmin(diff_val)}, max: {np.nanmax(diff_val)}")
+                            Id[q_indices] += diff_val
                     else:
-                        Id[q_indices] += np.square(
+                        diff_val = np.square(
                             np.abs(np.dot(F, self.V[dh,dk,dl,:,rank]))) * \
                                          self.Winv[dh,dk,dl,rank]
+                        print(f"DEBUG: At (dh,dk,dl)=({dh},{dk},{dl}), rank {rank}, diff_val min: {np.nanmin(diff_val)}, max: {np.nanmax(diff_val)}")
+                        Id[q_indices] += diff_val
         Id[~self.res_mask] = np.nan
-        Id = np.real(Id)
-        if outdir is not None:
-            np.save(os.path.join(outdir, f"rank_{rank:05}.npy"), Id)
+        print("DEBUG_HYP_NP: I_full BEFORE scaling: sum =", np.nansum(Id), 
+              ", first 10 elements =", Id.flatten()[:10])
+        _, mult = compute_multiplicity(self.crystal.model, 
+                                       self.hsampling, 
+                                       self.ksampling, 
+                                       self.lsampling)
+        print("DEBUG_HYP_NP: multiplicity stats: shape =", mult.shape, 
+              ", min =", np.nanmin(mult), 
+              ", max =", np.nanmax(mult), 
+              ", first 10 elements =", mult.flatten()[:10])
+        logging.debug(f"[OnePhonon.apply_disorder] Final diffuse intensity: shape={Id.shape}, min={np.nanmin(Id)}, max={np.nanmax(Id)}, mean={np.nanmean(Id)}")
+        elapsed = time.time() - start_time
+        logging.debug(f"[OnePhonon.apply_disorder] Completed disorder computation in {elapsed:.2f} s")
         return Id
 
 class OnePhononBrillouin:
