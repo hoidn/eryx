@@ -20,7 +20,6 @@
 - Reuse the existing `run_np()` function in `run_debug.py` with minimal modifications
 - Generate data with at least 3 parameter sets (small, medium, and default)
 - Add comprehensive logging to verify data capture
-- Ensure `DEBUG_MODE` environment variable is set to "1"
 
 ## Context
 
@@ -187,7 +186,6 @@ CREATE eryx/autotest_config.py:
     - Sets log directory to "ground_truth_data"
     - Ensures the log directory exists
     
-    ADD code to query the DEBUG_MODE environment variable and warn if not set
 ```
 
 9. Modify Run Debug Function for Parameter Variations
@@ -207,15 +205,8 @@ UPDATE eryx/run_debug.py:
 ```aider
 CREATE eryx/scripts/generate_ground_truth.py:
     IMPLEMENT a script that:
-    - Configures logging appropriately
-    - Imports the run_np function from eryx.run_debug
-    - Sets the DEBUG_MODE environment variable to "1" if not already set
-    - Creates the output and log directories if they don't exist
-    - Runs the function with different parameter sets:
-      * Default parameters
-      * Small grid parameters
-      * Medium grid parameters
-    - Logs when each run starts and completes
+    - Configures autotest debug mode appropriately
+    - Imports the run_np function from run_debug and runs it
     - Verifies that log files were created
 ```
 
