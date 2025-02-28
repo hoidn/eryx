@@ -13,6 +13,7 @@ This document captures the key architectural constraints and project conventions
    - Use autotest framework with debug mode enabled
    - Run the original `run_np()` function to generate logs
    - Only setup needed is ensuring autotest is configured for debug mode
+   - Configure debug mode through autotest_config.py, not through environment variables
 
 3. **Test Verification**
    - Use the autotest framework to validate PyTorch implementations against NumPy ground truth
