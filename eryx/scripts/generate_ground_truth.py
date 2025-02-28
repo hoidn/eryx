@@ -28,7 +28,11 @@ logging.basicConfig(
 )
 
 # Import after setting DEBUG_MODE
-from eryx.run_debug import run_np
+import sys
+import os
+# Add the project root to the path so we can import run_debug.py
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from run_debug import run_np
 from eryx.autotest_config import config
 
 def main():
