@@ -96,9 +96,24 @@ def instrument_models():
     eryx.models.OnePhonon.compute_hessian = debug(eryx.models.OnePhonon.compute_hessian)
     eryx.models.OnePhonon.compute_covariance_matrix = debug(eryx.models.OnePhonon.compute_covariance_matrix)
     
-    # Instrument other model classes as needed
-    eryx.models.RigidBodyTranslations.apply_disorder = debug(eryx.models.RigidBodyTranslations.apply_disorder)
-    eryx.models.LiquidLikeMotions.apply_disorder = debug(eryx.models.LiquidLikeMotions.apply_disorder)
+    # Instrument other model classes as needed - safely check if methods exist first
+    try:
+        if hasattr(eryx.models.RigidBodyTranslations, 'apply_disorder'):
+            eryx.models.RigidBodyTranslations.apply_disorder = debug(eryx.models.RigidBodyTranslations.apply_disorder)
+            logger.info("Instrumented RigidBodyTranslations.apply_disorder")
+        else:
+            logger.warning("RigidBodyTranslations.apply_disorder not found, skipping")
+    except AttributeError:
+        logger.warning("RigidBodyTranslations class not found, skipping")
+    
+    try:
+        if hasattr(eryx.models.LiquidLikeMotions, 'apply_disorder'):
+            eryx.models.LiquidLikeMotions.apply_disorder = debug(eryx.models.LiquidLikeMotions.apply_disorder)
+            logger.info("Instrumented LiquidLikeMotions.apply_disorder")
+        else:
+            logger.warning("LiquidLikeMotions.apply_disorder not found, skipping")
+    except AttributeError:
+        logger.warning("LiquidLikeMotions class not found, skipping")
 
 def generate_onephonon_data(pdb_path: str, output_dir: str):
     """
