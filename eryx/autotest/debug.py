@@ -172,13 +172,18 @@ class TestDebug(unittest.TestCase):
 #        formatted_log = self.debug._formatConsoleLog(data)
 #        self.assertEqual(formatted_log, "3, hello")
 
+# Import the global configuration
+from eryx.autotest_config import config
+
 # Create a global instance of Debug
 def _create_debug_decorator():
     debug_obj = Debug()
+    # Use the configuration from autotest_config
+    debug_obj.configuration = config
     return debug_obj.decorate
 
-# Only create the decorator if DEBUG_MODE is set
-if os.environ.get("DEBUG_MODE") == "1":
+# Create the decorator based on the configuration
+if config.getDebugFlag():
     debug = _create_debug_decorator()
 else:
     # Provide a no-op decorator when debugging is disabled

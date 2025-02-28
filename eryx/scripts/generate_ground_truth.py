@@ -12,10 +12,8 @@ import logging
 import time
 import numpy as np
 
-# Set DEBUG_MODE environment variable if not already set
-if os.environ.get("DEBUG_MODE") != "1":
-    os.environ["DEBUG_MODE"] = "1"
-    print("Set DEBUG_MODE=1 environment variable")
+# Import the configuration to ensure debug mode is enabled
+from eryx.autotest_config import config
 
 # Configure logging
 logging.basicConfig(
