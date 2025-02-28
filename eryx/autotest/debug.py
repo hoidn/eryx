@@ -42,6 +42,10 @@ import pickle
 import json
 from typing import Callable, Any, List, Union, Optional
 import re
+from .configuration import Configuration
+from .serializer import Serializer
+from .logger import Logger
+from .functionmapping import FunctionMapping
 
 def make_invocation_counter():
     count = 0
@@ -170,11 +174,6 @@ class TestDebug(unittest.TestCase):
 
 # Create a global instance of Debug
 def _create_debug_decorator():
-    from .serializer import Serializer
-    from .logger import Logger
-    from .functionmapping import FunctionMapping
-    from .configuration import Configuration
-    
     debug_obj = Debug()
     return debug_obj.decorate
 
