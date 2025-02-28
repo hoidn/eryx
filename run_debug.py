@@ -19,6 +19,11 @@ console.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s")
 logging.getLogger("").addHandler(console)
 
 
+import logging
+import os
+import sys
+from eryx.models import OnePhonon, RigidBodyTranslations, LiquidLikeMotions
+
 def setup_logging():
     # Remove any existing handlers.
     for handler in logging.root.handlers[:]:
@@ -38,6 +43,86 @@ def setup_logging():
     logging.getLogger("").addHandler(console)
 
 def run_np(variant="default"):
+    """
+    Run the NumPy implementation with different parameter sets.
+    
+    Args:
+        variant: Parameter set to use ('small', 'medium', or 'default')
+    """
+    logging.info(f"Starting NP branch computation with variant: {variant}")
+    
+    # Define parameter sets
+    if variant == "small":
+        logging.info("Using small parameter set")
+        pdb_path = "tests/pdbs/histidine.pdb"
+        hsampling = (-2, 2, 1)
+        ksampling = (-2, 2, 1)
+        lsampling = (-2, 2, 1)
+        model_type = "rigid_body_translations"
+    elif variant == "medium":
+        logging.info("Using medium parameter set")
+        pdb_path = "tests/pdbs/2ol9.pdb"
+        hsampling = (-5, 5, 1)
+        ksampling = (-5, 5, 1)
+        lsampling = (-5, 5, 1)
+        model_type = "liquid_like_motions"
+    else:  # default
+        logging.info("Using default parameter set")
+        pdb_path = "tests/pdbs/7n2h.pdb"
+        hsampling = (-10, 10, 1)
+        ksampling = (-10, 10, 1)
+        lsampling = (-10, 10, 1)
+        model_type = "one_phonon"
+    
+    # Create output directory
+    os.makedirs("output", exist_ok=True)
+    
+    # Run the appropriate model
+    if model_type == "one_phonon":
+        model = OnePhonon(
+            pdb_path=pdb_path,
+            hsampling=hsampling,
+            ksampling=ksampling,
+            lsampling=lsampling,
+            expand_p1=True,
+            group_by='asu',
+            res_limit=0.0,
+            model='gnm',
+            gnm_cutoff=4.0,
+            gamma_intra=1.0,
+            gamma_inter=1.0,
+            batch_size=1000,
+            n_processes=1
+        )
+        model.apply_disorder(rank=10, outdir=f"output/one_phonon_{variant}")
+    
+    elif model_type == "rigid_body_translations":
+        model = RigidBodyTranslations(
+            pdb_path=pdb_path,
+            hsampling=hsampling,
+            ksampling=ksampling,
+            lsampling=lsampling,
+            expand_friedel=True,
+            res_limit=0.0,
+            batch_size=1000,
+            n_processes=1
+        )
+        model.apply_disorder(sigmas=[0.1, 0.1, 0.1])
+    
+    elif model_type == "liquid_like_motions":
+        model = LiquidLikeMotions(
+            pdb_path=pdb_path,
+            hsampling=hsampling,
+            ksampling=ksampling,
+            lsampling=lsampling,
+            expand_p1=True,
+            border=1,
+            res_limit=0.0,
+            batch_size=1000,
+            n_processes=1,
+            asu_confined=False
+        )
+        model.apply_disorder(sigmas=[0.1], gammas=[10.0])
     """
     Run the NumPy implementation with different parameter sets.
     
