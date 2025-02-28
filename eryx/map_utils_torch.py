@@ -35,13 +35,34 @@ def generate_grid(A_inv: torch.Tensor, hsampling: Tuple[float, float, float],
     References:
         - Original implementation: eryx/map_utils.py:generate_grid
     """
-    # TODO: Implement PyTorch version using torch.meshgrid or equivalent
-    # TODO: Calculate hsteps, ksteps, lsteps
-    # TODO: Generate hkl_grid using torch operations 
-    # TODO: Reshape and reorder dimensions correctly
-    # TODO: Calculate q_grid if return_hkl is False
+    # Calculate steps for each dimension
+    hsteps = int(hsampling[2] * (hsampling[1] - hsampling[0]) + 1)
+    ksteps = int(ksampling[2] * (ksampling[1] - ksampling[0]) + 1)
+    lsteps = int(lsampling[2] * (lsampling[1] - lsampling[0]) + 1)
     
-    raise NotImplementedError("generate_grid not implemented")
+    # Create linspace for each dimension
+    l_grid = torch.linspace(lsampling[0], lsampling[1], lsteps)
+    k_grid = torch.linspace(ksampling[0], ksampling[1], ksteps)
+    h_grid = torch.linspace(hsampling[0], hsampling[1], hsteps)
+    
+    # Create meshgrid
+    # Note: torch.meshgrid behavior changed in PyTorch 1.10
+    # Using indexing='ij' to match NumPy's default behavior
+    l_mesh, k_mesh, h_mesh = torch.meshgrid(l_grid, k_grid, h_grid, indexing='ij')
+    
+    # Get map shape
+    map_shape = (h_mesh.size(2), k_mesh.size(1), l_mesh.size(0))
+    
+    # Reshape and reorder dimensions
+    hkl_grid = torch.stack([h_mesh.flatten(), k_mesh.flatten(), l_mesh.flatten()], dim=1)
+    
+    if return_hkl:
+        return hkl_grid, map_shape
+    else:
+        # Calculate q_grid using matrix multiplication
+        # q_grid = 2π * A_inv^T * hkl_grid^T
+        q_grid = 2 * torch.pi * torch.matmul(A_inv.T, hkl_grid.T).T
+        return q_grid, map_shape
 
 def get_symmetry_equivalents(hkl_grid: torch.Tensor, sym_ops: Dict[int, torch.Tensor]) -> torch.Tensor:
     """
@@ -57,11 +78,20 @@ def get_symmetry_equivalents(hkl_grid: torch.Tensor, sym_ops: Dict[int, torch.Te
     References:
         - Original implementation: eryx/map_utils.py:get_symmetry_equivalents
     """
-    # TODO: Initialize output tensor
-    # TODO: Apply symmetry operations using torch.matmul
-    # TODO: Stack and reshape results
+    # Initialize list to collect rotated hkl indices
+    hkl_grid_rotated_list = []
     
-    raise NotImplementedError("get_symmetry_equivalents not implemented")
+    # Apply each symmetry operation
+    for i, rot in sym_ops.items():
+        # Apply rotation matrix to hkl_grid
+        hkl_grid_rot = torch.matmul(hkl_grid, rot)
+        hkl_grid_rotated_list.append(hkl_grid_rot)
+    
+    # Stack all rotated grids
+    hkl_grid_sym = torch.stack(hkl_grid_rotated_list, dim=0)
+    
+    # Shape should be (n_asu, n_points, 3)
+    return hkl_grid_sym
 
 def get_ravel_indices(hkl_grid_sym: torch.Tensor, 
                     sampling: Tuple[float, float, float]) -> Tuple[torch.Tensor, Tuple[int, int, int]]:
@@ -80,12 +110,63 @@ def get_ravel_indices(hkl_grid_sym: torch.Tensor,
     References:
         - Original implementation: eryx/map_utils.py:get_ravel_indices
     """
-    # TODO: Reshape input for processing
-    # TODO: Convert to integer indices with scaling
-    # TODO: Find bounds and calculate map shape
-    # TODO: Implement ravel_multi_index equivalent using PyTorch
+    # Reshape for processing
+    n_asu, n_points, _ = hkl_grid_sym.shape
+    hkl_grid_stacked = hkl_grid_sym.reshape(-1, 3)
     
-    raise NotImplementedError("get_ravel_indices not implemented")
+    # Convert to integer indices with scaling
+    sampling_tensor = torch.tensor(sampling, device=hkl_grid_sym.device)
+    hkl_grid_int = torch.round(hkl_grid_stacked * sampling_tensor).long()
+    
+    # Find bounds and calculate map shape
+    lbounds, _ = torch.min(hkl_grid_int, dim=0)
+    ubounds, _ = torch.max(hkl_grid_int, dim=0)
+    map_shape_ravel = tuple((ubounds - lbounds + 1).tolist())
+    
+    # Reshape back to original dimensions
+    hkl_grid_int = hkl_grid_int.reshape(n_asu, n_points, 3)
+    
+    # Initialize output tensor
+    ravel = torch.zeros((n_asu, n_points), dtype=torch.long, device=hkl_grid_sym.device)
+    
+    # Implement ravel_multi_index equivalent
+    for i in range(n_asu):
+        # Shift indices to start from 0
+        shifted = hkl_grid_int[i] - lbounds
+        
+        # Calculate raveled indices
+        # Formula: index = x * (dim_y * dim_z) + y * dim_z + z
+        strides = torch.tensor([map_shape_ravel[1] * map_shape_ravel[2], 
+                               map_shape_ravel[2], 
+                               1], device=hkl_grid_sym.device)
+        
+        ravel[i] = torch.sum(shifted * strides, dim=1)
+    
+    return ravel, map_shape_ravel
+
+def cos_sq(angles: torch.Tensor) -> torch.Tensor:
+    """
+    Compute cosine squared of input angles in radians.
+    
+    Args:
+        angles: PyTorch tensor with angles in radians
+        
+    Returns:
+        PyTorch tensor with cos^2 of angles
+    """
+    return torch.square(torch.cos(angles))
+
+def sin_sq(angles: torch.Tensor) -> torch.Tensor:
+    """
+    Compute sine squared of input angles in radians.
+    
+    Args:
+        angles: PyTorch tensor with angles in radians
+        
+    Returns:
+        PyTorch tensor with sin^2 of angles
+    """
+    return torch.square(torch.sin(angles))
 
 def compute_resolution(cell: torch.Tensor, hkl: torch.Tensor) -> torch.Tensor:
     """
@@ -101,12 +182,34 @@ def compute_resolution(cell: torch.Tensor, hkl: torch.Tensor) -> torch.Tensor:
     References:
         - Original implementation: eryx/map_utils.py:compute_resolution
     """
-    # TODO: Extract cell parameters
-    # TODO: Convert to radians using torch operations
-    # TODO: Implement calculation using torch functions
-    # TODO: Handle potential divide by zero with torch.where
+    # Extract cell parameters
+    a, b, c = cell[0], cell[1], cell[2]
+    alpha, beta, gamma = torch.deg2rad(cell[3]), torch.deg2rad(cell[4]), torch.deg2rad(cell[5])
     
-    raise NotImplementedError("compute_resolution not implemented")
+    # Extract Miller indices
+    h, k, l = hkl[:, 0], hkl[:, 1], hkl[:, 2]
+    
+    # Calculate terms
+    pf = 1.0 - cos_sq(alpha) - cos_sq(beta) - cos_sq(gamma) + 2.0 * torch.cos(alpha) * torch.cos(beta) * torch.cos(gamma)
+    
+    n1 = torch.square(h) * sin_sq(alpha) / torch.square(a) + \
+         torch.square(k) * sin_sq(beta) / torch.square(b) + \
+         torch.square(l) * sin_sq(gamma) / torch.square(c)
+    
+    n2a = 2.0 * k * l * (torch.cos(beta) * torch.cos(gamma) - torch.cos(alpha)) / (b * c)
+    n2b = 2.0 * l * h * (torch.cos(gamma) * torch.cos(alpha) - torch.cos(beta)) / (c * a)
+    n2c = 2.0 * h * k * (torch.cos(alpha) * torch.cos(beta) - torch.cos(gamma)) / (a * b)
+    
+    # Calculate resolution with safe division
+    denominator = (n1 + n2a + n2b + n2c) / pf
+    # Handle potential divide by zero
+    safe_denominator = torch.where(denominator > 0, denominator, torch.ones_like(denominator))
+    resolution = 1.0 / torch.sqrt(safe_denominator)
+    
+    # Set resolution to infinity where denominator is zero or negative
+    resolution = torch.where(denominator > 0, resolution, float('inf') * torch.ones_like(resolution))
+    
+    return resolution
 
 def get_resolution_mask(cell: torch.Tensor, hkl_grid: torch.Tensor, 
                        res_limit: float) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -126,10 +229,13 @@ def get_resolution_mask(cell: torch.Tensor, hkl_grid: torch.Tensor,
     References:
         - Original implementation: eryx/map_utils.py:get_resolution_mask
     """
-    # TODO: Compute resolution map
-    # TODO: Create mask by comparing to res_limit
+    # Compute resolution map
+    res_map = compute_resolution(cell, hkl_grid)
     
-    raise NotImplementedError("get_resolution_mask not implemented")
+    # Create mask by comparing to res_limit
+    res_mask = res_map > res_limit
+    
+    return res_mask, res_map
 
 def get_dq_map(A_inv: torch.Tensor, hkl_grid: torch.Tensor) -> torch.Tensor:
     """
@@ -145,12 +251,23 @@ def get_dq_map(A_inv: torch.Tensor, hkl_grid: torch.Tensor) -> torch.Tensor:
     References:
         - Original implementation: eryx/map_utils.py:get_dq_map
     """
-    # TODO: Find closest integral hkl points using torch.round
-    # TODO: Convert to q-vectors
-    # TODO: Compute distances using torch.norm
-    # TODO: Round to specified precision
+    # Find closest integral hkl points using torch.round
+    hkl_closest = torch.round(hkl_grid)
     
-    raise NotImplementedError("get_dq_map not implemented")
+    # Convert to q-vectors
+    q_closest = 2 * torch.pi * torch.matmul(A_inv.T, hkl_closest.T).T
+    q_grid = 2 * torch.pi * torch.matmul(A_inv.T, hkl_grid.T).T
+    
+    # Compute distances using torch.norm
+    dq = torch.norm(torch.abs(q_closest - q_grid), dim=1)
+    
+    # Round to specified precision (8 decimal places)
+    # PyTorch doesn't have a direct equivalent to np.around with decimals
+    # We can multiply by 10^8, round, then divide by 10^8
+    scale = 1e8
+    dq = torch.round(dq * scale) / scale
+    
+    return dq
 
 def get_centered_sampling(map_shape: Tuple[int, int, int], 
                          sampling: Tuple[float, float, float]) -> List[Tuple[float, float, float]]:
@@ -167,11 +284,12 @@ def get_centered_sampling(map_shape: Tuple[int, int, int],
     References:
         - Original implementation: eryx/map_utils.py:get_centered_sampling
     """
-    # TODO: Calculate extent for each dimension
-    # TODO: Create tuples for min, max, sampling rate
-    # Note: This function may not need PyTorch as it's just calculating parameters
+    # Calculate extent for each dimension
+    # This is a pure calculation that doesn't need tensors
+    extents = [((map_shape[i] - 1) / sampling[i] / 2.0) for i in range(3)]
     
-    raise NotImplementedError("get_centered_sampling not implemented")
+    # Create tuples for min, max, sampling rate
+    return [(-extents[i], extents[i], sampling[i]) for i in range(3)]
 
 def resize_map(new_map: torch.Tensor, 
               old_sampling: List[Tuple[float, float, float]], 
@@ -190,8 +308,25 @@ def resize_map(new_map: torch.Tensor,
     References:
         - Original implementation: eryx/map_utils.py:resize_map
     """
-    # TODO: Check sampling differences with small tolerance
-    # TODO: Calculate cropping dimensions
-    # TODO: Apply cropping with PyTorch slicing operations
+    # Define tolerance
+    tol = 1e-6
     
-    raise NotImplementedError("resize_map not implemented")
+    # Check sampling differences and crop if needed
+    resized_map = new_map
+    
+    # Check and crop h dimension
+    if abs(new_sampling[0][1] - old_sampling[0][1]) > tol:
+        excise = int(torch.round(torch.tensor(2 * (new_sampling[0][1] - old_sampling[0][1]))))
+        resized_map = resized_map[excise:-excise, :, :]
+    
+    # Check and crop k dimension
+    if abs(new_sampling[1][1] - old_sampling[1][1]) > tol:
+        excise = int(torch.round(torch.tensor(2 * (new_sampling[1][1] - old_sampling[1][1]))))
+        resized_map = resized_map[:, excise:-excise, :]
+    
+    # Check and crop l dimension
+    if abs(new_sampling[2][1] - old_sampling[2][1]) > tol:
+        excise = int(torch.round(torch.tensor(2 * (new_sampling[2][1] - old_sampling[2][1]))))
+        resized_map = resized_map[:, :, excise:-excise]
+    
+    return resized_map
