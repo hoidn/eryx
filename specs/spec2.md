@@ -1,150 +1,232 @@
-# Specification: Test Framework for PyTorch-NumPy Equivalence
+# Specification: Ground Truth Generation for PyTorch Port
 > Ingest the information from this file, implement the Low-Level Tasks, and generate the code that will satisfy the High and Mid-Level Objectives.
 
 ## High-Level Objective
 
-- Establish a comprehensive testing framework to validate numerical equivalence between PyTorch and NumPy implementations of the Eryx diffuse scattering calculations
+- Generate comprehensive ground truth data from the original NumPy implementation to enable accurate testing and validation of the PyTorch port
 
 ## Mid-Level Objectives
 
-- Configure the autotest framework to efficiently capture ground truth data from NumPy implementations
-- Implement tolerance-based comparison methods for numerically sensitive operations
-- Create automated test generation for parallel PyTorch implementations
-- Define storage and management strategies for test data
+- Add `@debug` decorators to all designated functions in the original NumPy implementation
+- Configure the autotest framework for capturing function inputs and outputs
+- Implement ground truth data generation with multiple parameter sets
+- Validate the captured data for completeness
 
 ## Implementation Notes
 
-### Autotest Framework Usage
-- Leverage existing autotest components (Logger, Serializer, FunctionMapping, Testing)
-- Extend rather than replace the existing functionality
-- Use torch_testing.py as the foundation for PyTorch-specific testing
-
-### Ground Truth Capture Strategy
-- Use the debug decorator to instrument key NumPy functions
-- Capture inputs and outputs during normal execution
-- Store test data in a structured, retrievable format
-- Run the NumPy simulation with varied parameters to generate comprehensive test cases
-
-### Tolerance Settings
-- Define appropriate tolerances for different operation types:
-  * Basic arithmetic: 1e-7 relative, 1e-8 absolute
-  * Eigendecomposition: 1e-5 relative, 1e-5 absolute
-  * FFT operations: 1e-5 relative, 1e-6 absolute
-  * Complex operations: 1e-6 relative, 1e-7 absolute
-- Handle special cases like NaN values and very small numbers
-
-### Test Data Management
-- Create a consistent directory structure for test data
-- Implement cleaning/pruning utilities to manage data size
-- Store only essential inputs/outputs to minimize storage requirements
-- Enable selective loading of test data by function or module
+- Directly decorate original functions with `@debug` as specified in project rules
+- Do NOT create wrapper functions or duplicate implementations
+- Follow exactly the function list in `to_convert.json`
+- Reuse the existing `run_np()` function in `run_debug.py` with minimal modifications
+- Generate data with at least 3 parameter sets (small, medium, and default)
+- Add comprehensive logging to verify data capture
+- Ensure `DEBUG_MODE` environment variable is set to "1"
 
 ## Context
 
 ### Beginning Context
-- Existing autotest framework (logger.py, serializer.py, functionmapping.py, etc.)
-- Preliminary torch_testing.py with comparison methods
-- First iterations of PyTorch implementations for core components
+
+- Original implementation files (`scatter.py`, `map_utils.py`, `models.py`, etc.)
+- `run_debug.py` with `run_np()` function
+- Existing autotest framework in `eryx/autotest/`
+- `to_convert.json` listing functions to be ported
 
 ### Ending Context
-- Extended autotest framework with comprehensive PyTorch support
-- Ground truth data capture pipeline
-- Automated test generation for PyTorch implementations
-- Complete test coverage with appropriate tolerances
-- Documentation of testing methodology
+
+- Modified source files with `@debug` decorators
+- Configuration file for autotest at `eryx/autotest_config.py`
+- Modified `run_np()` function supporting parameter variations
+- Ground truth generation script at `eryx/scripts/generate_ground_truth.py`
+- Generated ground truth data in configured log directory
+- Verification of captured data
 
 ## Low-Level Tasks
 > Ordered from start to finish
 
-1. Extend torch_testing.py with enhanced comparison methods
+1. Add Debug Decorators to Scatter Module Functions
 ```aider
-UPDATE eryx/autotest/torch_testing.py:
-    EXTEND the TorchTesting class with:
-    - Add tensor_equals method with customizable tolerances by operation type
-    - Add specialized comparison methods for eigendecomposition results
-    - Add handling for NaN/Inf values in tensors
-    - Add detailed reporting of numerical differences
+UPDATE eryx/scatter.py:
+    ADD import statement: from eryx.autotest.debug import debug
     
-    IMPLEMENT a TestConfig class to store:
-    - Default tolerances by operation type
-    - Device placement strategies
-    - Test data management parameters
+    ADD @debug decorator to the following functions:
+    - compute_form_factors(q_grid, ff_a, ff_b, ff_c)
+    - structure_factors_batch(q_grid, xyz, ff_a, ff_b, ff_c, U=None, ...)
+    - structure_factors(q_grid, xyz, ff_a, ff_b, ff_c, U=None, ...)
+    
+    DO NOT modify the function implementations, only add the decorators
 ```
 
-2. Create a data capture utility using the debug decorator
+2. Add Debug Decorators to Map Utilities Module Functions
 ```aider
-CREATE eryx/autotest/data_capture.py:
-    IMPLEMENT a DataCapture class that:
-    - Uses the Debug decorator to instrument functions
-    - Provides a method to automatically instrument functions from a list
-    - Captures diverse test cases by varying parameters
-    - Creates a log directory structure matching the module structure
-    - Includes a cleanup utility to remove redundant or oversized test data
+UPDATE eryx/map_utils.py:
+    ADD import statement: from eryx.autotest.debug import debug
     
-    IMPLEMENT capture_ground_truth function that:
-    - Takes a list of target functions/methods to instrument
-    - Runs simulation with different parameters
-    - Logs inputs/outputs to appropriate directories
+    ADD @debug decorator to the following functions:
+    - generate_grid(A_inv, hsampling, ksampling, lsampling, return_hkl=False)
+    - get_symmetry_equivalents(hkl_grid, sym_ops)
+    - get_ravel_indices(hkl_grid_sym, sampling)
+    - compute_resolution(cell, hkl)
+    - get_resolution_mask(cell, hkl_grid, res_limit)
+    - get_dq_map(A_inv, hkl_grid)
+    - get_centered_sampling(map_shape, sampling)
+    - resize_map(new_map, old_sampling, new_sampling)
+    
+    DO NOT modify the function implementations, only add the decorators
 ```
 
-3. Create test generation utility for PyTorch implementations
+3. Add Debug Decorators to OnePhonon Class Methods
 ```aider
-CREATE eryx/autotest/test_generator.py:
-    IMPLEMENT a TestGenerator class that:
-    - Takes a list of functions/modules as input
-    - Generates test files for PyTorch implementations
-    - Creates test methods that load ground truth data
-    - Adds appropriate assertions with tolerances
-    - Generates test fixtures for common setup
+UPDATE eryx/models.py:
+    ADD import statement: from eryx.autotest.debug import debug
     
-    IMPLEMENT a command-line interface that:
-    - Accepts module names to generate tests for
-    - Provides options to customize test generation
-    - Allows filtering by function name or pattern
+    ADD @debug decorator to the following methods of the OnePhonon class:
+    - __init__(self, pdb_path, hsampling, ksampling, lsampling, expand_p1=True, group_by='asu', res_limit=0., model='gnm', gnm_cutoff=4., gamma_intra=1., gamma_inter=1., batch_size=10000, n_processes=8)
+    - _setup(self, pdb_path, expand_p1, res_limit, group_by)
+    - _setup_phonons(self, pdb_path, model, gnm_cutoff, gamma_intra, gamma_inter)
+    - _build_A(self)
+    - _build_M(self)
+    - _build_M_allatoms(self)
+    - _project_M(self, M_allatoms)
+    - _build_kvec_Brillouin(self)
+    - _center_kvec(self, x, L)
+    - _at_kvec_from_miller_points(self, hkl_kvec)
+    - compute_gnm_phonons(self)
+    - compute_hessian(self)
+    - compute_covariance_matrix(self)
+    - apply_disorder(self, rank=-1, outdir=None, use_data_adp=False)
+    
+    DO NOT modify the method implementations, only add the decorators
 ```
 
-4. Create a reference test case for key components
+4. Add Debug Decorators to Base Module Functions
 ```aider
-CREATE tests/reference_test_case.py:
-    IMPLEMENT a complete reference test that:
-    - Demonstrates capturing ground truth from NumPy implementation
-    - Shows testing of PyTorch implementation against ground truth
-    - Includes gradient checking examples
-    - Shows performance comparison between implementations
-    - Illustrates proper tolerance settings
+UPDATE eryx/base.py:
+    ADD import statement: from eryx.autotest.debug import debug
     
-    DOCUMENT with clear comments explaining:
-    - How to adapt the pattern for other components
-    - How to handle special cases
-    - Recommended testing strategies
+    ADD @debug decorator to the following functions:
+    - compute_molecular_transform(pdb_path, hsampling, ksampling, lsampling, U=None, expand_p1=True, expand_friedel=True, res_limit=0, batch_size=10000, n_processes=8)
+    - compute_crystal_transform(pdb_path, hsampling, ksampling, lsampling, U=None, expand_p1=True, res_limit=0, batch_size=5000, n_processes=8)
+    - incoherent_sum_real(model, hkl_grid, sampling, U=None, mask=None, batch_size=10000, n_processes=8)
+    - incoherent_sum_reciprocal(model, hkl_grid, sampling, U=None, batch_size=10000, n_processes=8)
+    
+    DO NOT modify the function implementations, only add the decorators
 ```
 
-5. Create a comprehensive test runner
+5. Add Debug Decorators to Additional Model Classes
 ```aider
-CREATE tests/run_all_tests.py:
-    IMPLEMENT a test runner that:
-    - Discovers and runs all PyTorch implementation tests
-    - Reports success/failure with detailed statistics
-    - Groups results by module/component
-    - Shows performance comparison between NumPy and PyTorch
-    - Generates an HTML report summarizing results
+UPDATE eryx/models.py:
+    ADD @debug decorator to the following methods in RigidBodyTranslations class:
+    - __init__(self, pdb_path, hsampling, ksampling, lsampling, expand_friedel=True, res_limit=0, batch_size=10000, n_processes=8)
+    - _setup(self, pdb_path, expand_friedel, res_limit, batch_size, n_processes)
+    - apply_disorder(self, sigmas)
+    - optimize(self, target, sigmas_min, sigmas_max, n_search=20)
     
-    INCLUDE command-line options to:
-    - Run specific test modules
-    - Set custom tolerance levels
-    - Generate new ground truth data
-    - Clean up old test data
+    ADD @debug decorator to the following methods in LiquidLikeMotions class:
+    - __init__(self, pdb_path, hsampling, ksampling, lsampling, expand_p1=True, border=1, res_limit=0, batch_size=5000, n_processes=8, asu_confined=False)
+    - _setup(self, pdb_path, expand_p1, border, res_limit, batch_size, n_processes, asu_confined)
+    - fft_convolve(self, transform, kernel)
+    - apply_disorder(self, sigmas, gammas)
+    - optimize(self, target, sigmas_min, sigmas_max, gammas_min, gammas_max, ns_search=20, ng_search=10)
+    
+    ADD @debug decorator to the following methods in RigidBodyRotations class:
+    - __init__(self, pdb_path, hsampling, ksampling, lsampling, expand_p1=True, res_limit=0, batch_size=10000, n_processes=8)
+    - _setup(self, pdb_path, expand_p1, res_limit)
+    - generate_rotations_around_axis(sigma, num_rot, axis=np.array([0,0,1.0]))
+    - apply_disorder(self, sigmas, num_rot=100, ensemble_dir=None)
+    - optimize(self, target, sigma_min, sigma_max, n_search=20, num_rot=100)
+    
+    DO NOT modify the method implementations, only add the decorators
 ```
 
-6. Create documentation of the testing framework
+6. Add Debug Decorators to PDB Module Functions
 ```aider
-CREATE eryx/autotest/README_testing.md:
-    DOCUMENT the testing framework:
-    - Overview of the autotest extension architecture
-    - Step-by-step guide to adding tests for new components
-    - Explanation of tolerance settings and when to adjust them
-    - Guidelines for generating ground truth data
-    - Troubleshooting common test failures
-    - Best practices for numerical comparison
-    - Examples of the most common testing patterns
+UPDATE eryx/pdb.py:
+    ADD import statement: from eryx.autotest.debug import debug
+    
+    ADD @debug decorator to the following functions and methods:
+    - sym_str_as_matrix(sym_str)
+    
+    In AtomicModel class:
+    - _get_xyz_asus(self, xyz)
+    - flatten_model(self)
+    
+    In Crystal class:
+    - get_asu_xyz(self, asu_id=0, unit_cell=None)
+    
+    In GaussianNetworkModel class:
+    - __init__(self, pdb_path, enm_cutoff, gamma_intra, gamma_inter)
+    - _setup_atomic_model(self, pdb_path)
+    - _setup_gaussian_network_model(self)
+    - build_gamma(self)
+    - build_neighbor_list(self)
+    - compute_hessian(self)
+    - compute_K(self, hessian, kvec=None)
+    - compute_Kinv(self, hessian, kvec=None, reshape=True)
+    
+    DO NOT modify the function implementations, only add the decorators
+```
+
+7. Add Debug Decorators to Reference Module Functions
+```aider
+UPDATE eryx/reference.py:
+    ADD import statement: from eryx.autotest.debug import debug
+    
+    ADD @debug decorator to the following functions:
+    - structure_factors(q_grid, xyz, elements, U=None)
+    - diffuse_covmat(q_grid, xyz, elements, V)
+    
+    DO NOT modify the function implementations, only add the decorators
+```
+
+8. Create Autotest Configuration
+```aider
+CREATE eryx/autotest_config.py:
+    IMPLEMENT a configuration file that:
+    - Imports Configuration from eryx.autotest.configuration
+    - Sets debug mode to True
+    - Sets log directory to "ground_truth_data"
+    - Ensures the log directory exists
+    
+    ADD code to query the DEBUG_MODE environment variable and warn if not set
+```
+
+9. Modify Run Debug Function for Parameter Variations
+```aider
+UPDATE eryx/run_debug.py:
+    MODIFY run_np function to:
+    - Accept an optional 'variant' parameter for different test cases
+    - Support 'small', 'medium', and default parameter sets
+    - Log parameter choices
+    - Save output with variant-specific filename
+    
+    DO NOT change the core computation logic
+    ENSURE the function remains compatible with existing code
+```
+
+10. Create Ground Truth Generation Script
+```aider
+CREATE eryx/scripts/generate_ground_truth.py:
+    IMPLEMENT a script that:
+    - Configures logging appropriately
+    - Imports the run_np function from eryx.run_debug
+    - Sets the DEBUG_MODE environment variable to "1" if not already set
+    - Creates the output and log directories if they don't exist
+    - Runs the function with different parameter sets:
+      * Default parameters
+      * Small grid parameters
+      * Medium grid parameters
+    - Logs when each run starts and completes
+    - Verifies that log files were created
+```
+
+11. Verify Ground Truth Data Capture
+```aider
+CREATE eryx/scripts/verify_ground_truth.py:
+    IMPLEMENT a script that:
+    - Searches the ground truth data directory for log files
+    - Groups log files by function
+    - Counts the number of captured function calls for each function
+    - Verifies that important functions have been captured
+    - Reports any functions from to_convert.json that are missing logs
+    - Prints a summary of the ground truth data capture
 ```
