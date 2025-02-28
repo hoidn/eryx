@@ -1,5 +1,7 @@
 import numpy as np
+from eryx.autotest.debug import debug
 
+@debug
 def structure_factors(q_grid, xyz, elements, U=None):
     """
     Compute the structure factors for an atomic model at 
@@ -45,6 +47,7 @@ def structure_factors(q_grid, xyz, elements, U=None):
 
     return A
 
+@debug
 def diffuse_covmat(q_grid, xyz, elements, V):
     """
     Compute a diffuse scattering map for disorder in the harmonic 

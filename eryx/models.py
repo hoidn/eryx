@@ -10,15 +10,18 @@ from .map_utils import *
 from .scatter import structure_factors
 from .stats import compute_cc
 from .base import compute_molecular_transform, compute_crystal_transform
+from eryx.autotest.debug import debug
 
 class RigidBodyTranslations:
     
+    @debug
     def __init__(self, pdb_path, hsampling, ksampling, lsampling, expand_friedel=True, res_limit=0, batch_size=10000, n_processes=8):
         self.hsampling = hsampling
         self.ksampling = ksampling
         self.lsampling = lsampling
         self._setup(pdb_path, expand_friedel, res_limit, batch_size, n_processes)
         
+    @debug
     def _setup(self, pdb_path, expand_friedel=True, res_limit=0, batch_size=10000, n_processes=8):
         """
         Set up class, including computing the molecular transform.
@@ -72,6 +75,7 @@ class RigidBodyTranslations:
         if output is not None:
             plt.savefig(output, dpi=300, bbox_inches='tight')
         
+    @debug
     def apply_disorder(self, sigmas):
         """
         Compute the diffuse map(s) from the molecular transform:
@@ -99,6 +103,7 @@ class RigidBodyTranslations:
         Id = self.transform.flatten() * (1 - np.exp(-1 * wilson))
         return Id
     
+    @debug
     def optimize(self, target, sigmas_min, sigmas_max, n_search=20):
         """
         Scan to find the sigma that maximizes the overall Pearson
@@ -151,6 +156,7 @@ class LiquidLikeMotions:
     and the convolution is with the molecular rather than crystal transform.
     """
     
+    @debug
     def __init__(self, pdb_path, hsampling, ksampling, lsampling, expand_p1=True, 
                  border=1, res_limit=0, batch_size=5000, n_processes=8, asu_confined=False):
         self.hsampling = hsampling
@@ -158,6 +164,7 @@ class LiquidLikeMotions:
         self.lsampling = lsampling
         self._setup(pdb_path, expand_p1, border, res_limit, batch_size, n_processes, asu_confined)
                 
+    @debug
     def _setup(self, pdb_path, expand_p1, border, res_limit, batch_size, n_processes, asu_confined):
         """
         Set up class, including calculation of the crystal or molecular 
@@ -234,6 +241,7 @@ class LiquidLikeMotions:
         self.scan_ccs = []
         self.opt_map = None
         
+    @debug
     def fft_convolve(self, transform, kernel):
         """ 
         Convolve the transform and kernel by multiplying their 
@@ -285,6 +293,7 @@ class LiquidLikeMotions:
         if output is not None:
             plt.savefig(output, dpi=300, bbox_inches='tight')
     
+    @debug
     def apply_disorder(self, sigmas, gammas):
         """
         Compute the diffuse map(s) from the crystal transform as:
@@ -335,6 +344,7 @@ class LiquidLikeMotions:
         Id[:,~self.res_mask] = np.nan
         return Id
 
+    @debug
     def optimize(self, target, sigmas_min, sigmas_max, gammas_min, gammas_max, ns_search=20, ng_search=10):
         """
         Scan to find the sigma that maximizes the overall Pearson
@@ -401,6 +411,7 @@ class RigidBodyRotations:
     oriented axis with a normally distributed rotation angle.
     """
     
+    @debug
     def __init__(self, pdb_path, hsampling, ksampling, lsampling, expand_p1=True, res_limit=0, batch_size=10000, n_processes=8):
         self.hsampling = hsampling
         self.ksampling = ksampling
@@ -409,6 +420,7 @@ class RigidBodyRotations:
         self.batch_size = batch_size
         self.n_processes = n_processes 
         
+    @debug
     def _setup(self, pdb_path, expand_p1, res_limit=0):
         """
         Compute q-vectors to evaluate.
@@ -433,6 +445,7 @@ class RigidBodyRotations:
         self.mask, res_map = get_resolution_mask(self.model.cell, hkl_grid, res_limit)
     
     @staticmethod
+    @debug
     def generate_rotations_around_axis(sigma, num_rot, axis=np.array([0,0,1.0])):
         """
         Generate uniform random rotations about an axis.
@@ -457,6 +470,7 @@ class RigidBodyRotations:
         rot_mat = scipy.spatial.transform.Rotation.from_rotvec(rot_vec).as_matrix()
         return rot_mat
     
+    @debug
     def apply_disorder(self, sigmas, num_rot=100, ensemble_dir=None):
         """
         Compute the diffuse maps(s) resulting from rotational disorder for 
@@ -517,6 +531,7 @@ class RigidBodyRotations:
         Id[:,~self.mask] = np.nan
         return Id 
     
+    @debug
     def optimize(self, target, sigma_min, sigma_max, n_search=20, num_rot=100):
         """
         Scan to find the sigma that maximizes the overall Pearson
@@ -727,6 +742,7 @@ class NonInteractingDeformableMolecules:
         self.compute_covariance_matrix()
         self.u, self.s = self._low_rank_truncation(self.covar)
         
+    @debug
     def compute_covariance_matrix(self):
         """
         Compute covariance matrix for one asymmetric unit.
@@ -903,6 +919,7 @@ class OnePhonon:
     approximation (a.k.a small-coupling regime).
     """
 
+    @debug
     def __init__(self, pdb_path, hsampling, ksampling, lsampling,
                  expand_p1=True, group_by='asu',
                  res_limit=0., model='gnm',
@@ -917,6 +934,7 @@ class OnePhonon:
         self._setup_phonons(pdb_path, model,
                             gnm_cutoff, gamma_intra, gamma_inter)
 
+    @debug
     def _setup(self, pdb_path, expand_p1, res_limit, group_by):
         """
         Compute q-vectors to evaluate and build the unit cell
@@ -962,6 +980,7 @@ class OnePhonon:
             self.n_dof_per_asu = 6
         self.n_dof_per_cell = self.n_asu * self.n_dof_per_asu
 
+    @debug
     def _setup_phonons(self, pdb_path, model,
                        gnm_cutoff, gamma_intra, gamma_inter):
         """
@@ -1037,6 +1056,7 @@ class OnePhonon:
                                         gamma_intra=gamma_intra,
                                         gamma_inter=gamma_inter)
 
+    @debug
     def _build_A(self):
         """
         Build the matrix A that projects small rigid-body displacements
@@ -1074,6 +1094,7 @@ class OnePhonon:
         else:
             self.Amat = None
 
+    @debug
     def _build_M(self):
         """
         Build the mass matrix M.
@@ -1094,6 +1115,7 @@ class OnePhonon:
                                  self.n_asu * self.n_dof_per_asu))
             self.Linv = np.linalg.inv(np.linalg.cholesky(Mmat))
 
+    @debug
     def _project_M(self, M_allatoms):
         """
         Project all-atom mass matrix M_0 using the A matrix: M = A.T M_0 A
@@ -1116,6 +1138,7 @@ class OnePhonon:
                                         self.Amat[j_asu]))
         return Mmat
 
+    @debug
     def _build_M_allatoms(self):
         """
         Build all-atom mass matrix M_0
@@ -1130,6 +1153,7 @@ class OnePhonon:
         return block_diag(*mass_list).reshape((self.n_asu, self.n_dof_per_asu_actual,
                                                self.n_asu, self.n_dof_per_asu_actual))
 
+    @debug
     def _center_kvec(self, x, L):
         """
         For x and L integers such that 0 < x < L, return -L/2 < x < L/2
@@ -1143,6 +1167,7 @@ class OnePhonon:
         """
         return int(((x - L / 2) % L) - L / 2) / L
 
+    @debug
     def _build_kvec_Brillouin(self):
         """
         Compute all k-vectors and their norm in the first Brillouin zone.
@@ -1158,6 +1183,7 @@ class OnePhonon:
                                                                  (k_dh, k_dk, k_dl)).T
                     self.kvec_norm[dh, dk, dl] = np.linalg.norm(self.kvec[dh, dk, dl])
 
+    @debug
     def _at_kvec_from_miller_points(self, hkl_kvec):
         """
         Return the indices of all q-vector that are k-vector away from any
@@ -1218,6 +1244,7 @@ class OnePhonon:
                     map[q_indices] = np.linalg.norm(self.q_grid[q_indices], axis=1)
         return map
 
+    @debug
     def compute_hessian(self):
         """
         Build the projected Hessian matrix for the supercell.
@@ -1282,6 +1309,7 @@ class OnePhonon:
         self.covar = np.real(self.covar.reshape((self.n_asu, self.n_dof_per_asu,
                                                  self.n_cell, self.n_asu, self.n_dof_per_asu)))
 
+    @debug
     def compute_gnm_phonons(self):
         """
         Compute the dynamical matrix for each k-vector in the first
@@ -1328,6 +1356,7 @@ class OnePhonon:
                     self.Winv[dh, dk, dl] = s
                     self.V[dh, dk, dl] = u
 
+    @debug
     def apply_disorder(self, rank=-1, outdir=None, use_data_adp=False):
         """
         Compute the diffuse intensity in the one-phonon scattering

@@ -5,6 +5,7 @@ import os
 from .pdb import AtomicModel
 from .map_utils import *
 from .scatter import structure_factors
+from eryx.autotest.debug import debug
 
 def natural_sort(l): 
     """
@@ -65,6 +66,7 @@ def guinier_reconstruct(ensemble_dir, n_grid_points, res_mask, n_asu, weights=No
     Id[~res_mask] = np.nan
     return Id
 
+@debug
 def compute_crystal_transform(pdb_path, hsampling, ksampling, lsampling, U=None, expand_p1=True, 
                               res_limit=0, batch_size=5000, n_processes=8):
     """
@@ -126,6 +128,7 @@ def compute_crystal_transform(pdb_path, hsampling, ksampling, lsampling, U=None,
                                                       n_processes=n_processes)))
     return q_grid, I.reshape(map_shape)
 
+@debug
 def compute_molecular_transform(pdb_path, hsampling, ksampling, lsampling, U=None, expand_p1=True,
                                 expand_friedel=True, res_limit=0, batch_size=10000, n_processes=8):
     """
@@ -203,6 +206,7 @@ def compute_molecular_transform(pdb_path, hsampling, ksampling, lsampling, U=Non
 
     return q_grid, I
 
+@debug
 def incoherent_sum_real(model, hkl_grid, sampling, U=None, mask=None, batch_size=10000, n_processes=8):
     """
     Compute the incoherent sum of the scattering from all asus.
@@ -275,6 +279,7 @@ def incoherent_sum_real(model, hkl_grid, sampling, U=None, mask=None, batch_size
     
     return I
     
+@debug
 def incoherent_sum_reciprocal(model, hkl_grid, sampling, U=None, batch_size=10000, n_processes=8):
     """
     Compute the incoherent sum of the scattering from all asus.
