@@ -2,6 +2,9 @@
 import os
 os.environ["DEBUG_MODE"] = "1"
 import logging
+import numpy as np
+from eryx.models import OnePhonon
+
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s %(levelname)s: %(message)s",
@@ -63,10 +66,8 @@ def run_torch():
 
 if __name__ == "__main__":
     setup_logging()
-    import numpy as np
-    from eryx.models import OnePhonon
-
-    # After setting up and importing everything, call the run routines.
+    
+    # After setting up, call the run routines.
     run_np()
     run_torch()
     logging.info("Completed debug run. Please check debug_output.log, np_diffuse_intensity.npy and torch_diffuse_intensity.npy")

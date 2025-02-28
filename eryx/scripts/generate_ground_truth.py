@@ -44,7 +44,7 @@ def main():
     os.makedirs("output", exist_ok=True)
     
     # Ensure log directory exists
-    log_dir = config.getLogFilePrefix()
+    log_dir = "logs"  # Use the default log directory
     os.makedirs(log_dir, exist_ok=True)
     logging.info(f"Log files will be saved to: {log_dir}")
     
