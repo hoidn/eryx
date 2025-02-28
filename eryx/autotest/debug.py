@@ -1,7 +1,9 @@
-from .serializer import Serializer
-from .logger import Logger
-from .functionmapping import FunctionMapping
-from .configuration import Configuration
+import os
+import time
+import pickle
+import json
+from typing import Callable, Any, List, Union, Optional
+import re
 
 # spec
 #    @depends_on(Logger, Configuration, FunctionMapping)
@@ -166,9 +168,25 @@ class TestDebug(unittest.TestCase):
 #        formatted_log = self.debug._formatConsoleLog(data)
 #        self.assertEqual(formatted_log, "3, hello")
 
-obj = Debug()
-debug = obj.decorate
+# Create a global instance of Debug
+def _create_debug_decorator():
+    from .serializer import Serializer
+    from .logger import Logger
+    from .functionmapping import FunctionMapping
+    from .configuration import Configuration
+    
+    debug_obj = Debug()
+    return debug_obj.decorate
+
+# Only create the decorator if DEBUG_MODE is set
+if os.environ.get("DEBUG_MODE") == "1":
+    debug = _create_debug_decorator()
+else:
+    # Provide a no-op decorator when debugging is disabled
+    def debug(func):
+        return func
 
 if __name__ == '__main__':
+    import unittest
     unittest.main(argv=[''], verbosity=2, exit=False)
 

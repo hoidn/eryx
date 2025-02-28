@@ -1,7 +1,15 @@
 import numpy as np
 import gemmi
 from scipy.spatial import KDTree
-from eryx.autotest.debug import debug
+import os
+
+# Import debug conditionally to avoid circular imports
+if os.environ.get("DEBUG_MODE") == "1":
+    from eryx.autotest.debug import debug
+else:
+    # Provide a no-op decorator when debugging is disabled
+    def debug(func):
+        return func
 
 @debug
 def sym_str_as_matrix(sym_str):

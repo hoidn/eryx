@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 import os
 os.environ["DEBUG_MODE"] = "1"
+import sys
+import numpy as np
 import logging
+
+# Set up logging
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s %(levelname)s: %(message)s",
     filename="debug_output.log",
     filemode="w"
 )
-# Also set up console logging here if desired:
+# Also set up console logging
 console = logging.StreamHandler()
 console.setLevel(logging.DEBUG)
 console.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
@@ -96,7 +100,8 @@ def run_torch():
 
 if __name__ == "__main__":
     setup_logging()
-    import numpy as np
+    
+    # Import after setting DEBUG_MODE to ensure decorators are properly applied
     from eryx.models import OnePhonon
 
     # After setting up and importing everything, call the run routines.
