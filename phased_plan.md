@@ -1,5 +1,11 @@
 # Final Implementation Plan for PyTorch Port
 
+
+// TODO: the plan is unclear about which components can be tested using 
+// the ground truth values generated from running run_np() with @debug outputs,
+// vs. which components aren't 1 to 1 with a np / reference implementation 
+// component and therefore have to be validated in a different way
+
 ## Current Status Overview
 
 - **Completed**: Most PyTorch stub files have been created with placeholders, docstrings, and type hints.
