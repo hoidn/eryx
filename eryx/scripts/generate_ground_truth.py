@@ -48,17 +48,14 @@ def main():
     os.makedirs(log_dir, exist_ok=True)
     logging.info(f"Log files will be saved to: {log_dir}")
     
-    # Run with different parameter sets
-    variants = ["small", "medium", "default"]
-    
-    for variant in variants:
-        variant_start = time.time()
-        logging.info(f"Running with {variant} parameters")
-        try:
-            run_np(variant)
-            logging.info(f"Completed {variant} run in {time.time() - variant_start:.2f} seconds")
-        except Exception as e:
-            logging.error(f"Error in {variant} run: {e}")
+    # Run the NumPy implementation once
+    run_start = time.time()
+    logging.info("Running NumPy implementation")
+    try:
+        run_np()
+        logging.info(f"Completed run in {time.time() - run_start:.2f} seconds")
+    except Exception as e:
+        logging.error(f"Error in run: {e}")
     
     # Verify log files were created
     log_files = []
