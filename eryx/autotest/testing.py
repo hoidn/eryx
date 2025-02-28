@@ -2,8 +2,6 @@ from .logger import Logger
 from .functionmapping import FunctionMapping
 from .configuration import Configuration
 import unittest
-from logger import Logger
-from functionmapping import FunctionMapping
 
 from typing import List, Tuple, Any, Optional, Callable, Union
 
