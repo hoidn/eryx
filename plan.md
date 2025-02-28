@@ -297,3 +297,315 @@ eryx/
 ## Total Estimated Timeline: 13-17 weeks
 
 https://claude.ai/chat/28eae72e-1cd0-42d2-8012-06a2f1075e02
+
+
+# Detailed impl Plan 
+# Implementation Plan for PyTorch Port
+
+## 1. Reorganized Spec Prompts and Implementation Order
+
+Based on dependencies and logical grouping, I recommend the following reorganized order for the spec prompts:
+
+1. **Test Framework Specification**
+   - This needs to be implemented first to establish testing infrastructure
+   - Will define how we capture and validate ground truth data
+
+2. **Adapter Component Specification**
+   - Essential bridge between NumPy and PyTorch implementations
+   - Required by all subsequent components
+
+3. **Grid and Transform Operations Specification**
+   - Low-level grid operations used by all physics components
+   - Provides foundation for higher-level physics calculations
+
+4. **Core Physics - Structure Factor Calculation Specification**
+   - Most fundamental computational component
+   - Required by all disorder models
+
+5. **Core Physics - Gaussian Network Model Specification**
+   - Network model required for phonon calculations
+   - More complex than structure factors but less than full phonon calculations
+
+6. **Core Physics - Phonon Calculations Specification**
+   - Central physical calculation for diffuse scattering
+   - Builds on GNM and structure factors
+
+7. **Alternative Disorder Models Specification**
+   - Additional models that can be implemented after core components
+   - Less critical for initial validation
+
+8. **Integration and Execution Specification**
+   - Ties all components together for end-to-end execution
+   - Depends on all previous components
+
+9. **Optimization and Validation Specification**
+   - Performance optimizations after functional implementation
+   - Final validation and benchmarking
+
+## 2. Ground Truth Generation Strategy
+
+### Approach
+1. **Automatic Instrumentation**
+   - Use autotest's Debug decorator to automatically instrument NumPy functions
+   - Capture inputs and outputs during normal execution
+   - Store serialized data for later testing
+
+2. **Test Data Generation**
+   - Create a script to run simplified simulations with various parameters
+   - Ensure coverage of edge cases and typical usage patterns
+   - Store the generated test data in a structured format
+
+3. **Granularity Levels**
+   - Function level: Capture inputs/outputs of individual functions
+   - Component level: Capture inputs/outputs of major components
+   - System level: Capture full simulation results for end-to-end testing
+
+### Implementation
+```python
+# Pseudocode for ground truth generation
+from eryx.autotest.debug import Debug
+import eryx.scatter as scatter
+import eryx.models as models
+
+# Configure Debug decorators
+debug = Debug().decorate
+
+# Instrument functions
+scatter.compute_form_factors = debug(scatter.compute_form_factors)
+scatter.structure_factors = debug(scatter.structure_factors)
+models.OnePhonon.apply_disorder = debug(models.OnePhonon.apply_disorder)
+# ...instrument other functions as needed
+
+# Run test cases with various parameters
+def generate_ground_truth():
+    # Test case 1: Basic simulation
+    model = models.OnePhonon("tests/pdbs/5zck_p1.pdb", 
+                            [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
+                            expand_p1=True, res_limit=0.0)
+    model.apply_disorder(use_data_adp=True)
+    
+    # Test case 2: Different parameters
+    model = models.OnePhonon("tests/pdbs/5zck_p1.pdb", 
+                            [-8, 8, 2], [-8, 8, 2], [-8, 8, 2],
+                            expand_p1=False, res_limit=2.0)
+    model.apply_disorder(use_data_adp=False)
+    
+    # Add more test cases as needed
+```
+
+## 3. Testing Strategy
+
+### Test Levels
+1. **Unit Tests**
+   - Test individual PyTorch functions against NumPy implementations
+   - Verify numerical accuracy within tolerance
+   - Check gradient computation for differentiable operations
+
+2. **Component Tests**
+   - Test larger components (e.g., full GNM calculation)
+   - Verify interactions between functions
+   - Check end-to-end component behavior
+
+3. **Integration Tests**
+   - Test full diffuse scattering calculation
+   - Compare full maps against NumPy implementation
+   - Verify gradient flow through entire computation
+
+### Test Implementation
+```python
+# Pseudocode for testing PyTorch implementation
+from eryx.autotest.torch_testing import TorchTesting
+from eryx.autotest.logger import Logger
+from eryx.autotest.functionmapping import FunctionMapping
+
+# Set up testing framework
+logger = Logger()
+function_mapping = FunctionMapping(log_directory="ground_truth")
+torch_testing = TorchTesting(logger, function_mapping)
+
+# Test individual functions
+def test_compute_form_factors():
+    from eryx.scatter_torch import compute_form_factors
+    assert torch_testing.testTorchCallable("ground_truth/eryx.scatter.compute_form_factors", 
+                                         compute_form_factors)
+
+# Test gradient computation
+def test_compute_form_factors_grad():
+    from eryx.scatter_torch import compute_form_factors
+    import torch
+    
+    # Create test inputs
+    q_grid = torch.randn(10, 3, requires_grad=True)
+    ff_a = torch.randn(5, 4, requires_grad=True)
+    ff_b = torch.randn(5, 4, requires_grad=True)
+    ff_c = torch.randn(5, requires_grad=True)
+    
+    # Forward pass
+    output = compute_form_factors(q_grid, ff_a, ff_b, ff_c)
+    
+    # Check gradients
+    grad_ok, stats = torch_testing.check_gradients(
+        lambda q, a, b, c: compute_form_factors(q, a, b, c),
+        [q_grid, ff_a, ff_b, ff_c]
+    )
+    assert grad_ok
+```
+
+## 4. Spec Prompts Draft
+
+### 1. Test Framework Specification
+
+#### High-Level Objective
+- Create a comprehensive test framework for validating PyTorch implementations against NumPy ground truth
+
+#### Mid-Level Objectives
+- Extend autotest framework with PyTorch-specific functionality
+- Implement automated ground truth data generation
+- Create numerical comparison utilities with appropriate tolerances
+- Implement gradient validation for differentiable functions
+
+#### Implementation Notes
+- Use autotest for serialization and storage of function inputs/outputs
+- Implement custom tensor comparison with tolerance settings
+- Add gradient checking with finite difference method
+- Create structured test data storage
+
+#### Low-Level Tasks
+1. Extend TorchTesting class
+```
+CREATE eryx/autotest/torch_testing.py
+    ADD class TorchTesting(Testing):
+        ADD methods for tensor comparison
+        ADD methods for gradient checking
+        ADD methods for NumPy-PyTorch conversion
+```
+
+2. Create ground truth generation script
+```
+CREATE scripts/generate_ground_truth.py
+    ADD function to instrument NumPy functions
+    ADD function to run test cases with various parameters
+    ADD function to verify ground truth data coverage
+```
+
+### 2. Adapter Component Specification
+
+#### High-Level Objective
+- Create adapter components to bridge between NumPy and PyTorch implementations
+
+#### Mid-Level Objectives
+- Design conversion utilities for all data structures
+- Implement gradient-preserving tensor conversion
+- Create domain-specific adapters for model classes
+- Implement robust error handling
+
+#### Implementation Notes
+- Ensure all conversions preserve computational graph for gradients
+- Handle complex data structures (e.g., nested dictionaries and lists)
+- Implement device management for GPU acceleration
+- Design clear interfaces for all adapter components
+
+#### Low-Level Tasks
+1. Implement core adapter components
+```
+CREATE eryx/adapters.py
+    ADD PDBToTensor class for atomic model conversion
+    ADD GridToTensor class for grid data conversion
+    ADD TensorToNumpy class for result conversion
+    ADD ModelAdapters class for model-specific conversions
+```
+
+### 3. Grid and Transform Operations Specification
+
+#### High-Level Objective
+- Implement PyTorch versions of grid and transform operations for diffuse scattering
+
+#### Mid-Level Objectives
+- Create differentiable grid generation functions
+- Implement tensor-based symmetry operations
+- Port resolution and masking calculations to PyTorch
+- Implement differentiable transformation operations
+
+#### Implementation Notes
+- Use torch.meshgrid for grid generation
+- Ensure proper gradient flow through all operations
+- Implement device-agnostic operations
+- Optimize memory usage for large grids
+
+#### Low-Level Tasks
+1. Implement grid operations
+```
+CREATE eryx/map_utils_torch.py
+    ADD generate_grid function using PyTorch operations
+    ADD get_symmetry_equivalents function for tensor operations
+    ADD resolution and masking functions
+    ADD helper functions for grid manipulation
+```
+
+### Remaining Specs (Abbreviated)
+
+4. **Core Physics - Structure Factor Calculation Specification**
+   - Implement PyTorch versions of structure factor calculations
+   - Ensure proper handling of complex numbers
+   - Optimize batch operations for performance
+   - Implement gradient flow through all calculations
+
+5. **Core Physics - Gaussian Network Model Specification**
+   - Port GNM calculations to PyTorch
+   - Implement tensor-based spring constant matrices
+   - Adapt neighbor list handling for PyTorch
+   - Ensure differentiable Hessian calculations
+
+6. **Core Physics - Phonon Calculations Specification**
+   - Implement differentiable eigendecomposition
+   - Port covariance matrix calculations to PyTorch
+   - Ensure gradient flow through phonon mode calculations
+   - Preserve simulation physics in differentiable form
+
+7. **Alternative Disorder Models Specification**
+   - Implement PyTorch versions of all disorder models
+   - Ensure consistent interfaces with NumPy versions
+   - Adapt optimization routines for gradient-based optimization
+   - Handle state management for PyTorch models
+
+8. **Integration and Execution Specification**
+   - Implement run_torch.py script
+   - Create end-to-end simulation workflow
+   - Implement result comparison and visualization
+   - Add performance benchmarking
+
+9. **Optimization and Validation Specification**
+   - Add performance profiling utilities
+   - Implement memory optimization techniques
+   - Add GPU acceleration for key operations
+   - Create numerical validation methodology
+
+## 5. Implementation Timeline and Dependencies
+
+```
+Week 1-2: Test Framework & Adapters
+  - Test Framework Specification
+  - Adapter Component Specification
+
+Week 3-4: Core Grid Operations
+  - Grid and Transform Operations Specification
+
+Week 5-7: Core Physics - Foundation
+  - Structure Factor Calculation Specification
+  - Gaussian Network Model Specification
+
+Week 8-10: Core Physics - Advanced
+  - Phonon Calculations Specification
+  - Alternative Disorder Models Specification
+
+Week 11-12: Integration & Optimization
+  - Integration and Execution Specification
+  - Optimization and Validation Specification
+
+Week 13: Final Testing & Documentation
+  - End-to-end validation
+  - Performance benchmarking
+  - Documentation and examples
+```
+
+This implementation plan provides a structured approach to creating a PyTorch port of the diffuse scattering simulation, with a focus on establishing a robust testing framework, creating essential adapter components, and implementing physics calculations in a logical order based on dependencies.
