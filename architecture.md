@@ -93,6 +93,18 @@ graph TD
         LiquidLike
     end
     
+    %% Test Framework
+    subgraph "Testing Framework"
+        GroundTruth --> |searchLogDirectory| Logger[Logger]
+        Logger --> |loadLog| InputOutput[Inputs/Outputs]
+        InputOutput --> TestCase[Test Case]
+        TorchModel --> TestCase
+        TestCase --> |compare| TestResult[Test Result]
+        TorchModel --> GradTest[Gradient Testing]
+        GradUtils --> GradTest
+        GradTest --> GradResult[Gradient Validation]
+    end
+    
     %% Bidirectional flows
     ModelAdapters <--> OnePhonon
     ModelAdapters <--> RigidTrans
@@ -256,6 +268,72 @@ graph TD
   - `generate_rotations_around_axis(sigma, num_rot)`: Generate rotation matrices
   - `apply_disorder(sigmas, num_rot)`: Apply rotational disorder
 - **Gradient Requirements**: Rotation generation must preserve gradients
+
+### Testing Framework
+
+#### Logger
+- **Purpose**: Handles ground truth data storage and retrieval
+- **Key Methods**:
+  - `searchLogDirectory(log_path_prefix)`: Finds relevant log files
+  - `loadLog(log_file_path)`: Loads serialized inputs and outputs
+- **Used By**: TorchTesting for accessing ground truth data
+
+#### TorchTesting
+- **Purpose**: Provides PyTorch-specific testing utilities
+- **Key Methods**:
+  - `testTorchCallable(log_path_prefix, torch_func)`: Tests PyTorch function against ground truth
+  - `check_gradients(torch_func, inputs)`: Validates gradient computation
+- **Used By**: Test scripts for validating PyTorch implementations
+
+## Ground Truth Testing Strategy
+
+### Component-to-Test Mapping
+
+The following table maps PyTorch components to their corresponding ground truth data and testing approaches:
+
+| PyTorch Component | Ground Truth Data | Testing Approach | Tolerances |
+|-------------------|-------------------|------------------|------------|
+| `ComplexTensorOps` | N/A (utility class) | Unit tests with known values | rtol=1e-5, atol=1e-8 |
+| `EigenOps` | N/A (utility class) | Unit tests with known values | rtol=1e-5, atol=1e-8 |
+| `map_utils_torch.generate_grid` | `logs/eryx.map_utils.generate_grid.log` | Compare grid outputs | rtol=1e-5, atol=1e-8 |
+| `map_utils_torch.get_symmetry_equivalents` | `logs/eryx.map_utils.get_symmetry_equivalents.log` | Compare indices | exact match |
+| `scatter_torch.compute_form_factors` | `logs/eryx.scatter.compute_form_factors.log` | Compare form factors | rtol=1e-4, atol=1e-7 |
+| `scatter_torch.structure_factors_batch` | `logs/eryx.scatter.structure_factors_batch.log` | Compare structure factors | rtol=1e-4, atol=1e-7 |
+| `models_torch.OnePhonon.compute_gnm_phonons` | `logs/eryx.models.OnePhonon.compute_gnm_phonons.log` | Compare eigenvalues and vectors | rtol=1e-4, atol=1e-6 |
+| `models_torch.OnePhonon.apply_disorder` | `logs/eryx.models.OnePhonon.apply_disorder.log` | Compare diffuse intensity | rtol=1e-3, atol=1e-5 |
+
+For eigendecomposition and FFT operations, larger tolerances may be needed due to numerical differences between NumPy and PyTorch implementations.
+
+### Testing Flow Diagram
+
+```mermaid
+graph TD
+    A[Ground Truth Data] --> B[Logger.searchLogDirectory]
+    B --> C[Logger.loadLog]
+    C --> D[Deserialized Inputs/Outputs]
+    
+    E[PyTorch Implementation] --> F[TorchTesting.testTorchCallable]
+    
+    D --> F
+    F --> G{Output Matches?}
+    
+    G -->|Yes| H[Test Passes]
+    G -->|No| I[Test Fails]
+    
+    J[Tensor Inputs with requires_grad] --> K[Forward Pass]
+    K --> L[Backward Pass]
+    L --> M[Analytical Gradients]
+    
+    J --> N[GradientUtils.finite_differences]
+    N --> O[Numerical Gradients]
+    
+    M --> P[GradientUtils.validate_gradients]
+    O --> P
+    
+    P --> Q{Gradients Valid?}
+    Q -->|Yes| R[Gradient Test Passes]
+    Q -->|No| S[Gradient Test Fails]
+```
 
 ## Key Data Flows
 

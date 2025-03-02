@@ -9,6 +9,8 @@
 - [ ] Implement `complex_mul(a_real, a_imag, b_real, b_imag)` for complex multiplication
 - [ ] Implement `complex_abs_squared(real, imag)` to compute |z|²
 - [ ] Implement `complex_exp_dwf(q_vec, u_vec)` for Debye-Waller factor calculation
+- [ ] Implement `complex_add(a_real, a_imag, b_real, b_imag)` for complex addition
+- [ ] Implement `complex_div(a_real, a_imag, b_real, b_imag)` for complex division
 - [ ] Add comprehensive tests verifying gradient flow through all operations
 - [ ] Document tensor shapes and gradient requirements for all methods
 
@@ -21,6 +23,9 @@
 - [ ] Implement `svd_decomposition(matrix)` for SVD with gradient support
 - [ ] Implement `eigen_decomposition(matrix)` for eigendecomposition with gradient support
 - [ ] Implement `solve_linear_system(A, b)` to solve Ax=b with gradient support
+- [ ] Implement `pseudo_inverse(matrix)` for Moore-Penrose pseudoinverse
+- [ ] Implement `stabilized_eigen_decomposition(matrix)` for better gradient stability
+- [ ] Implement `hermitian_to_real(matrix)` for handling complex matrices
 - [ ] Handle degenerate eigenvalues and numerical stability issues
 - [ ] Document limitations and trade-offs in implementation approach
 
@@ -44,6 +49,7 @@
 - [ ] Implement `finite_differences(func, input_tensor)` for numerical gradient calculation
 - [ ] Implement `validate_gradients(analytical_grad, numerical_grad)` to compare gradients
 - [ ] Implement `gradient_norm(gradient)` to compute gradient L2 norm
+- [ ] Implement `compute_jacobian(func, input_tensor)` for Jacobian matrix computation
 - [ ] Document appropriate tolerance selection for different use cases
 
 **Component Interactions:**
@@ -214,15 +220,130 @@
 ## 10. Integration and Testing
 
 - [ ] Implement `run_torch.py` for end-to-end simulation
-- [ ] Create testing suite with component and integration tests
+- [ ] Create comprehensive test suite with component and integration tests
 - [ ] Implement performance benchmarking and optimization
 - [ ] Create examples of gradient-based parameter optimization
 - [ ] Document end-to-end workflows
 
-**Component Interactions:**
-- Integrates all components
-- Demonstrates end-to-end gradient flow
-- Validates against NumPy implementation
+## Testing Tasks
+
+For each component, implement the following testing tasks:
+
+### Core Utilities Testing
+- [ ] Implement unit tests for ComplexTensorOps using known values and gradient validation
+- [ ] Implement unit tests for EigenOps using known values and gradient validation
+- [ ] Implement unit tests for FFTOps with validation against NumPy FFT
+- [ ] Implement unit tests for GradientUtils to verify numerical gradient calculation
+
+### Map Utilities Testing
+- [ ] Load ground truth data for `map_utils.generate_grid`
+- [ ] Test PyTorch implementation against ground truth with appropriate tolerances
+- [ ] Add gradient validation for differentiable grid operations
+- [ ] Repeat for all map utility functions with ground truth data
+
+### Structure Factor Testing
+- [ ] Load ground truth data for `scatter.compute_form_factors`
+- [ ] Test PyTorch implementation against ground truth with appropriate tolerances
+- [ ] Add gradient validation for form factor calculations
+- [ ] Load ground truth data for `scatter.structure_factors_batch`
+- [ ] Test with various input shapes and verify output consistency
+- [ ] Add gradient validation for structure factor calculations
+
+### Model Testing
+- [ ] Load ground truth data for `models.OnePhonon.compute_gnm_phonons`
+- [ ] Test PyTorch eigendecomposition against ground truth with appropriate tolerances
+- [ ] Add gradient validation for eigendecomposition
+- [ ] Load ground truth data for `models.OnePhonon.apply_disorder`
+- [ ] Test end-to-end diffuse scattering calculation
+- [ ] Add gradient validation for the complete model
+
+## Test Template
+
+For each component with ground truth data, implement a test function following this template:
+
+```python
+def test_component_function():
+    """
+    Test PyTorch implementation against NumPy ground truth.
+    
+    This template demonstrates the standard approach for testing
+    PyTorch implementations using captured ground truth data.
+    """
+    # Setup
+    logger = Logger()
+    function_mapping = FunctionMapping()
+    torch_testing = TorchTesting(logger, function_mapping)
+    
+    # 1. Find ground truth data files for the function
+    log_path_prefix = "eryx.module.function"
+    log_files = logger.searchLogDirectory(log_path_prefix)
+    
+    assert len(log_files) > 0, f"No ground truth data found for {log_path_prefix}"
+    
+    # 2. Create PyTorch implementation instance
+    torch_function = function_torch  # The PyTorch implementation to test
+    
+    # 3. Run test against all ground truth data files
+    for log_file in log_files:
+        # Test output correctness
+        is_valid = torch_testing.testTorchCallable(log_file, torch_function)
+        assert is_valid, f"Function output doesn't match ground truth in {log_file}"
+        
+        # For differentiable functions, also test gradient computation
+        if hasattr(torch_function, 'requires_grad'):
+            # Load the input data
+            logs = logger.loadLog(log_file)
+            for i in range(len(logs) // 2):
+                # Get inputs from log
+                args = logger.serializer.deserialize(logs[2 * i]['args'])
+                kwargs = logger.serializer.deserialize(logs[2 * i]['kwargs'])
+                
+                # Convert to tensors with requires_grad=True
+                tensor_args = to_tensors_with_grad(args)
+                tensor_kwargs = to_tensors_with_grad(kwargs)
+                
+                # Define a scalar output function for gradient checking
+                def scalar_func(*args, **kwargs):
+                    output = torch_function(*args, **kwargs)
+                    if isinstance(output, torch.Tensor):
+                        return output.sum()
+                    else:
+                        return sum(o.sum() for o in output if isinstance(o, torch.Tensor))
+                
+                # Check gradients for tensor inputs
+                for arg in tensor_args:
+                    if isinstance(arg, torch.Tensor) and arg.requires_grad:
+                        # Compute analytical gradients
+                        scalar_func(*tensor_args, **tensor_kwargs).backward()
+                        analytical_grad = arg.grad.clone()
+                        arg.grad.zero_()
+                        
+                        # Compute numerical gradients
+                        numerical_grad = GradientUtils.finite_differences(
+                            lambda x: scalar_func(x, *tensor_args[1:], **tensor_kwargs), 
+                            arg
+                        )
+                        
+                        # Validate gradients
+                        is_valid, stats = GradientUtils.validate_gradients(
+                            analytical_grad, numerical_grad, rtol=1e-4, atol=1e-6
+                        )
+                        
+                        assert is_valid, f"Gradient check failed for {log_file}: {stats}"
+
+def to_tensors_with_grad(obj):
+    """Helper function to convert NumPy arrays to tensors with requires_grad=True."""
+    if isinstance(obj, np.ndarray):
+        return torch.from_numpy(obj.copy()).requires_grad_(True)
+    elif isinstance(obj, list):
+        return [to_tensors_with_grad(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(to_tensors_with_grad(item) for item in obj)
+    elif isinstance(obj, dict):
+        return {k: to_tensors_with_grad(v) for k, v in obj.items()}
+    else:
+        return obj
+```
 
 ## Implementation Priorities
 

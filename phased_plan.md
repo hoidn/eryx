@@ -15,6 +15,49 @@ This document outlines the implementation plan for the PyTorch port of the diffu
 - **Generated**: Ground truth data for 22 components has been captured using `@debug` decorators.
 - **Not Started**: Core implementation of differentiable operations, adapters, and model components.
 
+## Ground Truth Testing Strategy
+
+### Data Storage and Access
+Ground truth data is stored in the `logs/` directory, with each function's inputs and outputs captured via the `@debug` decorator. Each log file follows the naming convention `logs/eryx.module.function.log` and contains serialized inputs and expected outputs.
+
+### Accessing Ground Truth Data
+The testing framework accesses ground truth data through the following process:
+1. Use `Logger.searchLogDirectory()` to find relevant log files for a component
+2. Use `Logger.loadLog()` to deserialize input/output pairs for testing
+3. Feed inputs through the PyTorch implementation and compare outputs
+
+### Testing Framework
+The `TorchTesting` class in `eryx/autotest/torch_testing.py` provides specialized methods for testing PyTorch implementations:
+- `testTorchCallable(log_path_prefix, torch_func)`: Tests a PyTorch function against NumPy ground truth
+- `create_tensor_test_case(log_path_prefix, torch_func, numpy_func)`: Creates complete test cases
+- `check_gradients(torch_func, inputs)`: Validates gradient computation
+
+### Test Execution Process
+For each PyTorch component:
+1. Find all ground truth logs for the corresponding NumPy function
+2. Convert inputs from NumPy arrays to PyTorch tensors
+3. Pass inputs to the PyTorch implementation
+4. Convert outputs back to NumPy for comparison
+5. Verify outputs match within specified tolerances
+6. (For differentiable components) Validate gradient computation
+
+### Component-to-Test Mapping
+
+The following table maps PyTorch components to their corresponding ground truth data and testing approaches:
+
+| PyTorch Component | Ground Truth Data | Testing Approach | Tolerances |
+|-------------------|-------------------|------------------|------------|
+| `ComplexTensorOps` | N/A (utility class) | Unit tests with known values | rtol=1e-5, atol=1e-8 |
+| `EigenOps` | N/A (utility class) | Unit tests with known values | rtol=1e-5, atol=1e-8 |
+| `map_utils_torch.generate_grid` | `logs/eryx.map_utils.generate_grid.log` | Compare grid outputs | rtol=1e-5, atol=1e-8 |
+| `map_utils_torch.get_symmetry_equivalents` | `logs/eryx.map_utils.get_symmetry_equivalents.log` | Compare indices | exact match |
+| `scatter_torch.compute_form_factors` | `logs/eryx.scatter.compute_form_factors.log` | Compare form factors | rtol=1e-4, atol=1e-7 |
+| `scatter_torch.structure_factors_batch` | `logs/eryx.scatter.structure_factors_batch.log` | Compare structure factors | rtol=1e-4, atol=1e-7 |
+| `models_torch.OnePhonon.compute_gnm_phonons` | `logs/eryx.models.OnePhonon.compute_gnm_phonons.log` | Compare eigenvalues and vectors | rtol=1e-4, atol=1e-6 |
+| `models_torch.OnePhonon.apply_disorder` | `logs/eryx.models.OnePhonon.apply_disorder.log` | Compare diffuse intensity | rtol=1e-3, atol=1e-5 |
+
+For eigendecomposition and FFT operations, larger tolerances may be needed due to numerical differences between NumPy and PyTorch implementations.
+
 ## System Boundaries and Differentiability Constraints
 
 Based on the [Architecture Component Diagram](./architecture.md#component-interaction-diagram), we distinguish between components that should remain in NumPy and those that should be converted to PyTorch with differentiability:
@@ -46,6 +89,11 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Critical for: Phase calculations, structure factors
 - Gradient flow: Must support backpropagation through complex operations
 
+**Testing Approach:**
+- Unit tests with known input/output values (e.g., e^(iπ/2) = i)
+- Gradient validation using finite differences
+- No ground truth data needed (pure utility class)
+
 **References:**
 - **Component Details**: [Architecture: ComplexTensorOps](./architecture.md#complextensorops)
 - **Implementation Checklist**: [TODOS: ComplexTensorOps Class](./TODOS.md#complextensorops-class)
@@ -61,6 +109,11 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Output used by: OnePhonon.compute_gnm_phonons()
 - Critical for: Phonon mode calculation, covariance matrix
 - Gradient flow: Must support backpropagation through eigendecomposition
+
+**Testing Approach:**
+- Unit tests with known matrices and their eigendecomposition
+- Gradient validation using finite differences
+- No ground truth data needed (pure utility class)
 
 **References:**
 - **Component Details**: [Architecture: EigenOps](./architecture.md#eigenops)
@@ -79,6 +132,11 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Critical for: Liquid-like motion disorder calculations
 - Gradient flow: Must preserve gradients through FFT operations
 
+**Testing Approach:**
+- Unit tests comparing with NumPy FFT results
+- Gradient validation through convolution operations
+- No ground truth data needed (pure utility class)
+
 **References:**
 - **Component Details**: [Architecture: FFTOps](./architecture.md#fftops)
 - **Implementation Checklist**: [TODOS: FFTOps Class](./TODOS.md#fftops-class)
@@ -94,6 +152,11 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Used for: Validating gradients in all model components
 - Critical for: Verifying analytical gradient implementations
 - Flow: Compare analytical gradients with numerical approximations
+
+**Testing Approach:**
+- Unit tests with simple functions with known gradients
+- Test gradient computation accuracy with different step sizes
+- No ground truth data needed (pure utility class)
 
 **References:**
 - **Component Details**: [Architecture: GradientUtils](./architecture.md#gradientutils)
@@ -114,6 +177,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Critical conversions: Coordinates, form factors, cell parameters
 - Gradient flow: Preserve structure for backpropagation
 
+**Testing Approach:**
+- Unit tests with sample PDB data
+- Verify correct conversion of arrays to tensors
+- Test device placement and gradient enablement
+- No ground truth data needed (pure utility class)
+
 **References:**
 - **Component Details**: [Architecture: PDBToTensor](./architecture.md#pdbtotensor)
 - **Implementation Checklist**: [TODOS: PDBToTensor Class](./TODOS.md#pdbtotensor-class)
@@ -132,6 +201,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Critical conversions: q-grid, symmetry operations
 - Gradient flow: Grid points need gradients, masks typically don't
 
+**Testing Approach:**
+- Unit tests with sample grid data
+- Verify correct conversion of arrays to tensors
+- Test propagation of requires_grad property
+- No ground truth data needed (pure utility class)
+
 **References:**
 - **Component Details**: [Architecture: GridToTensor](./architecture.md#gridtotensor)
 - **Implementation Checklist**: [TODOS: GridToTensor Class](./TODOS.md#gridtotensor-class)
@@ -149,6 +224,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Critical conversions: Intensity maps, statistics
 - Gradient flow: N/A (one-way conversion)
 
+**Testing Approach:**
+- Unit tests with various tensor shapes and types
+- Verify correct detachment and CPU conversion
+- Test handling of complex tensors and nested structures
+- No ground truth data needed (pure utility class)
+
 **References:**
 - **Component Details**: [Architecture: TensorToNumpy](./architecture.md#tensortonumpy)
 - **Implementation Checklist**: [TODOS: TensorToNumpy Class](./TODOS.md#tensortonumpy-class)
@@ -164,6 +245,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Bidirectional flow with: OnePhonon, RigidBodyTranslations, etc.
 - Critical conversions: Model parameters, intermediate results
 - Gradient flow: Must preserve model structure for optimization
+
+**Testing Approach:**
+- Unit tests with mock model structures
+- Test bidirectional conversion accuracy
+- Verify gradient preservation through conversion
+- No ground truth data needed (pure utility class)
 
 **References:**
 - **Component Details**: [Architecture: ModelAdapters](./architecture.md#modeladapters)
@@ -184,6 +271,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Critical operations: Grid generation, symmetry handling
 - Gradient flow: Must preserve q-vector derivatives
 
+**Testing Approach:**
+- Test against ground truth data in `logs/eryx.map_utils.*.log`
+- Use `TorchTesting.testTorchCallable()` with appropriate tolerances
+- Add gradient validation for differentiable functions
+- Test performance with large grid sizes
+
 **References:**
 - **Component Details**: [Architecture: map_utils_torch](./architecture.md#map_utils_torch-map_utils_torchpy)
 - **Implementation Checklist**: [TODOS: Map Utilities Implementation](./TODOS.md#3-map-utilities-implementation-map_utils_torchpy)
@@ -202,6 +295,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Output to: OnePhonon, RigidBodyTranslations, etc.
 - Gradient flow: Through complex exponentials and phase factors
 
+**Testing Approach:**
+- Test against ground truth data in `logs/eryx.scatter.*.log`
+- Use `TorchTesting.testTorchCallable()` with specific tolerances (rtol=1e-4, atol=1e-7)
+- Test with various batch sizes and input configurations
+- Verify gradient flow through complex number operations
+
 **References:**
 - **Component Details**: [Architecture: scatter_torch](./architecture.md#scatter_torch-scatter_torchpy)
 - **Implementation Checklist**: [TODOS: Structure Factor Calculation](./TODOS.md#4-structure-factor-calculation-implementation-scatter_torchpy)
@@ -219,6 +318,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Uses: scatter_torch for structure factors
 - Output to: Disorder models
 - Gradient flow: Through transform calculations
+
+**Testing Approach:**
+- Test against ground truth data in `logs/eryx.base.*.log`
+- Use `TorchTesting.testTorchCallable()` with appropriate tolerances
+- Test with different symmetry operations and sampling rates
+- Verify gradient flow through transform calculations
 
 **References:**
 - **Implementation Checklist**: [TODOS: Transform Implementation](./TODOS.md#5-transform-implementation-base_torchpy)
@@ -240,6 +345,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Output to: TensorToNumpy (diffuse intensity)
 - Gradient flow: From model parameters to diffuse intensity
 
+**Testing Approach:**
+- Test against ground truth data in `logs/eryx.models.OnePhonon.*.log`
+- Use `TorchTesting.testTorchCallable()` with specific tolerances for eigendecomposition (rtol=1e-4, atol=1e-6)
+- Test with different parameter sets from ground truth data
+- Verify end-to-end gradient flow from parameters to intensity
+
 **References:**
 - **Component Details**: [Architecture: OnePhonon](./architecture.md#onephonon)
 - **Implementation Checklist**: [TODOS: OnePhonon Model Implementation](./TODOS.md#6-onephonon-model-implementation-models_torchpy)
@@ -259,6 +370,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Output to: TensorToNumpy
 - Gradient flow: From sigma parameters to diffuse intensity
 
+**Testing Approach:**
+- Test against ground truth data in `logs/eryx.models.RigidBodyTranslations.*.log`
+- Use `TorchTesting.testTorchCallable()` with appropriate tolerances
+- Test optimization with gradient-based approach
+- Compare with NumPy optimization results
+
 **References:**
 - **Component Details**: [Architecture: RigidBodyTranslations](./architecture.md#rigidbodytranslations)
 - **Implementation Checklist**: [TODOS: RigidBodyTranslations Model Implementation](./TODOS.md#7-rigidbodytranslations-model-implementation-models_torchpy)
@@ -275,6 +392,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Uses: scatter_torch, FFTOps, ComplexTensorOps
 - Output to: TensorToNumpy
 - Gradient flow: Through FFT convolutions and parameter scaling
+
+**Testing Approach:**
+- Test against ground truth data in `logs/eryx.models.LiquidLikeMotions.*.log`
+- Use `TorchTesting.testTorchCallable()` with appropriate tolerances
+- Test with various kernel sizes and parameter sets
+- Verify gradient flow through FFT operations
 
 **References:**
 - **Component Details**: [Architecture: LiquidLikeMotions](./architecture.md#liquidlikemotions)
@@ -293,6 +416,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Uses: scatter_torch, ComplexTensorOps
 - Output to: TensorToNumpy
 - Gradient flow: Through rotation generation and application
+
+**Testing Approach:**
+- Test against ground truth data in `logs/eryx.models.RigidBodyRotations.*.log`
+- Use `TorchTesting.testTorchCallable()` with appropriate tolerances
+- Test with various rotation parameters
+- Verify gradient flow through rotation operations
 
 **References:**
 - **Component Details**: [Architecture: RigidBodyRotations](./architecture.md#rigidbodyrotations)
@@ -313,6 +442,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Output: Diffuse intensity maps
 - Demonstrates: End-to-end gradient flow
 
+**Testing Approach:**
+- Compare end-to-end output with NumPy implementation
+- Verify matching output with ground truth data
+- Test with different parameter configurations
+- Benchmark performance against NumPy implementation
+
 **References:**
 - **Implementation Checklist**: [TODOS: Integration and Testing](./TODOS.md#10-integration-and-testing)
 - **Model Execution Flow**: [Architecture: Model Execution Flow](./architecture.md#5-model-execution-flow)
@@ -330,6 +465,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Validates: Correctness and gradient computation
 - Ensures: Compatibility across component boundaries
 
+**Testing Approach:**
+- Create test modules for each component
+- Use test template for ground truth validation
+- Add specific gradient tests for differentiable components
+- Test end-to-end workflow with various configurations
+
 **References:**
 - **Testing Approach**: [Architecture: Testing Flow](./architecture.md#7-testing-flow)
 - **Ground Truth Strategy**: [Architecture: Ground Truth Generation Strategy](./architecture.md#ground-truth-generation-strategy)
@@ -346,6 +487,12 @@ Based on the [Architecture Component Diagram](./architecture.md#component-intera
 - Focuses on: OnePhonon.apply_disorder(), structure_factors()
 - Balances: Memory usage vs. computation speed
 - Preserves: Gradient flow through all operations
+
+**Testing Approach:**
+- Benchmark before and after optimizations
+- Verify output consistency with optimizations
+- Test with both CPU and GPU configurations
+- Measure memory usage with profiling tools
 
 **References:**
 - **Performance Considerations**: [Project Rules: Performance Considerations](./project_rules.md#performance-considerations)
@@ -372,6 +519,37 @@ Based on the component interactions diagram and critical differentiability point
 - **Phase 5 (3 weeks)**: Integration - Depends on all previous phases
 
 **Total Timeline: 14 weeks**
+
+## Testing Flow Diagram
+
+```mermaid
+graph TD
+    A[Ground Truth Data] --> B[Logger.searchLogDirectory]
+    B --> C[Logger.loadLog]
+    C --> D[Deserialized Inputs/Outputs]
+    
+    E[PyTorch Implementation] --> F[TorchTesting.testTorchCallable]
+    
+    D --> F
+    F --> G{Output Matches?}
+    
+    G -->|Yes| H[Test Passes]
+    G -->|No| I[Test Fails]
+    
+    J[Tensor Inputs with requires_grad] --> K[Forward Pass]
+    K --> L[Backward Pass]
+    L --> M[Analytical Gradients]
+    
+    J --> N[GradientUtils.finite_differences]
+    N --> O[Numerical Gradients]
+    
+    M --> P[GradientUtils.validate_gradients]
+    O --> P
+    
+    P --> Q{Gradients Valid?}
+    Q -->|Yes| R[Gradient Test Passes]
+    Q -->|No| S[Gradient Test Fails]
+```
 
 ## Critical Validation Points
 
