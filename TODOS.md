@@ -1,61 +1,262 @@
+# Updated TODOS: PyTorch Port Implementation Tasks
 
-This file contains a detailed list of tasks derived 1-to-1 from the spec prompts outlined in plan.md.
+> This file contains a detailed list of tasks derived from the architecture document and phased implementation plan. For detailed component interactions and data flows, see [architecture.md](./architecture.md).
 
-## 1. Test Framework Specification
-- **Autotest Extension**: Extend the autotest framework with PyTorch-specific functionality (e.g., implement a TorchTesting class).
-- **Numerical Comparison Utilities**: Develop utilities for tolerance-based numerical comparisons between PyTorch and NumPy outputs.
-- **Gradient Checking**: Implement gradient checking utilities using finite differences to validate differentiable operations.
-- **Ground Truth Generation**: Create a script to generate and serialize ground truth data from NumPy implementations for regression testing.
+## 1. Core Utilities Implementation (torch_utils.py)
 
-## 2. Adapter Component Specification
-- **PDBToTensor**: Implement conversion of AtomicModel and related crystallographic data from NumPy arrays to PyTorch tensors, preserving the computational graph.
-- **GridToTensor**: Create an adapter to convert reciprocal space grids from NumPy arrays to PyTorch tensors.
-- **TensorToNumpy**: Implement conversion of PyTorch tensor outputs back to NumPy arrays for visualization and further processing.
-- **ModelAdapters**: Develop adapters for model-specific conversions to seamlessly interoperate between NumPy and PyTorch implementations.
-- **Error Handling and Device Management**: Ensure robust error handling and proper device (CPU/GPU) assignment during conversions.
+### ComplexTensorOps Class
+- [ ] Implement `complex_exp(phase)` to compute e^(i*phase) returning (real, imaginary) parts
+- [ ] Implement `complex_mul(a_real, a_imag, b_real, b_imag)` for complex multiplication
+- [ ] Implement `complex_abs_squared(real, imag)` to compute |z|²
+- [ ] Implement `complex_exp_dwf(q_vec, u_vec)` for Debye-Waller factor calculation
+- [ ] Add comprehensive tests verifying gradient flow through all operations
+- [ ] Document tensor shapes and gradient requirements for all methods
 
-## 3. Grid and Transform Operations Specification
-- **Grid Generation**: Port grid generation functions (e.g., generate_grid) to PyTorch, ensuring differentiability.
-- **Symmetry Operations**: Implement differentiable functions to compute symmetry-equivalent Miller indices and perform raveling using PyTorch.
-- **Resolution and Masking Calculations**: Convert resolution computation and masking functions to PyTorch.
-- **Transform Operations**: Create differentiable operations for transformations (e.g., Fourier transforms) using PyTorch.
+**Component Interactions:**
+- Output used by: `scatter_torch.structure_factors_batch`
+- Critical for: Phase calculations in structure factors
+- Must support backpropagation through complex operations
 
-## 4. Core Physics - Structure Factor Calculation Specification
-- **compute_form_factors**: Develop a PyTorch version to compute atomic form factors.
-- **structure_factors_batch and structure_factors**: Implement PyTorch versions of batch and overall structure factor calculations.
-- **Complex Operations and Gradient Flow**: Ensure proper handling of complex number operations and preservation of gradient flow throughout the calculations.
+### EigenOps Class
+- [ ] Implement `svd_decomposition(matrix)` for SVD with gradient support
+- [ ] Implement `eigen_decomposition(matrix)` for eigendecomposition with gradient support
+- [ ] Implement `solve_linear_system(A, b)` to solve Ax=b with gradient support
+- [ ] Handle degenerate eigenvalues and numerical stability issues
+- [ ] Document limitations and trade-offs in implementation approach
 
-## 5. Core Physics - Gaussian Network Model (GNM) Specification
-- **GNM Calculations**: Port Gaussian Network Model calculations to PyTorch, including the construction of tensor-based spring constant matrices.
-- **Neighbor List Adaptation**: Adapt neighbor list computation to work with PyTorch tensors.
-- **Hessian Computation**: Implement differentiable Hessian computations for the GNM using PyTorch.
+**Component Interactions:**
+- Output used by: `OnePhonon.compute_gnm_phonons()`
+- Critical for: Phonon mode calculations
+- Must support backpropagation through eigendecomposition
 
-## 6. Core Physics - Phonon Calculations Specification
-- **Eigendecomposition**: Implement differentiable eigendecomposition (or SVD) using PyTorch functions.
-- **Covariance Matrix Calculation**: Port covariance matrix computations to PyTorch.
-- **Phonon Mode Calculation**: Ensure that phonon mode calculations (frequency and mode extraction) are differentiable and physically consistent.
+### FFTOps Class
+- [ ] Implement `fft_convolve(signal, kernel)` for FFT-based convolution
+- [ ] Implement `fft_3d(input_tensor)` and `ifft_3d(input_tensor)` for 3D FFT operations
+- [ ] Ensure proper normalization that preserves gradients
+- [ ] Test with various input sizes and boundary conditions
 
-## 7. Alternative Disorder Models Specification
-- **RigidBodyTranslations**: Implement a PyTorch version of the rigid body translations disorder model.
-- **LiquidLikeMotions**: Develop a PyTorch variant of the liquid-like motions disorder model with FFT-based convolution.
-- **RigidBodyRotations**: Create a PyTorch implementation for rigid body rotational disorder.
-- **API Consistency and Optimization Routines**: Ensure consistency with the NumPy versions and adapt optimization routines for gradient-based optimization; manage internal state appropriately.
+**Component Interactions:**
+- Output used by: `LiquidLikeMotions.fft_convolve()`
+- Critical for: Liquid-like motion disorder calculations
+- Must preserve gradients through FFT operations
 
-## 8. Integration and Execution Specification
-- **run_torch.py Script**: Develop the PyTorch equivalent of the simulation script (run_torch.py) for full end-to-end diffuse scattering simulation.
-- **Module Integration**: Integrate grid, physics, model, and adapter components into a cohesive PyTorch pipeline.
-- **Result Comparison Utilities**: Implement utilities to compare PyTorch outputs with legacy NumPy outputs.
-- **Demonstration Notebooks and Visualization**: Create demonstration notebooks and scripts for visualization and workflow presentation.
-- **Performance Benchmarking**: Add performance and profiling utilities to measure execution time and memory usage.
+### GradientUtils Class
+- [ ] Implement `finite_differences(func, input_tensor)` for numerical gradient calculation
+- [ ] Implement `validate_gradients(analytical_grad, numerical_grad)` to compare gradients
+- [ ] Implement `gradient_norm(gradient)` to compute gradient L2 norm
+- [ ] Document appropriate tolerance selection for different use cases
 
-## 9. Optimization and Validation Specification
-- **Comprehensive Testing**: Develop unit tests, component tests, and integration tests for all PyTorch modules.
-- **Performance Profiling**: Implement profiling tools to measure execution time and memory usage; identify bottlenecks.
-- **GPU Optimization**: Optimize tensor operations for efficient GPU execution and improved memory usage.
-- **Documentation and Examples**: Finalize documentation, update in-code comments, and create user-facing example notebooks.
-- **Gradient and Numerical Accuracy Validation**: Validate gradient computations and ensure numerical accuracy throughout the pipeline.
+**Component Interactions:**
+- Used for: Validating gradients in all model components
+- Critical for: Development and testing of gradient implementations
+- Ensures gradient calculation correctness
 
-## Additional Tasks (from Spec Prompts)
-- **Ground Truth Generation Strategy**: Instrument NumPy functions to capture and serialize ground truth results.
-- **Testing Strategy Implementation**: Establish testing pipelines for unit, component, and end-to-end tests as outlined in the plan.
-- **Timeline and Dependencies Documentation**: Document project timelines and inter-module dependencies as specified in plan.md.
+## 2. Adapter Components Implementation (adapters.py)
+
+### PDBToTensor Class
+- [ ] Implement `convert_atomic_model(model)` to convert AtomicModel to tensor dictionary
+- [ ] Implement `convert_crystal(crystal)` to convert Crystal to tensor dictionary
+- [ ] Implement `convert_gnm(gnm)` to convert GaussianNetworkModel to tensor dictionary
+- [ ] Implement `array_to_tensor(array, requires_grad)` helper method
+- [ ] Implement `convert_dict_of_arrays(dict_arrays)` helper method
+- [ ] Support explicit device placement with proper defaults
+- [ ] Document tensor shapes, dtypes, and gradient requirements
+
+**Component Interactions:**
+- Input from: AtomicModel, Crystal, GaussianNetworkModel
+- Output to: PyTorch model implementations
+- Preserves structure for backpropagation
+
+### GridToTensor Class
+- [ ] Implement `convert_grid(q_grid, map_shape)` to convert q_grid to tensor
+- [ ] Implement `convert_mask(mask)` to convert boolean mask to tensor
+- [ ] Implement `convert_symmetry_ops(sym_ops)` to convert symmetry operations to tensors
+- [ ] Document which components should be differentiable vs. non-differentiable
+
+**Component Interactions:**
+- Input from: Grid parameters, resolution masks
+- Output to: map_utils_torch functions
+- Grid points need gradients, masks typically don't
+
+### TensorToNumpy Class
+- [ ] Implement `tensor_to_array(tensor)` to convert tensor to array
+- [ ] Implement `convert_dict_of_tensors(dict_tensors)` to convert dictionary of tensors
+- [ ] Implement `convert_intensity_map(intensity, map_shape)` for intensity map conversion
+- [ ] Document handling of requires_grad and device placement
+
+**Component Interactions:**
+- Input from: PyTorch model outputs
+- Output to: NumPy arrays for visualization
+- One-way conversion (no gradient preservation needed)
+
+### ModelAdapters Class
+- [ ] Implement `adapt_one_phonon_inputs(np_model)` for OnePhonon model
+- [ ] Implement `adapt_one_phonon_outputs(torch_outputs)` for OnePhonon results
+- [ ] Implement similar methods for RigidBodyTranslations, LiquidLikeMotions, RigidBodyRotations
+- [ ] Document model-specific conversion requirements
+
+**Component Interactions:**
+- Bidirectional flow with: OnePhonon, RigidBodyTranslations, etc.
+- Preserves model structure for optimization
+
+## 3. Map Utilities Implementation (map_utils_torch.py)
+
+- [ ] Implement `generate_grid(A_inv, hsampling, ksampling, lsampling)` for q-grid generation
+- [ ] Implement `get_symmetry_equivalents(hkl_grid, sym_ops)` for symmetry operations
+- [ ] Implement `get_ravel_indices(hkl_grid_sym, sampling)` for index raveling
+- [ ] Implement `compute_resolution(cell, hkl)` for resolution calculation
+- [ ] Implement `get_resolution_mask(cell, hkl_grid, res_limit)` for masking
+- [ ] Implement `get_dq_map(A_inv, hkl_grid)` for distance calculation
+- [ ] Implement `get_centered_sampling(map_shape, sampling)` for sampling parameters
+- [ ] Implement `resize_map(new_map, old_sampling, new_sampling)` for map resizing
+- [ ] Add comprehensive documentation on tensor shapes and gradient flow
+
+**Component Interactions:**
+- Input from: GridToTensor adapter
+- Output to: scatter_torch, disorder models
+- Grid generation must preserve gradients
+
+## 4. Structure Factor Calculation Implementation (scatter_torch.py)
+
+- [ ] Implement `compute_form_factors(q_grid, ff_a, ff_b, ff_c)` using tensor operations
+- [ ] Implement `structure_factors_batch(q_grid, xyz, ff_a, ff_b, ff_c)` with complex operations
+- [ ] Implement `structure_factors(q_grid, xyz, ff_a, ff_b, ff_c)` with batch processing
+- [ ] Use ComplexTensorOps for all complex number operations
+- [ ] Add device management with proper defaults
+- [ ] Implement efficient batching strategy for large datasets
+- [ ] Document tensor shapes, grad requirements, and potential numerical issues
+
+**Component Interactions:**
+- Uses: ComplexTensorOps for complex operations
+- Input from: PDBToTensor (atomic data), map_utils_torch (q-grid)
+- Output to: OnePhonon, RigidBodyTranslations, etc.
+- Complex operations must preserve gradients
+
+## 5. Transform Implementation (base_torch.py)
+
+- [ ] Implement `compute_molecular_transform(pdb_path, hsampling, ksampling, lsampling)` 
+- [ ] Implement `compute_crystal_transform(pdb_path, hsampling, ksampling, lsampling)`
+- [ ] Implement `incoherent_sum_real(model, hkl_grid, sampling)` with PyTorch operations
+- [ ] Implement `incoherent_sum_reciprocal(model, hkl_grid, sampling)` with PyTorch operations
+- [ ] Ensure all functions preserve gradient information
+- [ ] Document transform calculations and their differentiability
+
+**Component Interactions:**
+- Input from: PDBToTensor, map_utils_torch
+- Uses: scatter_torch for structure factors
+- Output to: Disorder models
+- Transform calculations must preserve gradients
+
+## 6. OnePhonon Model Implementation (models_torch.py)
+
+- [ ] Implement `__init__` method with tensor initialization
+- [ ] Implement `_setup` method for atomic model and grid setup
+- [ ] Implement `_setup_phonons` for phonon calculation initialization
+- [ ] Implement `_build_A()` for projection matrix construction
+- [ ] Implement `_build_M()` for mass matrix construction
+- [ ] Implement `_build_kvec_Brillouin()` for k-vector computation
+- [ ] Implement `compute_gnm_phonons()` using EigenOps for eigendecomposition
+- [ ] Implement `compute_hessian()` for Hessian matrix construction
+- [ ] Implement `compute_covariance_matrix()` for displacement covariances
+- [ ] Implement `apply_disorder()` with end-to-end gradient flow
+- [ ] Document tensor shapes, grad requirements, and numerical considerations
+
+**Component Interactions:**
+- Input from: PDBToTensor (atomic data), GridToTensor (grid data)
+- Uses: scatter_torch, EigenOps, ComplexTensorOps
+- Output to: TensorToNumpy (diffuse intensity)
+- End-to-end gradient flow from parameters to intensity
+
+## 7. RigidBodyTranslations Model Implementation (models_torch.py)
+
+- [ ] Implement `__init__` method with tensor initialization
+- [ ] Implement `_setup` method for transform calculation
+- [ ] Implement `apply_disorder(sigmas)` with gradient flow to sigmas
+- [ ] Implement `optimize(target, sigmas_min, sigmas_max)` with gradient-based option
+- [ ] Document tensor operations and parameter gradients
+
+**Component Interactions:**
+- Input from: PDBToTensor, GridToTensor
+- Uses: scatter_torch, ComplexTensorOps
+- Output to: TensorToNumpy
+- Gradient flow from sigma parameters to intensity
+
+## 8. LiquidLikeMotions Model Implementation (models_torch.py)
+
+- [ ] Implement `__init__` method with tensor initialization
+- [ ] Implement `_setup` method for transform and kernel setup
+- [ ] Implement `fft_convolve(transform, kernel)` using FFTOps
+- [ ] Implement `apply_disorder(sigmas, gammas)` with gradient preservation
+- [ ] Implement `optimize(target, sigmas_min, sigmas_max, gammas_min, gammas_max)` with gradient-based option
+- [ ] Document FFT-based calculations and gradient flow
+
+**Component Interactions:**
+- Input from: PDBToTensor, GridToTensor
+- Uses: scatter_torch, FFTOps, ComplexTensorOps
+- Output to: TensorToNumpy
+- Gradient flow through FFT convolutions
+
+## 9. RigidBodyRotations Model Implementation (models_torch.py)
+
+- [ ] Implement `__init__` method with tensor initialization
+- [ ] Implement `_setup` method for transform setup
+- [ ] Implement `generate_rotations_around_axis(sigma, num_rot)` with gradient support
+- [ ] Implement `apply_disorder(sigmas, num_rot)` with proper ensemble handling
+- [ ] Implement `optimize(target, sigma_min, sigma_max)` with gradient-based option
+- [ ] Document rotational gradient considerations
+
+**Component Interactions:**
+- Input from: PDBToTensor, GridToTensor
+- Uses: scatter_torch, ComplexTensorOps
+- Output to: TensorToNumpy
+- Gradient flow through rotation generation
+
+## 10. Integration and Testing
+
+- [ ] Implement `run_torch.py` for end-to-end simulation
+- [ ] Create testing suite with component and integration tests
+- [ ] Implement performance benchmarking and optimization
+- [ ] Create examples of gradient-based parameter optimization
+- [ ] Document end-to-end workflows
+
+**Component Interactions:**
+- Integrates all components
+- Demonstrates end-to-end gradient flow
+- Validates against NumPy implementation
+
+## Implementation Priorities
+
+1. **Core Utilities (torch_utils.py)**:
+   - ComplexTensorOps - Critical for structure factors and most computations
+   - EigenOps - Required for phonon mode calculations
+   - FFTOps - Needed for liquid-like motion simulations
+   - GradientUtils - Essential for validation during development
+
+2. **Adapter Components (adapters.py)**:
+   - PDBToTensor - Foundation for data conversion
+   - GridToTensor - Required for proper grid handling
+   - TensorToNumpy - Needed for result visualization
+   - ModelAdapters - Essential for proper model interfacing
+
+3. **Physics Calculations**:
+   - map_utils_torch.py - Grid generation foundation
+   - scatter_torch.py - Structure factor calculation core
+   - base_torch.py - Transform calculation foundation
+   
+4. **Model Implementations**:
+   - OnePhonon - Most complex model, high priority
+   - Alternative disorder models
+
+## Dependency Graph
+
+```
+ComplexTensorOps, EigenOps, FFTOps
+↓
+PDBToTensor, GridToTensor
+↓
+map_utils_torch, scatter_torch
+↓
+OnePhonon, RigidBodyTranslations, LiquidLikeMotions, RigidBodyRotations
+↓
+run_torch.py, Testing Suite
+```

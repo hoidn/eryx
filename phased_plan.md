@@ -1,19 +1,23 @@
-# Final Implementation Plan for PyTorch Port
+# Updated Phased Implementation Plan for PyTorch Port
 
+## Overview and Resources
 
-// TODO: the plan is unclear about which components can be tested using 
-// the ground truth values generated from running run_np() with @debug outputs,
-// vs. which components aren't 1 to 1 with a np / reference implementation 
-// component and therefore have to be validated in a different way
+This document outlines the implementation plan for the PyTorch port of the diffuse scattering simulation codebase. For comprehensive information about the architecture and component interactions, refer to the following resources:
+
+- **Component Architecture**: [Architecture Document](./architecture.md) provides detailed component descriptions and interactions
+- **Implementation Tasks**: [TODOS Document](./TODOS.md) contains detailed checklists for each component
+- **Code Standards**: [Project Rules](./project_rules.md) specifies requirements for implementation
+- **Ground Truth Data**: Located in `logs/` directory, generated via `@debug` decorators
 
 ## Current Status Overview
 
 - **Completed**: Most PyTorch stub files have been created with placeholders, docstrings, and type hints.
-- **Not Started**: Ground truth data generation, adapter implementation, and core function implementation.
+- **Generated**: Ground truth data for 22 components has been captured using `@debug` decorators.
+- **Not Started**: Core implementation of differentiable operations, adapters, and model components.
 
 ## System Boundaries and Differentiability Constraints
 
-Based on plan.md, we must clearly distinguish between components that should remain in NumPy and those that should be converted to PyTorch with differentiability:
+Based on the [Architecture Component Diagram](./architecture.md#component-interaction-diagram), we distinguish between components that should remain in NumPy and those that should be converted to PyTorch with differentiability:
 
 ### Non-Differentiable Components (Keep in NumPy)
 - **Data Loading**: PDB loading, cell parameter extraction, symmetry operations
@@ -28,360 +32,371 @@ Based on plan.md, we must clearly distinguish between components that should rem
 
 ## Revised Implementation Plan
 
-### Phase 1: Ground Truth Generation (1 week)
+### Phase 1: Core Utilities Implementation (2 weeks)
 
-#### Task 1.1: Add Debug Decorators to Source Files
-- Directly add `@debug` decorators to all functions identified in `to_convert.json`
-- Modify the original source files in place to ensure direct decoration
-- Add import statements: `from eryx.autotest.debug import debug`
+#### Task 1.1: Implement ComplexTensorOps in torch_utils.py
+- Implement differentiable complex exponential for phase calculations
+- Implement complex multiplication with gradient preservation
+- Implement complex absolute square value calculation
+- Implement Debye-Waller factor calculation
+- Add comprehensive tests verifying gradient flow
 
-**Key Files to Modify (based on to_convert.json prioritization):**
+**Component Interactions:**
+- Output used by: scatter_torch.structure_factors_batch
+- Critical for: Phase calculations, structure factors
+- Gradient flow: Must support backpropagation through complex operations
 
-1. `eryx/scatter.py`:
-   ```python
-   @debug
-   def compute_form_factors(q_grid, ff_a, ff_b, ff_c): ...
+**References:**
+- **Component Details**: [Architecture: ComplexTensorOps](./architecture.md#complextensorops)
+- **Implementation Checklist**: [TODOS: ComplexTensorOps Class](./TODOS.md#complextensorops-class)
+- **Differentiability Approach**: [Architecture: Complex Operations Critical Point](./architecture.md#critical-differentiability-points)
 
-   @debug
-   def structure_factors_batch(q_grid, xyz, ff_a, ff_b, ff_c, U=None, ...): ...
+#### Task 1.2: Implement EigenOps in torch_utils.py
+- Implement SVD-based approach for eigenvalue decomposition
+- Implement proper gradient handling for degenerate eigenvalues
+- Implement linear system solver with gradient support
+- Document gradient flow limitations and stability considerations
 
-   @debug
-   def structure_factors(q_grid, xyz, ff_a, ff_b, ff_c, U=None, ...): ...
-   ```
+**Component Interactions:**
+- Output used by: OnePhonon.compute_gnm_phonons()
+- Critical for: Phonon mode calculation, covariance matrix
+- Gradient flow: Must support backpropagation through eigendecomposition
 
-2. `eryx/map_utils.py`:
-   ```python
-   @debug
-   def generate_grid(A_inv, hsampling, ksampling, lsampling, return_hkl=False): ...
+**References:**
+- **Component Details**: [Architecture: EigenOps](./architecture.md#eigenops)
+- **Implementation Checklist**: [TODOS: EigenOps Class](./TODOS.md#eigenops-class)
+- **Differentiability Approach**: [Architecture: Eigendecomposition Critical Point](./architecture.md#critical-differentiability-points)
+- **Data Flow**: [Architecture: Phonon Calculation Flow](./architecture.md#4-phonon-calculation-flow)
 
-   @debug
-   def get_symmetry_equivalents(hkl_grid, sym_ops): ...
+#### Task 1.3: Implement FFTOps in torch_utils.py
+- Implement differentiable FFT convolution for LiquidLikeMotions model
+- Create helpers for complex FFT operations with gradient preservation
+- Ensure proper normalization that preserves gradients
+- Test with various input sizes and boundary conditions
 
-   # Continue with other functions from to_convert.json
-   ```
+**Component Interactions:**
+- Output used by: LiquidLikeMotions.fft_convolve()
+- Critical for: Liquid-like motion disorder calculations
+- Gradient flow: Must preserve gradients through FFT operations
 
-3. `eryx/models.py` - Add decorators to OnePhonon class methods:
-   ```python
-   class OnePhonon:
-       @debug
-       def __init__(self, pdb_path, hsampling, ksampling, lsampling, ...): ...
-       
-       @debug
-       def _setup(self, pdb_path, expand_p1, res_limit, group_by): ...
-       
-       # Continue with other methods from to_convert.json
-   ```
+**References:**
+- **Component Details**: [Architecture: FFTOps](./architecture.md#fftops)
+- **Implementation Checklist**: [TODOS: FFTOps Class](./TODOS.md#fftops-class)
+- **Differentiability Approach**: [Architecture: FFT Operations Critical Point](./architecture.md#critical-differentiability-points)
 
-4. Additional files as specified in `to_convert.json`
+#### Task 1.4: Implement GradientUtils in torch_utils.py
+- Create finite difference validation tools
+- Implement gradient norm calculations
+- Add gradient visualization helpers
+- Document validation methodology and appropriate tolerances
 
-#### Task 1.2: Configure Autotest Framework
-- Create configuration file for autotest at `eryx/autotest_config.py`
-- Ensure debug mode is enabled and log directory is properly set
+**Component Interactions:**
+- Used for: Validating gradients in all model components
+- Critical for: Verifying analytical gradient implementations
+- Flow: Compare analytical gradients with numerical approximations
 
-#### Task 1.3: Generate Ground Truth Data
+**References:**
+- **Component Details**: [Architecture: GradientUtils](./architecture.md#gradientutils)
+- **Implementation Checklist**: [TODOS: GradientUtils Class](./TODOS.md#gradientutils-class)
+- **Validation Strategy**: [Architecture: Gradient Validation Flow](./architecture.md#6-gradient-validation-flow)
 
-- Leverage the existing `run_np()` function in `run_debug.py` instead of creating a new script
-- Modify the function slightly to ensure comprehensive ground truth data generation:
+### Phase 2: Adapter Implementation (2 weeks)
 
-```python
-# In run_debug.py, update run_np() to ensure comprehensive ground truth:
-
-def run_np(variant=None):
-    """
-    Run NumPy version of diffuse scattering simulation to generate ground truth data.
-    The @debug decorators will automatically capture inputs/outputs for testing.
-    
-    Args:
-        variant: Optional string to specify parameter variations for comprehensive testing
-    """
-    # Base configuration
-    pdb_path = "tests/pdbs/5zck_p1.pdb"
-    
-    if variant == "small":
-        # Small grid for quick testing
-        hsampling, ksampling, lsampling = [-2, 2, 2], [-2, 2, 2], [-2, 2, 2]
-    elif variant == "medium":
-        # Medium grid with different parameters
-        hsampling, ksampling, lsampling = [-4, 4, 3], [-8, 8, 3], [-8, 8, 3]
-        gnm_cutoff, gamma_intra, gamma_inter = 5.0, 0.8, 1.2
-    else:
-        # Default/full configuration
-        hsampling, ksampling, lsampling = [-4, 4, 3], [-17, 17, 3], [-29, 29, 3]
-        gnm_cutoff, gamma_intra, gamma_inter = 4.0, 1.0, 1.0
-    
-    logging.info(f"Starting NP branch computation with variant: {variant}")
-    
-    # Create model with parameters
-    onephonon_np = OnePhonon(
-        pdb_path,
-        hsampling, ksampling, lsampling,
-        expand_p1=True,
-        res_limit=0.0,
-        gnm_cutoff=gnm_cutoff if 'gnm_cutoff' in locals() else 4.0,
-        gamma_intra=gamma_intra if 'gamma_intra' in locals() else 1.0,
-        gamma_inter=gamma_inter if 'gamma_inter' in locals() else 1.0
-    )
-    
-    # Apply disorder to generate diffuse intensity
-    Id_np = onephonon_np.apply_disorder(use_data_adp=True)
-    
-    # Log statistics for verification
-    logging.info(f"NP branch diffuse intensity stats: min={np.nanmin(Id_np)}, max={np.nanmax(Id_np)}")
-    
-    # Save results
-    output_filename = f"np_diffuse_intensity{'_'+variant if variant else ''}.npy"
-    np.save(output_filename, Id_np)
-    
-    return Id_np
-```
-
-- Create a small driver script to run different variants:
-
-```python
-# Create scripts/generate_ground_truth.py:
-
-import os
-import logging
-from eryx.autotest_config import config
-from eryx.run_debug import run_np
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-logger.info(f"Autotest debug mode: {config.getDebugFlag()}")
-logger.info(f"Log directory: {config.getLogFilePrefix()}")
-
-# Create output directory if needed
-os.makedirs(config.getLogFilePrefix(), exist_ok=True)
-
-# Run simulation with different parameter sets to ensure comprehensive coverage
-logger.info("Running simulation to generate ground truth data")
-run_np()  # Default parameters
-run_np("small")  # Small grid for quick testing
-run_np("medium")  # Different parameters
-logger.info("Ground truth data generation complete")
-```
-
-- Verify ground truth data was captured properly:
-  - Check that log files were created in the configured log directory
-  - Confirm all instrumented functions generated logs
-  - Validate that logs contain required input/output data
-
-### Phase 2: Core Utilities Implementation (2 weeks)
-
-#### Task 2.1: Implement Differentiable Tensor Operations
-- Complete `ComplexTensorOps` in `eryx/torch_utils.py`:
-  - Implement differentiable complex exponential for phase calculations
-  - Ensure complex multiplication preserves gradients
-  - Create differentiable Debye-Waller factor calculations
-- Implement `EigenOps` with special focus on differentiable eigendecomposition:
-  - Create SVD-based approach for eigenvalue decomposition
-  - Ensure proper backpropagation through eigen operations
-  - Document gradient flow and stability considerations
-- Document all differentiability decisions
-
-#### Task 2.2: Implement FFT Operations
-- Complete `FFTOps` in `eryx/torch_utils.py`:
-  - Implement differentiable FFT convolution for LiquidLikeMotions model
-  - Create helpers for complex FFT operations
-  - Ensure proper normalization that preserves gradients
-- Document FFT implementation choices for differentiability
-
-#### Task 2.3: Implement Gradient Utilities
-- Complete `GradientUtils` in `eryx/torch_utils.py`:
-  - Create tools for finite difference validation
-  - Implement gradient norm calculations
-  - Add gradient validation helpers
-- Document validation methodology
-
-### Phase 3: Adapter Implementation (2 weeks)
-
-#### Task 3.1: Implement PDBToTensor Adapter
-- Complete `convert_atomic_model(model)` method for AtomicModel conversion:
-  - Convert only differentiable components to tensors
-  - Keep non-differentiable components (like neighbor lists) in NumPy
-- Implement `convert_crystal(crystal)` and `convert_gnm(gnm)` methods:
-  - Document which components should be differentiable
+#### Task 2.1: Implement PDBToTensor in adapters.py
+- Implement convert_atomic_model() method with specific tensor conversions
+- Implement convert_crystal() and convert_gnm() methods
 - Support explicit device placement with proper defaults
-- Add tests to verify bidirectional conversion
+- Add comprehensive docstrings describing tensor shapes and types
 
-#### Task 3.2: Implement GridToTensor Adapter
-- Complete `convert_grid(q_grid, map_shape)` method:
-  - Ensure grid generation is differentiable
-- Implement `convert_mask(mask)` and `convert_symmetry_ops(sym_ops)` methods:
-  - Keep masks non-differentiable (boolean)
-  - Ensure symmetry operations preserve gradients
-- Add tests for grid conversion
+**Component Interactions:**
+- Input from: AtomicModel, Crystal, GaussianNetworkModel
+- Output to: PyTorch model implementations
+- Critical conversions: Coordinates, form factors, cell parameters
+- Gradient flow: Preserve structure for backpropagation
 
-#### Task 3.3: Implement TensorToNumpy and ModelAdapters
-- Complete conversions with gradient preservation
-- Implement model-specific adapters based on differentiability needs
-- Add comprehensive tests for each adapter
+**References:**
+- **Component Details**: [Architecture: PDBToTensor](./architecture.md#pdbtotensor)
+- **Implementation Checklist**: [TODOS: PDBToTensor Class](./TODOS.md#pdbtotensor-class)
+- **Data Flow**: [Architecture: Data Initialization Flow](./architecture.md#1-data-initialization-flow)
+- **Device Management**: [Project Rules: Device Management](./project_rules.md#device-management)
 
-### Phase 4: Core Function Implementation (3 weeks)
+#### Task 2.2: Implement GridToTensor in adapters.py
+- Implement convert_grid() method with gradient preservation
+- Implement convert_mask() and convert_symmetry_ops() methods
+- Document which components need to be differentiable
+- Add tests verifying conversion correctness and gradient preservation
 
-#### Task 4.1: Implement Map Utilities
-- Complete `generate_grid` in `eryx/map_utils_torch.py`:
-  - Use differentiable PyTorch grid operations
-  - Preserve shape information for gradient flow
-- Implement symmetry operations with gradient preservation
-- Document grid generation differentiability
+**Component Interactions:**
+- Input from: Grid parameters, resolution masks
+- Output to: map_utils_torch functions
+- Critical conversions: q-grid, symmetry operations
+- Gradient flow: Grid points need gradients, masks typically don't
 
-#### Task 4.2: Implement Structure Factor Calculations
-- Complete `compute_form_factors` in `eryx/scatter_torch.py`:
-  - Ensure differentiable form factor calculation
-  - Preserve gradients through exponential operations
-- Implement `structure_factors_batch` with proper gradient flow:
-  - Use complex number operations that preserve gradients
-  - Implement differentiable Debye-Waller factor application
-- Add device management with proper defaults
-- Document structure factor gradient flow
+**References:**
+- **Component Details**: [Architecture: GridToTensor](./architecture.md#gridtotensor)
+- **Implementation Checklist**: [TODOS: GridToTensor Class](./TODOS.md#gridtotensor-class)
+- **Data Flow**: [Architecture: Grid Generation Flow](./architecture.md#2-grid-generation-flow)
 
-#### Task 4.3: Implement Base Transforms
-- Complete `compute_molecular_transform` in `eryx/base_torch.py`:
-  - Preserve gradients through transform calculations
-- Implement `compute_crystal_transform` with gradient preservation
-- Document transform differentiability considerations
+#### Task 2.3: Implement TensorToNumpy in adapters.py
+- Implement tensor_to_array() with proper detachment
+- Implement convert_dict_of_tensors() and convert_intensity_map()
+- Document shape handling and any detach/clone operations
+- Add tests for various tensor types and shapes
 
-### Phase 5: Model Implementation - OnePhonon (3 weeks)
+**Component Interactions:**
+- Input from: PyTorch model outputs
+- Output to: NumPy arrays for visualization
+- Critical conversions: Intensity maps, statistics
+- Gradient flow: N/A (one-way conversion)
 
-#### Task 5.1: Implement OnePhonon Matrix Construction
-- Complete `_build_A` method:
-  - Ensure differentiable projection matrix construction
-  - Document gradient flow through matrix operations
-- Implement `_build_M` method:
-  - Create differentiable mass matrix construction
-  - Use PyTorch's matrix operations for gradient preservation
-- Complete `_build_kvec_Brillouin` with differentiable operations
-- Document matrix construction differentiability
+**References:**
+- **Component Details**: [Architecture: TensorToNumpy](./architecture.md#tensortonumpy)
+- **Implementation Checklist**: [TODOS: TensorToNumpy Class](./TODOS.md#tensortonumpy-class)
+- **Output Flow**: [Architecture: Model Execution Flow](./architecture.md#5-model-execution-flow)
 
-#### Task 5.2: Implement OnePhonon Physics Calculations
-- Complete `compute_hessian` method:
-  - Ensure differentiable Hessian construction
-  - Preserve gradients through matrix operations
-- Implement `compute_gnm_phonons` with special attention to eigendecomposition:
-  - Use differentiable eigendecomposition from `EigenOps`
-  - Ensure proper handling of numerical instabilities
-  - Document eigendecomposition differentiability approach
-- Complete `compute_covariance_matrix` with gradient preservation
-- Document physics calculation differentiability
+#### Task 2.4: Implement ModelAdapters in adapters.py
+- Implement model-specific adapters for each disorder model type
+- Document specific tensor shape and gradient requirements
+- Add bidirectional conversion tests
+- Verify gradient preservation across conversions
 
-#### Task 5.3: Implement OnePhonon Disorder Application
-- Complete `apply_disorder` method:
-  - Ensure end-to-end gradient flow from inputs to diffuse intensity
-  - Optimize memory usage while preserving computation graph
-  - Implement differentiable structure factor operations
-- Add tests comparing to ground truth output
-- Document differentiability through the complete model
+**Component Interactions:**
+- Bidirectional flow with: OnePhonon, RigidBodyTranslations, etc.
+- Critical conversions: Model parameters, intermediate results
+- Gradient flow: Must preserve model structure for optimization
 
-### Phase 6: Alternative Models Implementation (3 weeks)
+**References:**
+- **Component Details**: [Architecture: ModelAdapters](./architecture.md#modeladapters)
+- **Implementation Checklist**: [TODOS: ModelAdapters Class](./TODOS.md#modeladapters-class)
+- **Model Interfaces**: [Architecture: Disorder Models](./architecture.md#disorder-models-models_torchpy)
 
-#### Task 6.1: Implement RigidBodyTranslations Model
-- Complete `apply_disorder` method:
-  - Implement differentiable Debye-Waller factor calculation
-  - Ensure gradient flow through Wilson parameters
-- Implement `optimize` method:
-  - Add gradient-based optimization option
-- Document model-specific differentiability
+### Phase 3: Core Function Implementation (3 weeks)
 
-#### Task 6.2: Implement LiquidLikeMotions Model
-- Complete `fft_convolve` method:
-  - Use differentiable FFT operations from `FFTOps`
-  - Ensure gradient preservation through convolution
-- Implement `apply_disorder` method:
-  - Preserve gradients through kernel operations
-  - Ensure differentiable scaling with displacement parameters
-- Document FFT-based differentiability approach
+#### Task 3.1: Implement map_utils_torch.py
+- Implement generate_grid() using PyTorch tensor operations
+- Implement get_symmetry_equivalents() and get_ravel_indices()
+- Implement compute_resolution() and get_resolution_mask()
+- Ensure all functions preserve gradient information
 
-#### Task 6.3: Implement RigidBodyRotations Model
-- Complete `generate_rotations_around_axis` method:
-  - Ensure differentiable rotation matrix generation
-  - Use PyTorch's rotation functions with gradient support
-- Implement `apply_disorder` method:
-  - Preserve gradients through rotational disorder application
-- Document rotational differentiability considerations
+**Component Interactions:**
+- Input from: GridToTensor adapter
+- Output to: scatter_torch, disorder models
+- Critical operations: Grid generation, symmetry handling
+- Gradient flow: Must preserve q-vector derivatives
 
-### Phase 7: Integration and Optimization (2 weeks)
+**References:**
+- **Component Details**: [Architecture: map_utils_torch](./architecture.md#map_utils_torch-map_utils_torchpy)
+- **Implementation Checklist**: [TODOS: Map Utilities Implementation](./TODOS.md#3-map-utilities-implementation-map_utils_torchpy)
+- **Type Annotation Guidelines**: [Architecture: Type Annotation](./architecture.md#implementation-guidelines)
+- **Ground Truth Generation**: [Architecture: Ground Truth Generation Strategy](./architecture.md#ground-truth-generation-strategy)
 
-#### Task 7.1: Complete Run Script
-- Finish implementation of `eryx/run_torch.py`:
-  - Add device management and error handling
-  - Create end-to-end gradient flow demonstration
-- Add end-to-end tests with gradient validation
+#### Task 3.2: Implement scatter_torch.py
+- Implement compute_form_factors() using ComplexTensorOps
+- Implement structure_factors_batch() with gradient preservation
+- Implement structure_factors() with efficient batching
+- Document tensor shapes and gradient requirements
 
-#### Task 7.2: Optimize Performance
-- Implement batching for large datasets with gradient preservation
-- Optimize memory usage with careful tensor management
-- Document optimization decisions and tradeoffs
+**Component Interactions:**
+- Uses: ComplexTensorOps for complex operations
+- Input from: PDBToTensor (atomic data), map_utils_torch (q-grid)
+- Output to: OnePhonon, RigidBodyTranslations, etc.
+- Gradient flow: Through complex exponentials and phase factors
 
-#### Task 7.3: Validation and Documentation
-- Add comprehensive gradient validation
-- Complete documentation of all differentiability considerations
-- Create example notebooks demonstrating gradient-based optimization
+**References:**
+- **Component Details**: [Architecture: scatter_torch](./architecture.md#scatter_torch-scatter_torchpy)
+- **Implementation Checklist**: [TODOS: Structure Factor Calculation](./TODOS.md#4-structure-factor-calculation-implementation-scatter_torchpy)
+- **Data Flow**: [Architecture: Structure Factor Calculation Flow](./architecture.md#3-structure-factor-calculation-flow)
+- **Memory Optimization**: [Architecture: Implementation Guidelines](./architecture.md#implementation-guidelines)
 
-## Implementation Priorities (based on to_convert.json and differentiability requirements)
+#### Task 3.3: Implement base_torch.py
+- Implement compute_molecular_transform() with gradient preservation
+- Implement compute_crystal_transform() with proper symmetry handling
+- Implement incoherent_sum functions with PyTorch operations
+- Document transformation operations with gradient considerations
 
-1. Differentiable tensor operations (especially complex numbers and eigendecomposition)
-2. Structure factor calculations with gradient preservation
-3. Map utilities with differentiable grid operations
-4. OnePhonon model with focus on eigendecomposition and matrix operations
-5. Alternative models with model-specific differentiability requirements
+**Component Interactions:**
+- Input from: PDBToTensor, map_utils_torch
+- Uses: scatter_torch for structure factors
+- Output to: Disorder models
+- Gradient flow: Through transform calculations
+
+**References:**
+- **Implementation Checklist**: [TODOS: Transform Implementation](./TODOS.md#5-transform-implementation-base_torchpy)
+- **Original Implementation**: Check base.py for transform calculations
+- **Error Handling Guidelines**: [Architecture: Error Handling](./architecture.md#implementation-guidelines)
+
+### Phase 4: Model Implementation (4 weeks)
+
+#### Task 4.1: Implement OnePhonon in models_torch.py
+- Implement matrix construction methods (_build_A, _build_M)
+- Implement compute_gnm_phonons() using EigenOps
+- Implement compute_covariance_matrix() with gradient preservation
+- Implement apply_disorder() with end-to-end gradient flow
+- Add extensive documentation on tensor shapes and grad requirements
+
+**Component Interactions:**
+- Input from: PDBToTensor (atomic data), GridToTensor (grid data)
+- Uses: scatter_torch, EigenOps, ComplexTensorOps
+- Output to: TensorToNumpy (diffuse intensity)
+- Gradient flow: From model parameters to diffuse intensity
+
+**References:**
+- **Component Details**: [Architecture: OnePhonon](./architecture.md#onephonon)
+- **Implementation Checklist**: [TODOS: OnePhonon Model Implementation](./TODOS.md#6-onephonon-model-implementation-models_torchpy)
+- **Data Flow**: [Architecture: Phonon Calculation Flow](./architecture.md#4-phonon-calculation-flow)
+- **Critical Differentiability**: [Architecture: Eigendecomposition Critical Point](./architecture.md#critical-differentiability-points)
+- **Memory Management**: [Architecture: Batching and Memory Management](./architecture.md#critical-differentiability-points)
+
+#### Task 4.2: Implement RigidBodyTranslations in models_torch.py
+- Implement core setup methods with tensor operations
+- Implement apply_disorder() with gradient flow to sigmas
+- Implement optimize() with gradient-based optimization option
+- Document tensor operations and parameter gradients
+
+**Component Interactions:**
+- Input from: PDBToTensor, GridToTensor
+- Uses: scatter_torch, ComplexTensorOps
+- Output to: TensorToNumpy
+- Gradient flow: From sigma parameters to diffuse intensity
+
+**References:**
+- **Component Details**: [Architecture: RigidBodyTranslations](./architecture.md#rigidbodytranslations)
+- **Implementation Checklist**: [TODOS: RigidBodyTranslations Model Implementation](./TODOS.md#7-rigidbodytranslations-model-implementation-models_torchpy)
+- **Type Annotation Guidelines**: [Architecture: Type Annotation](./architecture.md#implementation-guidelines)
+
+#### Task 4.3: Implement LiquidLikeMotions in models_torch.py
+- Implement fft_convolve() using FFTOps
+- Implement apply_disorder() with gradient preservation
+- Implement optimize() with gradient-based options
+- Document FFT-based calculations and gradient flow
+
+**Component Interactions:**
+- Input from: PDBToTensor, GridToTensor
+- Uses: scatter_torch, FFTOps, ComplexTensorOps
+- Output to: TensorToNumpy
+- Gradient flow: Through FFT convolutions and parameter scaling
+
+**References:**
+- **Component Details**: [Architecture: LiquidLikeMotions](./architecture.md#liquidlikemotions)
+- **Implementation Checklist**: [TODOS: LiquidLikeMotions Model Implementation](./TODOS.md#8-liquidlikemotions-model-implementation-models_torchpy)
+- **Critical Differentiability**: [Architecture: FFT Operations Critical Point](./architecture.md#critical-differentiability-points)
+- **Numerical Stability**: [Architecture: Numerical Stability](./architecture.md#implementation-guidelines)
+
+#### Task 4.4: Implement RigidBodyRotations in models_torch.py
+- Implement generate_rotations_around_axis() with gradient support
+- Implement apply_disorder() with proper ensemble handling
+- Document rotational gradient considerations
+- Implement optimize() with gradient-based option
+
+**Component Interactions:**
+- Input from: PDBToTensor, GridToTensor
+- Uses: scatter_torch, ComplexTensorOps
+- Output to: TensorToNumpy
+- Gradient flow: Through rotation generation and application
+
+**References:**
+- **Component Details**: [Architecture: RigidBodyRotations](./architecture.md#rigidbodyrotations)
+- **Implementation Checklist**: [TODOS: RigidBodyRotations Model Implementation](./TODOS.md#9-rigidbodyrotations-model-implementation-models_torchpy)
+- **Device Placement Guidelines**: [Architecture: Device Placement](./architecture.md#implementation-guidelines)
+
+### Phase 5: Integration and Testing (3 weeks)
+
+#### Task 5.1: Implement run_torch.py
+- Create end-to-end simulation script mirroring run_debug.py
+- Add device management and error handling
+- Implement gradient-based parameter optimization examples
+- Document workflow with tensor operations
+
+**Component Interactions:**
+- Inputs: Simulation parameters, PDB files
+- Uses: All PyTorch model implementations
+- Output: Diffuse intensity maps
+- Demonstrates: End-to-end gradient flow
+
+**References:**
+- **Implementation Checklist**: [TODOS: Integration and Testing](./TODOS.md#10-integration-and-testing)
+- **Model Execution Flow**: [Architecture: Model Execution Flow](./architecture.md#5-model-execution-flow)
+- **Error Handling Guidelines**: [Architecture: Error Handling](./architecture.md#implementation-guidelines)
+
+#### Task 5.2: Implement Comprehensive Testing
+- Create component-level tests for all implementations
+- Add gradient validation tests using GradientUtils
+- Implement integration tests across component boundaries
+- Add performance benchmarks comparing NumPy and PyTorch versions
+
+**Component Interactions:**
+- Tests: All component interactions in the architecture
+- Uses: Ground truth data from NumPy implementation
+- Validates: Correctness and gradient computation
+- Ensures: Compatibility across component boundaries
+
+**References:**
+- **Testing Approach**: [Architecture: Testing Flow](./architecture.md#7-testing-flow)
+- **Ground Truth Strategy**: [Architecture: Ground Truth Generation Strategy](./architecture.md#ground-truth-generation-strategy)
+- **Testing Requirements**: [Project Rules: Ground Truth and Testing](./project_rules.md#ground-truth-and-testing)
+
+#### Task 5.3: Optimize Performance
+- Implement memory optimization strategies
+- Add strategic use of torch.no_grad() where appropriate
+- Implement batching with gradient accumulation
+- Add device-specific optimizations (CPU/GPU)
+
+**Component Interactions:**
+- Optimizes: All performance-critical components
+- Focuses on: OnePhonon.apply_disorder(), structure_factors()
+- Balances: Memory usage vs. computation speed
+- Preserves: Gradient flow through all operations
+
+**References:**
+- **Performance Considerations**: [Project Rules: Performance Considerations](./project_rules.md#performance-considerations)
+- **Memory Optimization**: [Architecture: Memory Optimization](./architecture.md#implementation-guidelines)
+- **Batching Approaches**: [Architecture: Batching and Memory Management](./architecture.md#critical-differentiability-points)
+
+## Implementation Priorities
+
+Based on the component interactions diagram and critical differentiability points:
+
+1. **ComplexTensorOps**: Foundation for structure factor calculations
+2. **EigenOps**: Critical for phonon calculations in OnePhonon
+3. **PDBToTensor and GridToTensor**: Needed for proper input representation
+4. **scatter_torch**: Core for all disorder models
+5. **OnePhonon model**: Most complex model with eigendecomposition challenges
+6. **Alternative models**: Built on the foundation of the above components
 
 ## Timeline and Dependencies
 
-- **Phase 1** (1 week): No dependencies, can start immediately
-- **Phase 2** (2 weeks): Depends on Phase 1 for ground truth data
-- **Phase 3** (2 weeks): Depends on Phase 2 for tensor operations
-- **Phase 4** (3 weeks): Depends on Phase 3 for adapter components
-- **Phase 5** (3 weeks): Depends on Phase 4 for core functions
-- **Phase 6** (3 weeks): Depends on Phase 5 for tensor operations and physics implementations
-- **Phase 7** (2 weeks): Depends on all previous phases
+- **Phase 1 (2 weeks)**: Core Utilities - Can start immediately with ground truth data
+- **Phase 2 (2 weeks)**: Adapters - Depends on Phase 1 for tensor operations
+- **Phase 3 (3 weeks)**: Core Functions - Depends on Phases 1-2
+- **Phase 4 (4 weeks)**: Models - Depends on Phases 1-3
+- **Phase 5 (3 weeks)**: Integration - Depends on all previous phases
 
-**Total Timeline: 16 weeks**
+**Total Timeline: 14 weeks**
 
-## Model-Specific Differentiability Requirements
+## Critical Validation Points
 
-### OnePhonon Model
-- Matrix operations (`_build_A`, `_build_M`) must preserve gradients
-- Eigendecomposition in `compute_gnm_phonons` requires special handling for differentiability
-- Covariance matrix calculation must maintain the computational graph
-- Complex number operations in structure factors must preserve gradients
+Throughout all phases, we need to validate:
 
-### LiquidLikeMotions Model
-- FFT convolution must be implemented with gradient preservation
-- Kernel operations need to maintain the computational graph
-- Complex exponential operations must preserve gradients
+1. **Output Correctness**: PyTorch results match NumPy ground truth
+2. **Gradient Correctness**: Analytical gradients match numerical approximations
+3. **Memory Efficiency**: Implementation scales to realistic problem sizes
+4. **Numerical Stability**: Results are stable across parameter ranges
+5. **Device Compatibility**: Implementation works correctly on both CPU and GPU
 
-### RigidBodyTranslations Model
-- Debye-Waller factor calculations must be differentiable
-- Wilson parameter scaling must preserve gradients
+## Implementation Sequence
 
-### RigidBodyRotations Model
-- Rotation matrix generation must be differentiable
-- Ensemble averaging must preserve gradients when needed
-
-## Documentation Requirements
-
-Throughout all phases:
-- Document all architectural decisions with focus on differentiability
-- Include mathematical explanations of gradient flow through complex operations
-- Document shape information and gradient handling in all operations
-- Explain model-specific differentiability considerations
-- Provide examples of gradient calculation and propagation
-
-## Device Management Strategy
-
-- All PyTorch implementations should support explicit device placement
-- Default to CUDA if available, CPU otherwise
-- Implement device context managers for consistent device handling
-- Document device placement strategies in all components
-- Ensure consistent device handling across model components
-
-## Testing Strategy
-
-- Use ground truth data generated in Phase 1 for all component tests
-- Implement tests for each component using `torch_testing.py`
-- Add gradient validation tests for all differentiable operations
-- Create end-to-end tests that verify gradient flow
-- Document testing methodology and tolerance settings
+```mermaid
+gantt
+    title PyTorch Port Implementation Schedule
+    dateFormat  YYYY-MM-DD
+    section Phase 1
+    Core Utilities (2 weeks)            :a1, 2025-03-03, 14d
+    section Phase 2
+    Adapters (2 weeks)                  :a2, after a1, 14d
+    section Phase 3
+    Core Functions (3 weeks)            :a3, after a2, 21d
+    section Phase 4
+    Models (4 weeks)                    :a4, after a3, 28d
+    section Phase 5
+    Integration (3 weeks)               :a5, after a4, 21d
+```
