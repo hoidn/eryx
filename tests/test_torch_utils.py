@@ -144,10 +144,21 @@ class TestComplexTensorOps(unittest.TestCase):
         self.assertIsNotNone(b_imag.grad)
         
         # Check gradient values
+        # For complex multiplication (a_real + i*a_imag) * (b_real + i*b_imag):
+        # real = a_real*b_real - a_imag*b_imag
+        # imag = a_real*b_imag + a_imag*b_real
+        # 
+        # Gradients:
+        # ∂real/∂a_real = b_real, ∂real/∂a_imag = -b_imag
+        # ∂real/∂b_real = a_real, ∂real/∂b_imag = -a_imag
+        # ∂imag/∂a_real = b_imag, ∂imag/∂a_imag = b_real
+        # ∂imag/∂b_real = a_imag, ∂imag/∂b_imag = a_real
+        #
+        # Since we're computing loss = real + imag, the gradients are:
         self.assertAlmostEqual(a_real.grad.item(), b_real.item() + b_imag.item(), places=6)
-        self.assertAlmostEqual(a_imag.grad.item(), -b_real.item() + b_imag.item(), places=6)
-        self.assertAlmostEqual(b_real.grad.item(), a_real.item() - a_imag.item(), places=6)
-        self.assertAlmostEqual(b_imag.grad.item(), a_imag.item() + a_real.item(), places=6)
+        self.assertAlmostEqual(a_imag.grad.item(), -b_imag.item() + b_real.item(), places=6)
+        self.assertAlmostEqual(b_real.grad.item(), a_real.item() + a_imag.item(), places=6)
+        self.assertAlmostEqual(b_imag.grad.item(), -a_imag.item() + a_real.item(), places=6)
     
     def test_complex_abs_squared(self):
         """Test complex absolute value squared function."""
@@ -572,6 +583,9 @@ class TestEigenOps(unittest.TestCase):
             [1.0, 3.0]
         ], device=self.device, requires_grad=True)
         b = torch.tensor([5.0, 8.0], device=self.device, requires_grad=True).unsqueeze(-1)
+        
+        # Ensure b is a leaf tensor
+        b = b.detach().requires_grad_(True)
         
         x = EigenOps.solve_linear_system(A, b)
         loss = x.sum()
