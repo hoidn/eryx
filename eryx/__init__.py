@@ -32,6 +32,11 @@ try:
     # Import adapters for convenience
     from eryx.adapters import PDBToTensor, GridToTensor, TensorToNumpy, ModelAdapters
     
+    # Import utility classes from torch_utils.py
+    from eryx.torch_utils import ComplexTensorOps
+    from eryx.torch_utils import EigenOps
+    from eryx.torch_utils import GradientUtils
+    
 except ImportError:
     HAS_TORCH = False
 
