@@ -1,49 +1,109 @@
 {
   "models.py": {
     "class OnePhonon": {
-      "__init__": "Constructor that initializes the OnePhonon model with PDB path, sampling parameters, and GNM parameters. Must convert all core data structures to PyTorch tensors for differentiation.",
-      "_setup": "Core setup function that initializes reciprocal space grid, resolution mask, and sets up the crystal object. Initializes tensors for computations.",
-      "_setup_phonons": "Sets up phonon calculations: initializes k-vector grid, dynamical matrices, and eigenvalue arrays as tensors.",
-      "_build_A": "Builds the displacement projection matrix (A matrix) that projects rigid-body displacements to individual atomic displacements.",
-      "_build_M": "Builds the mass matrix for the normal mode analysis, projects the all-atom mass matrix using the A matrix.",
-      "_build_M_allatoms": "Creates the atomic mass matrix from element weights. This is diagonal with atomic masses.",
-      "_project_M": "Projects the all-atom mass matrix to rigid-body degrees of freedom using A matrix projections.",
-      "_build_kvec_Brillouin": "Computes all k-vectors and their norms in the first Brillouin zone by regularly sampling reciprocal space.",
-      "_center_kvec": "Helper function for k-vector centering within Brillouin zone. Applies periodic boundary conditions.",
-      "_at_kvec_from_miller_points": "Maps Miller indices to reciprocal space indices. Used to find indices of all q-vectors that are k-vector away from Miller indices.",
-      "compute_gnm_phonons": "Computes phonon modes from the Gaussian Network Model (GNM) at each k-vector in the Brillouin zone.",
-      "compute_hessian": "Builds the Hessian matrix for the elastic network model of the crystal, capturing interatomic force constants.",
-      "compute_covariance_matrix": "Computes the covariance matrix for atomic displacements, using the GNM Hessian and scaling to match experimental ADPs.",
-      "apply_disorder": "Main computation function that produces diffuse intensity by applying the one-phonon approximation to the structure factors."
+      "__init__": "run_np() → OnePhonon.__init__()",
+      "_setup": "run_np() → OnePhonon.__init__() → self._setup()",
+      "_setup_phonons": "run_np() → OnePhonon.__init__() → self._setup_phonons()",
+      "_build_A": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._build_A()",
+      "_build_M": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._build_M()",
+      "_build_M_allatoms": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._build_M() → self._build_M_allatoms()",
+      "_project_M": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._build_M() → self._project_M()",
+      "_build_kvec_Brillouin": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._build_kvec_Brillouin()",
+      "_center_kvec": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._build_kvec_Brillouin() → self._center_kvec()",
+      "_at_kvec_from_miller_points": "run_np() → onephonon_np.apply_disorder() → self._at_kvec_from_miller_points()",
+      "compute_gnm_phonons": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_gnm_phonons()",
+      "compute_hessian": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_gnm_phonons() → self.compute_hessian()",
+      "compute_covariance_matrix": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_covariance_matrix()",
+      "apply_disorder": "run_np() → onephonon_np.apply_disorder()"
     }
   },
   "scatter.py": {
-    "compute_form_factors": "Evaluates atomic form factors at given q-vectors using the parameterized form factor coefficients.",
-    "structure_factors_batch": "Computes structure factors for a batch of q-vectors, including atomic form factors, phase factors, and thermal displacement factors.",
-    "structure_factors": "Wrapper that breaks calculation into batches and optionally parallelizes the computation of structure factors."
+    "compute_form_factors": "run_np() → onephonon_np.apply_disorder() → structure_factors() → structure_factors_batch() → compute_form_factors()",
+    "structure_factors_batch": "run_np() → onephonon_np.apply_disorder() → structure_factors() → structure_factors_batch()",
+    "structure_factors": "run_np() → onephonon_np.apply_disorder() → structure_factors()"
   },
   "pdb.py": {
     "class GaussianNetworkModel": {
-      "__init__": "Constructor for GNM that sets up atomic interactions with spring constants.",
-      "_setup_atomic_model": "Builds unit cell and nearest neighbors while storing dimensions needed for computation.",
-      "_setup_gaussian_network_model": "Builds interaction pair lists and spring constants for the elastic network.",
-      "build_gamma": "Creates tensor of spring constants between atom pairs, with different values for intra-ASU vs. inter-ASU interactions.",
-      "build_neighbor_list": "Uses spatial tree search to identify atom pairs within cutoff distance for elastic interactions.",
-      "compute_hessian": "Builds the Hessian matrix from interaction pairs and spring constants, encoding force relationships.",
-      "compute_K": "Computes the dynamical matrix for a given k-vector by summing Hessian blocks with phase factors.",
-      "compute_Kinv": "Computes the inverse of the dynamical matrix, which relates to atomic displacement correlations."
+      "__init__": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._setup_gnm() → GaussianNetworkModel.__init__()",
+      "_setup_atomic_model": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._setup_gnm() → GaussianNetworkModel.__init__() → self._setup_atomic_model()",
+      "_setup_gaussian_network_model": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._setup_gnm() → GaussianNetworkModel.__init__() → self._setup_gaussian_network_model()",
+      "build_gamma": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._setup_gnm() → GaussianNetworkModel.__init__() → self._setup_gaussian_network_model() → self.build_gamma()",
+      "build_neighbor_list": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._setup_gnm() → GaussianNetworkModel.__init__() → self._setup_gaussian_network_model() → self.build_neighbor_list()",
+      "compute_hessian": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_gnm_phonons() → gnm.compute_hessian()",
+      "compute_K": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_gnm_phonons() → gnm.compute_K()",
+      "compute_Kinv": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_covariance_matrix() → gnm.compute_Kinv()"
     },
     "class AtomicModel": {
-      "_get_xyz_asus": "Transforms atomic coordinates using symmetry operations to generate all asymmetric units in the unit cell.",
-      "flatten_model": "Reshapes multi-dimensional tensor arrays to simplify computations."
+      "_get_xyz_asus": "run_np() → OnePhonon.__init__() → self._setup() → AtomicModel.__init__() → self.extract_frame() → self._extract_xyz() → self._get_xyz_asus()",
+      "flatten_model": "run_np() → OnePhonon.__init__() → self._setup() → model.flatten_model()"
     },
     "class Crystal": {
-      "get_asu_xyz": "Returns atomic coordinates for a specific asymmetric unit in a specified unit cell, used in diffuse scattering calculations."
+      "get_asu_xyz": "run_np() → onephonon_np.apply_disorder() → used indirectly via various components"
+    },
+    "sym_str_as_matrix": "run_np() → OnePhonon.__init__() → self._setup() → AtomicModel.__init__() → self._get_sym_ops() → called from extract_sym_ops()"
+  },
+  "map_utils.py": {
+    "generate_grid": "run_np() → OnePhonon.__init__() → self._setup() → generate_grid()",
+    "get_symmetry_equivalents": "run_np() → OnePhonon.__init__() → self._setup() → used indirectly through map calculations",
+    "get_ravel_indices": "run_np() → OnePhonon.__init__() → self._setup() → used indirectly through map calculations",
+    "compute_resolution": "run_np() → OnePhonon.__init__() → self._setup() → get_resolution_mask() → compute_resolution()",
+    "get_resolution_mask": "run_np() → OnePhonon.__init__() → self._setup() → get_resolution_mask()"
+  },
+  "adapter_components": {
+    "PDBToTensor": "Will be needed to bridge AtomicModel data to PyTorch tensors in run_torch()",
+    "NPGridToTensor": "Will be needed to convert NumPy grids to PyTorch tensors in run_torch()",
+    "TensorToCrystal": "Will be needed to interface PyTorch results with Crystal model in run_torch()",
+    "TensorToMap": "Will be needed to convert PyTorch tensor outputs to NumPy arrays in run_torch()"
+  }
+}
+
+{
+  "models.py": {
+    "class onephonon": {
+      "__init__": "constructor that initializes the onephonon model with pdb path, sampling parameters, and gnm parameters. must convert all core data structures to pytorch tensors for differentiation.",
+      "_setup": "core setup function that initializes reciprocal space grid, resolution mask, and sets up the crystal object. initializes tensors for computations.",
+      "_setup_phonons": "sets up phonon calculations: initializes k-vector grid, dynamical matrices, and eigenvalue arrays as tensors.",
+      "_build_a": "builds the displacement projection matrix (a matrix) that projects rigid-body displacements to individual atomic displacements.",
+      "_build_m": "builds the mass matrix for the normal mode analysis, projects the all-atom mass matrix using the a matrix.",
+      "_build_m_allatoms": "creates the atomic mass matrix from element weights. this is diagonal with atomic masses.",
+      "_project_m": "projects the all-atom mass matrix to rigid-body degrees of freedom using a matrix projections.",
+      "_build_kvec_brillouin": "computes all k-vectors and their norms in the first brillouin zone by regularly sampling reciprocal space.",
+      "_center_kvec": "helper function for k-vector centering within brillouin zone. applies periodic boundary conditions.",
+      "_at_kvec_from_miller_points": "maps miller indices to reciprocal space indices. used to find indices of all q-vectors that are k-vector away from miller indices.",
+      "compute_gnm_phonons": "computes phonon modes from the gaussian network model (gnm) at each k-vector in the brillouin zone.",
+      "compute_hessian": "builds the hessian matrix for the elastic network model of the crystal, capturing interatomic force constants.",
+      "compute_covariance_matrix": "computes the covariance matrix for atomic displacements, using the gnm hessian and scaling to match experimental adps.",
+      "apply_disorder": "main computation function that produces diffuse intensity by applying the one-phonon approximation to the structure factors."
+    }
+  },
+  "scatter.py": {
+    "compute_form_factors": "evaluates atomic form factors at given q-vectors using the parameterized form factor coefficients.",
+    "structure_factors_batch": "computes structure factors for a batch of q-vectors, including atomic form factors, phase factors, and thermal displacement factors.",
+    "structure_factors": "wrapper that breaks calculation into batches and optionally parallelizes the computation of structure factors."
+  },
+  "pdb.py": {
+    "class gaussiannetworkmodel": {
+      "__init__": "constructor for gnm that sets up atomic interactions with spring constants.",
+      "_setup_atomic_model": "builds unit cell and nearest neighbors while storing dimensions needed for computation.",
+      "_setup_gaussian_network_model": "builds interaction pair lists and spring constants for the elastic network.",
+      "build_gamma": "creates tensor of spring constants between atom pairs, with different values for intra-asu vs. inter-asu interactions.",
+      "build_neighbor_list": "uses spatial tree search to identify atom pairs within cutoff distance for elastic interactions.",
+      "compute_hessian": "builds the hessian matrix from interaction pairs and spring constants, encoding force relationships.",
+      "compute_k": "computes the dynamical matrix for a given k-vector by summing hessian blocks with phase factors.",
+      "compute_kinv": "computes the inverse of the dynamical matrix, which relates to atomic displacement correlations."
+    },
+    "class atomicmodel": {
+      "_get_xyz_asus": "transforms atomic coordinates using symmetry operations to generate all asymmetric units in the unit cell.",
+      "flatten_model": "reshapes multi-dimensional tensor arrays to simplify computations."
+    },
+    "class crystal": {
+      "get_asu_xyz": "returns atomic coordinates for a specific asymmetric unit in a specified unit cell, used in diffuse scattering calculations."
     }
   },
   "map_utils.py": {
-    "generate_grid": "Creates a grid of q-vectors (or hkl indices) based on desired extents and spacing in reciprocal space.",
-    "get_resolution_mask": "Creates boolean mask indicating which grid points are within resolution limits.",
-    "compute_resolution": "Calculates the resolution in Angstroms for given Miller indices based on unit cell parameters."
+    "generate_grid": "creates a grid of q-vectors (or hkl indices) based on desired extents and spacing in reciprocal space.",
+    "get_resolution_mask": "creates boolean mask indicating which grid points are within resolution limits.",
+    "compute_resolution": "calculates the resolution in angstroms for given miller indices based on unit cell parameters."
   }
 }
+
