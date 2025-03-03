@@ -2,23 +2,23 @@
 
 ## Component-to-Function Mapping
 
-This table explicitly maps architectural components to functions specified in `to_convert.json`:
+This table explicitly maps architectural components to functions specified in `to_convert.json` with their execution paths documented in `call_chains.json`:
 
-| Component | Functions | Source File | Implementation Phase |
-|-----------|-----------|-------------|---------------------|
-| **ComplexTensorOps** | N/A (utility) | N/A | Phase 1 |
-| **EigenOps** | N/A (utility) | N/A | Phase 1 |
-| **GradientUtils** | N/A (utility) | N/A | Phase 1 |
-| **map_utils_torch** | generate_grid | map_utils.py | Phase 3 |
-| **map_utils_torch** | compute_resolution | map_utils.py | Phase 3 |
-| **map_utils_torch** | get_resolution_mask | map_utils.py | Phase 3 |
-| **scatter_torch** | compute_form_factors | scatter.py | Phase 3 |
-| **scatter_torch** | structure_factors_batch | scatter.py | Phase 3 |
-| **scatter_torch** | structure_factors | scatter.py | Phase 3 |
-| **OnePhonon** | All OnePhonon methods | models.py | Phase 4 |
-| **GaussianNetworkModel (partial)** | compute_hessian, compute_K, compute_Kinv | pdb.py | Phase 4 |
-| **Adapters for AtomicModel** | _get_xyz_asus, flatten_model | pdb.py | Phase 2 |
-| **Adapters for Crystal** | get_asu_xyz | pdb.py | Phase 2 |
+| Component | Functions | Source File | Implementation Phase | Call Path |
+|-----------|-----------|-------------|---------------------|-----------|
+| **ComplexTensorOps** | N/A (utility) | N/A | Phase 1 | N/A |
+| **EigenOps** | N/A (utility) | N/A | Phase 1 | N/A |
+| **GradientUtils** | N/A (utility) | N/A | Phase 1 | N/A |
+| **map_utils_torch** | generate_grid | map_utils.py | Phase 3 | run_np() → OnePhonon.__init__() → self._setup() → generate_grid() |
+| **map_utils_torch** | compute_resolution | map_utils.py | Phase 3 | run_np() → OnePhonon.__init__() → self._setup() → get_resolution_mask() → compute_resolution() |
+| **map_utils_torch** | get_resolution_mask | map_utils.py | Phase 3 | run_np() → OnePhonon.__init__() → self._setup() → get_resolution_mask() |
+| **scatter_torch** | compute_form_factors | scatter.py | Phase 3 | run_np() → onephonon_np.apply_disorder() → structure_factors() → structure_factors_batch() → compute_form_factors() |
+| **scatter_torch** | structure_factors_batch | scatter.py | Phase 3 | run_np() → onephonon_np.apply_disorder() → structure_factors() → structure_factors_batch() |
+| **scatter_torch** | structure_factors | scatter.py | Phase 3 | run_np() → onephonon_np.apply_disorder() → structure_factors() |
+| **OnePhonon** | All OnePhonon methods | models.py | Phase 4 | Various paths as detailed in call_chains.json |
+| **GaussianNetworkModel (partial)** | compute_hessian, compute_K, compute_Kinv | pdb.py | Phase 4 | Various paths as detailed in call_chains.json |
+| **Adapters for AtomicModel** | _get_xyz_asus, flatten_model | pdb.py | Phase 2 | run_np() → OnePhonon.__init__() → self._setup() → Various paths |
+| **Adapters for Crystal** | get_asu_xyz | pdb.py | Phase 2 | run_np() → onephonon_np.apply_disorder() → Various indirect paths |
 
 ## Component Interaction Diagram
 
@@ -100,6 +100,9 @@ graph TD
         GradUtils --> GradTest
         GradTest --> GradResult[Gradient Validation]
     end
+
+    %% Call Chain Flows
+    CallChains[call_chains.json] -.-> |Documents execution paths| TorchModel
 ```
 
 ## Component Descriptions
@@ -140,7 +143,7 @@ graph TD
   - `gradient_norm(gradient)`: Computes L2 norm of gradients
 - **Used By**: Testing framework for validating gradients
 
-### Adapter Components (`adapters.py`) - Phase 2
+## Adapter Components (`adapters.py`) - Phase 2
 
 #### PDBToTensor
 - **Purpose**: Converts AtomicModel and related data to PyTorch tensors
@@ -153,6 +156,9 @@ graph TD
   - Handles AtomicModel._get_xyz_asus
   - Handles AtomicModel.flatten_model
   - Handles Crystal.get_asu_xyz
+- **Call Paths**:
+  - Used in execution path from run_np() → OnePhonon.__init__() → self._setup()
+- **Note**: Sometimes alternatively referred to as `PDBToTensor` (same name)
 
 #### GridToTensor
 - **Purpose**: Converts grid data and related structures to PyTorch tensors
@@ -163,6 +169,9 @@ graph TD
 - **Tensor Shapes**:
   - `convert_grid`: Input (N,3) → Output (N,3)
   - `convert_mask`: Input (N,) → Output (N,)
+- **Call Paths**:
+  - Used in execution path from run_np() → OnePhonon.__init__() → self._setup()
+- **Note**: Sometimes alternatively referred to as `NPGridToTensor`
 
 #### TensorToNumpy
 - **Purpose**: Converts PyTorch tensors back to NumPy arrays
@@ -174,6 +183,15 @@ graph TD
   - Detach tensors from computational graph
   - Move tensors to CPU
   - Convert to NumPy arrays
+- **Call Paths**:
+  - Used after run_np() → onephonon_np.apply_disorder() to convert results
+- **Note**: Sometimes alternatively referred to as `TensorToMap`
+
+#### ModelAdapters
+- **Purpose**: Adapts between model representations
+- **Key Methods**:
+  - Various adapter methods for different model types
+- **Note**: Some functionality may overlap with an alternatively named `TensorToCrystal` adapter
 
 ### Physics Calculations - Phase 3
 
@@ -188,6 +206,9 @@ graph TD
   - `generate_grid`: Input (3,3), tuples → Output (N,3), tuple
   - `compute_resolution`: Input (6,), (N,3) → Output (N,)
   - `get_resolution_mask`: Input (6,), (N,3), float → Output (N,), (N,)
+- **Call Paths**:
+  - run_np() → OnePhonon.__init__() → self._setup() → generate_grid()
+  - run_np() → OnePhonon.__init__() → self._setup() → get_resolution_mask() → compute_resolution()
 
 #### scatter_torch (`scatter_torch.py`)
 - **Purpose**: Provides structure factor calculations
@@ -200,6 +221,10 @@ graph TD
   - `compute_form_factors`: Input (N,3), (M,4), (M,4), (M,) → Output (N,M)
   - `structure_factors_batch`: Input (N,3), (M,3), (M,4), (M,4), (M,) → Output (N,)
   - `structure_factors`: Input (N,3), (M,3), (M,4), (M,4), (M,) → Output (N,)
+- **Call Paths**:
+  - run_np() → onephonon_np.apply_disorder() → structure_factors() → structure_factors_batch() → compute_form_factors()
+  - run_np() → onephonon_np.apply_disorder() → structure_factors() → structure_factors_batch()
+  - run_np() → onephonon_np.apply_disorder() → structure_factors()
 
 ### OnePhonon Model (`models_torch.py`) - Phase 4
 
@@ -217,6 +242,9 @@ graph TD
   - `apply_disorder`: Input parameters → Output (N,)
   - `compute_gnm_phonons`: No explicit input → Modifies self.V and self.Winv
   - `compute_covariance_matrix`: No explicit input → Modifies self.covar
+- **Call Paths**:
+  - run_np() → OnePhonon.__init__() → Multiple execution paths documented in call_chains.json
+  - run_np() → onephonon_np.apply_disorder()
 
 #### GaussianNetworkModel Methods
 - **Purpose**: Provides elastic network model functionality
@@ -229,6 +257,10 @@ graph TD
   - These methods will be implemented within OnePhonon class, not as a separate class
   - They will use tensor operations for differentiability
   - Non-differentiable parts like building neighbor lists remain in NumPy
+- **Call Paths**:
+  - run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_gnm_phonons() → gnm.compute_hessian()
+  - run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_gnm_phonons() → gnm.compute_K()
+  - run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_covariance_matrix() → gnm.compute_Kinv()
 
 ## Device Management Strategy
 

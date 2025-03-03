@@ -3,7 +3,7 @@
 ## 1. Call Structure Analysis and System Boundaries
 
 ### Core Call Sequence
-The simulation follows this primary call structure:
+The simulation follows this primary call structure as documented in `call_chains.json`:
 
 1. **`run_np()`** in `run_debug.py`
    - Sets up logging, parameters
@@ -160,5 +160,3 @@ eryx/
     ├── test_integration.py     # NEW: End-to-end integration tests
     └── test_gradients.py       # NEW: Tests for gradient calculation
 ```
-
-https://claude.ai/chat/28eae72e-1cd0-42d2-8012-06a2f1075e02

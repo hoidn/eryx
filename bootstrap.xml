@@ -12,30 +12,36 @@
                 <description>Definitive list of components that need to be ported to PyTorch.</description>
                 <relationship type="defines-scope-for" target="plan.md,phased_plan.md,architecture.md,specs/spec1.md"/>
             </document>
+            
+            <document id="call_chains.json" type="reference">
+                <description>Execution paths for components showing runtime dependencies and call chains.</description>
+                <relationship type="supplements" target="to_convert.json"/>
+                <relationship type="informs" target="architecture.md,phased_plan.md"/>
+            </document>
 
             <document id="plan.md" type="high-level">
                 <description>High-level overview of the implementation plan, system boundaries, and architecture.</description>
-                <relationship type="references" target="to_convert.json,architecture.md,phased_plan.md"/>
+                <relationship type="references" target="to_convert.json,architecture.md,phased_plan.md,call_chains.json"/>
                 <relationship type="informs" target="specs/spec1.md"/>
             </document>
 
             <document id="phased_plan.md" type="implementation-timeline">
                 <description>Detailed phase-by-phase implementation plan with tasks, dependencies, and timelines.</description>
-                <relationship type="references" target="to_convert.json,plan.md,architecture.md"/>
+                <relationship type="references" target="to_convert.json,plan.md,architecture.md,call_chains.json"/>
                 <relationship type="details" target="plan.md"/>
                 <relationship type="informs" target="progress.md"/>
             </document>
 
             <document id="architecture.md" type="technical-details">
                 <description>Detailed component descriptions, interactions, and implementation guidelines.</description>
-                <relationship type="references" target="to_convert.json"/>
+                <relationship type="references" target="to_convert.json,call_chains.json"/>
                 <relationship type="details" target="plan.md"/>
                 <relationship type="guides" target="phased_plan.md"/>
             </document>
 
             <document id="specs/spec1.md" type="detailed-specification">
                 <description>Implementation specifications with low-level task details.</description>
-                <relationship type="references" target="to_convert.json,plan.md,phased_plan.md,architecture.md"/>
+                <relationship type="references" target="to_convert.json,plan.md,phased_plan.md,architecture.md,call_chains.json"/>
                 <relationship type="details" target="phased_plan.md"/>
             </document>
 
@@ -69,34 +75,38 @@
                 <purpose>Understand the exact scope of components to be ported</purpose>
             </step>
             <step order="2">
+                <document>call_chains.json</document>
+                <purpose>Understand execution paths and runtime dependencies</purpose>
+            </step>
+            <step order="3">
                 <document>project_rules.md</document>
                 <purpose>Understand the architectural constraints and conventions</purpose>
             </step>
-            <step order="3">
+            <step order="4">
                 <document>plan.md</document>
                 <purpose>Get a high-level overview of the implementation plan and system boundaries</purpose>
             </step>
-            <step order="4">
+            <step order="5">
                 <document>architecture.md</document>
                 <purpose>Understand component interactions and implementation details</purpose>
             </step>
-            <step order="5">
+            <step order="6">
                 <document>phased_plan.md</document>
                 <purpose>Review the detailed implementation plan with phases and tasks</purpose>
             </step>
-            <step order="6">
+            <step order="7">
                 <document>specs/spec1.md</document>
                 <purpose>Review the detailed implementation specifications</purpose>
             </step>
-            <step order="7">
+            <step order="8">
                 <document>progress.md</document>
                 <purpose>Check the current implementation status</purpose>
             </step>
-            <step order="8">
+            <step order="9">
                 <document>eryx/</document>
                 <purpose>Examine relevant source files to understand implementation details</purpose>
             </step>
-            <step order="9">
+            <step order="10">
                 <document>eryx/,progress.md</document>
                 <purpose>Verify implementation state is consistent with documentation</purpose>
             </step>
@@ -131,14 +141,15 @@
             <instruction>
                 1. Review the documents in the order specified in the review-process section.
                 2. Pay special attention to the definitive scope in to_convert.json.
-                3. Understand the system boundaries between NumPy and PyTorch parts in plan.md.
-                4. Study the component interactions in architecture.md.
-                5. Review the phased implementation plan in phased_plan.md.
-                6. Check the current implementation status in progress.md.
-                7. For implementation tasks, refer to the detailed specifications in specs/spec1.md.
-                8. When reviewing code, first check the original implementation, then the PyTorch stubs.
-                9. Note that ground truth data is available in logs/ directory but not directly accessible in the provided files.
-                10. Compare implementation state in source files with documentation (particularly progress.md) to ensure consistency.
+                3. Understand the execution paths and runtime dependencies in call_chains.json.
+                4. Understand the system boundaries between NumPy and PyTorch parts in plan.md.
+                5. Study the component interactions in architecture.md.
+                6. Review the phased implementation plan in phased_plan.md.
+                7. Check the current implementation status in progress.md.
+                8. For implementation tasks, refer to the detailed specifications in specs/spec1.md.
+                9. When reviewing code, first check the original implementation, then the PyTorch stubs.
+                10. Note that ground truth data is available in logs/ directory but not directly accessible in the provided files.
+                11. Compare implementation state in source files with documentation (particularly progress.md) to ensure consistency.
             </instruction>
         </bootstrap-instructions>
     </boot>
@@ -235,50 +246,63 @@
 
             <!-- Scenario 3: Scope Changes -->
             <scenario id="scope-change">
-                <condition>Changes to the components that need to be ported (to_convert.json)</condition>
+                <condition>Changes to the components that need to be ported (to_convert.json) or new reference documents</condition>
                 <process>
                     <step order="1">
-                        <action>Update to_convert.json with new scope</action>
+                        <action>Update to_convert.json with new scope or add new reference documents</action>
                         <details>
                             - Add or remove functions as needed
                             - Ensure the format is consistent
+                            - For new reference documents like call_chains.json, ensure proper structure
                         </details>
                     </step>
                     <step order="2">
+                        <action>Update bootstrap.xml document relationships</action>
+                        <details>
+                            - Add new documents to document-relationships section
+                            - Define relationships with other documents
+                            - Update review-process section if needed
+                        </details>
+                    </step>
+                    <step order="3">
                         <action>Update plan.md</action>
                         <details>
                             - Update the Function Mapping Table
                             - Adjust system boundaries if needed
                             - Update call structure analysis if new components are added
+                            - Add references to new documents
                         </details>
                     </step>
-                    <step order="3">
+                    <step order="4">
                         <action>Update architecture.md</action>
                         <details>
                             - Update the Component-to-Function Mapping table
                             - Modify the component interaction diagram
                             - Add or remove component descriptions
                             - Update data flows
+                            - Reference new documents if relevant to component design
                         </details>
                     </step>
-                    <step order="4">
+                    <step order="5">
                         <action>Update phased_plan.md</action>
                         <details>
                             - Update the Function-to-Task Mapping table
                             - Add or remove implementation tasks
                             - Adjust timeline and dependencies
                             - Update Component-to-Test Mapping
+                            - Reference new documents if relevant to implementation plan
                         </details>
                     </step>
-                    <step order="5">
+                    <step order="6">
                         <action>Update specs/spec1.md</action>
                         <details>
                             - Update the Function-to-Task Mapping
                             - Modify Low-Level Tasks
                             - Update Implementation Validation Strategy
+                            - Reference new documents if relevant to implementation specs
                         </details>
                     </step>
-                    <step order="6">
+                    <step order="7">
                         <action>Update progress.md</action>
                         <details>
                             - Add or remove functions from tracking tables
@@ -299,6 +323,7 @@
                         <details>
                             - Ensure all documents accurately reflect the components in to_convert.json
                             - Check for any mentions of components not in scope
+                            - Verify that new documents like call_chains.json are properly referenced
                         </details>
                     </step>
                     <step order="2">

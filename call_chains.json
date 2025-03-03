@@ -1,0 +1,52 @@
+{
+  "models.py": {
+    "class OnePhonon": {
+      "__init__": "run_np() → OnePhonon.__init__()",
+      "_setup": "run_np() → OnePhonon.__init__() → self._setup()",
+      "_setup_phonons": "run_np() → OnePhonon.__init__() → self._setup_phonons()",
+      "_build_A": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._build_A()",
+      "_build_M": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._build_M()",
+      "_build_M_allatoms": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._build_M() → self._build_M_allatoms()",
+      "_project_M": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._build_M() → self._project_M()",
+      "_build_kvec_Brillouin": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._build_kvec_Brillouin()",
+      "_center_kvec": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._build_kvec_Brillouin() → self._center_kvec()",
+      "_at_kvec_from_miller_points": "run_np() → onephonon_np.apply_disorder() → self._at_kvec_from_miller_points()",
+      "compute_gnm_phonons": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_gnm_phonons()",
+      "compute_hessian": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_gnm_phonons() → self.compute_hessian()",
+      "compute_covariance_matrix": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_covariance_matrix()",
+      "apply_disorder": "run_np() → onephonon_np.apply_disorder()"
+    }
+  },
+  "scatter.py": {
+    "compute_form_factors": "run_np() → onephonon_np.apply_disorder() → structure_factors() → structure_factors_batch() → compute_form_factors()",
+    "structure_factors_batch": "run_np() → onephonon_np.apply_disorder() → structure_factors() → structure_factors_batch()",
+    "structure_factors": "run_np() → onephonon_np.apply_disorder() → structure_factors()"
+  },
+  "pdb.py": {
+    "class GaussianNetworkModel": {
+      "__init__": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._setup_gnm() → GaussianNetworkModel.__init__()",
+      "_setup_atomic_model": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._setup_gnm() → GaussianNetworkModel.__init__() → self._setup_atomic_model()",
+      "_setup_gaussian_network_model": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._setup_gnm() → GaussianNetworkModel.__init__() → self._setup_gaussian_network_model()",
+      "build_gamma": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._setup_gnm() → GaussianNetworkModel.__init__() → self._setup_gaussian_network_model() → self.build_gamma()",
+      "build_neighbor_list": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self._setup_gnm() → GaussianNetworkModel.__init__() → self._setup_gaussian_network_model() → self.build_neighbor_list()",
+      "compute_hessian": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_gnm_phonons() → gnm.compute_hessian()",
+      "compute_K": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_gnm_phonons() → gnm.compute_K()",
+      "compute_Kinv": "run_np() → OnePhonon.__init__() → self._setup_phonons() → self.compute_covariance_matrix() → gnm.compute_Kinv()"
+    },
+    "class AtomicModel": {
+      "_get_xyz_asus": "run_np() → OnePhonon.__init__() → self._setup() → AtomicModel.__init__() → self.extract_frame() → self._extract_xyz() → self._get_xyz_asus()",
+      "flatten_model": "run_np() → OnePhonon.__init__() → self._setup() → model.flatten_model()"
+    },
+    "class Crystal": {
+      "get_asu_xyz": "run_np() → onephonon_np.apply_disorder() → used indirectly via various components"
+    },
+    "sym_str_as_matrix": "run_np() → OnePhonon.__init__() → self._setup() → AtomicModel.__init__() → self._get_sym_ops() → called from extract_sym_ops()"
+  },
+  "map_utils.py": {
+    "generate_grid": "run_np() → OnePhonon.__init__() → self._setup() → generate_grid()",
+    "get_symmetry_equivalents": "run_np() → OnePhonon.__init__() → self._setup() → used indirectly through map calculations",
+    "get_ravel_indices": "run_np() → OnePhonon.__init__() → self._setup() → used indirectly through map calculations",
+    "compute_resolution": "run_np() → OnePhonon.__init__() → self._setup() → get_resolution_mask() → compute_resolution()",
+    "get_resolution_mask": "run_np() → OnePhonon.__init__() → self._setup() → get_resolution_mask()"
+  }
+}
