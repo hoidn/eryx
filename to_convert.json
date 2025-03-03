@@ -1,96 +1,49 @@
 {
   "models.py": {
     "class OnePhonon": {
-      "__init__": "Main constructor, needs to initialize PyTorch tensors",
-      "_setup": "Core setup that initializes tensor structures",
-      "_setup_phonons": "Sets up phonon calculations with tensors",
-      "_build_A": "Builds displacement projection matrix using tensor operations",
-      "_build_M": "Builds mass matrix using tensor operations",
-      "_build_M_allatoms": "Creates atomic mass matrix",
-      "_project_M": "Projects all-atom mass matrix",
-      "_build_kvec_Brillouin": "Computes k-vectors in Brillouin zone",
-      "_center_kvec": "Helper function for k-vector centering",
-      "_at_kvec_from_miller_points": "Maps Miller indices to reciprocal space",
-      "compute_gnm_phonons": "Core physics for phonon calculations",
-      "compute_hessian": "Builds the Hessian matrix for elastic network",
-      "compute_covariance_matrix": "Computes atomic displacement covariances",
-      "apply_disorder": "Main computation that produces diffuse intensity"
-    },
-    "class RigidBodyTranslations": {
-      "__init__": "Initializes tensor structures",
-      "_setup": "Core setup for tensor operations",
-      "apply_disorder": "Main computation applying disorder to molecular transform",
-      "optimize": "Optimization routine (if used in training)"
-    },
-    "class LiquidLikeMotions": {
-      "__init__": "Initializes tensor structures",
-      "_setup": "Core tensor setup",
-      "fft_convolve": "FFT convolution operation",
-      "apply_disorder": "Applies liquid-like disorder model",
-      "optimize": "Optimization routine (if used in training)"
-    },
-    "class RigidBodyRotations": {
-      "__init__": "Initializes tensor structures",
-      "_setup": "Core tensor setup",
-      "generate_rotations_around_axis": "Generates rotation matrices",
-      "apply_disorder": "Applies rotational disorder model",
-      "optimize": "Optimization routine (if used in training)"
+      "__init__": "Constructor that initializes the OnePhonon model with PDB path, sampling parameters, and GNM parameters. Must convert all core data structures to PyTorch tensors for differentiation.",
+      "_setup": "Core setup function that initializes reciprocal space grid, resolution mask, and sets up the crystal object. Initializes tensors for computations.",
+      "_setup_phonons": "Sets up phonon calculations: initializes k-vector grid, dynamical matrices, and eigenvalue arrays as tensors.",
+      "_build_A": "Builds the displacement projection matrix (A matrix) that projects rigid-body displacements to individual atomic displacements.",
+      "_build_M": "Builds the mass matrix for the normal mode analysis, projects the all-atom mass matrix using the A matrix.",
+      "_build_M_allatoms": "Creates the atomic mass matrix from element weights. This is diagonal with atomic masses.",
+      "_project_M": "Projects the all-atom mass matrix to rigid-body degrees of freedom using A matrix projections.",
+      "_build_kvec_Brillouin": "Computes all k-vectors and their norms in the first Brillouin zone by regularly sampling reciprocal space.",
+      "_center_kvec": "Helper function for k-vector centering within Brillouin zone. Applies periodic boundary conditions.",
+      "_at_kvec_from_miller_points": "Maps Miller indices to reciprocal space indices. Used to find indices of all q-vectors that are k-vector away from Miller indices.",
+      "compute_gnm_phonons": "Computes phonon modes from the Gaussian Network Model (GNM) at each k-vector in the Brillouin zone.",
+      "compute_hessian": "Builds the Hessian matrix for the elastic network model of the crystal, capturing interatomic force constants.",
+      "compute_covariance_matrix": "Computes the covariance matrix for atomic displacements, using the GNM Hessian and scaling to match experimental ADPs.",
+      "apply_disorder": "Main computation function that produces diffuse intensity by applying the one-phonon approximation to the structure factors."
     }
   },
   "scatter.py": {
-    "compute_form_factors": "Calculates atomic form factors",
-    "structure_factors_batch": "Core physics for structure factor calculation",
-    "structure_factors": "Wrapper for structure factor calculation"
+    "compute_form_factors": "Evaluates atomic form factors at given q-vectors using the parameterized form factor coefficients.",
+    "structure_factors_batch": "Computes structure factors for a batch of q-vectors, including atomic form factors, phase factors, and thermal displacement factors.",
+    "structure_factors": "Wrapper that breaks calculation into batches and optionally parallelizes the computation of structure factors."
   },
   "pdb.py": {
     "class GaussianNetworkModel": {
-      "__init__": "Initializes network model",
-      "_setup_atomic_model": "Setup for atomic model",
-      "_setup_gaussian_network_model": "Core setup for GNM",
-      "build_gamma": "Builds spring constant matrix",
-      "build_neighbor_list": "Builds spatial relationship data",
-      "compute_hessian": "Core physics calculation",
-      "compute_K": "Computes dynamical matrix at k-vector",
-      "compute_Kinv": "Computes inverse dynamical matrix"
+      "__init__": "Constructor for GNM that sets up atomic interactions with spring constants.",
+      "_setup_atomic_model": "Builds unit cell and nearest neighbors while storing dimensions needed for computation.",
+      "_setup_gaussian_network_model": "Builds interaction pair lists and spring constants for the elastic network.",
+      "build_gamma": "Creates tensor of spring constants between atom pairs, with different values for intra-ASU vs. inter-ASU interactions.",
+      "build_neighbor_list": "Uses spatial tree search to identify atom pairs within cutoff distance for elastic interactions.",
+      "compute_hessian": "Builds the Hessian matrix from interaction pairs and spring constants, encoding force relationships.",
+      "compute_K": "Computes the dynamical matrix for a given k-vector by summing Hessian blocks with phase factors.",
+      "compute_Kinv": "Computes the inverse of the dynamical matrix, which relates to atomic displacement correlations."
     },
     "class AtomicModel": {
-      "_get_xyz_asus": "Transforms atomic coordinates - needed for computation",
-      "flatten_model": "Reshapes tensors for computation"
+      "_get_xyz_asus": "Transforms atomic coordinates using symmetry operations to generate all asymmetric units in the unit cell.",
+      "flatten_model": "Reshapes multi-dimensional tensor arrays to simplify computations."
     },
     "class Crystal": {
-      "get_asu_xyz": "Gets atomic coordinates for computation"
-    },
-    "sym_str_as_matrix": "Converts symmetry string to matrix"
+      "get_asu_xyz": "Returns atomic coordinates for a specific asymmetric unit in a specified unit cell, used in diffuse scattering calculations."
+    }
   },
   "map_utils.py": {
-    "generate_grid": "Creates computational grid",
-    "get_symmetry_equivalents": "Gets symmetry equivalent Miller indices",
-    "get_ravel_indices": "Maps 3D indices to 1D",
-    "compute_resolution": "Calculates resolution from cell parameters",
-    "get_resolution_mask": "Creates resolution mask for computation",
-    "get_dq_map": "Calculates distance to nearest Bragg peak",
-    "get_centered_sampling": "Gets sampling parameters",
-    "resize_map": "Resizes maps for computation"
-  },
-  "stats.py": {
-    "compute_cc": "Computes correlation coefficient",
-    "compute_cc_by_shell": "Computes CC by resolution shell",
-    "compute_cc_by_dq": "Computes CC by distance to Bragg peak"
-  },
-  "base.py": {
-    "compute_molecular_transform": "Computes molecular transform",
-    "compute_crystal_transform": "Computes crystal transform",
-    "incoherent_sum_real": "Sums scattering in real space",
-    "incoherent_sum_reciprocal": "Sums scattering in reciprocal space"
-  },
-  "reference.py": {
-    "structure_factors": "Reference implementation of structure factors",
-    "diffuse_covmat": "Computes diffuse scattering from covariance matrix"
-  },
-  "adapter_components": {
-    "PDBToTensor": "Adapter to convert PDB data to PyTorch tensors",
-    "NPGridToTensor": "Adapter to convert NumPy grids to PyTorch tensors",
-    "TensorToCrystal": "Adapter to convert PyTorch tensor results to Crystal format",
-    "TensorToMap": "Adapter to convert PyTorch tensor results to map format"
+    "generate_grid": "Creates a grid of q-vectors (or hkl indices) based on desired extents and spacing in reciprocal space.",
+    "get_resolution_mask": "Creates boolean mask indicating which grid points are within resolution limits.",
+    "compute_resolution": "Calculates the resolution in Angstroms for given Miller indices based on unit cell parameters."
   }
 }

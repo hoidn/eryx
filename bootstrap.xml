@@ -1,0 +1,442 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bootstrap>
+    <boot>
+        <!-- Documentation Structure and Relationships -->
+        <documentation-overview>
+            This project involves porting specific components of a diffuse scattering simulation from NumPy to PyTorch, focusing on gradient flow capabilities. The documentation consists of several interrelated files detailing the architecture, implementation plan, specifications, and progress tracking.
+        </documentation-overview>
+
+        <document-relationships>
+            <!-- Core Documentation -->
+            <document id="to_convert.json" type="source-of-truth">
+                <description>Definitive list of components that need to be ported to PyTorch.</description>
+                <relationship type="defines-scope-for" target="plan.md,phased_plan.md,architecture.md,specs/spec1.md"/>
+            </document>
+
+            <document id="plan.md" type="high-level">
+                <description>High-level overview of the implementation plan, system boundaries, and architecture.</description>
+                <relationship type="references" target="to_convert.json,architecture.md,phased_plan.md"/>
+                <relationship type="informs" target="specs/spec1.md"/>
+            </document>
+
+            <document id="phased_plan.md" type="implementation-timeline">
+                <description>Detailed phase-by-phase implementation plan with tasks, dependencies, and timelines.</description>
+                <relationship type="references" target="to_convert.json,plan.md,architecture.md"/>
+                <relationship type="details" target="plan.md"/>
+                <relationship type="informs" target="progress.md"/>
+            </document>
+
+            <document id="architecture.md" type="technical-details">
+                <description>Detailed component descriptions, interactions, and implementation guidelines.</description>
+                <relationship type="references" target="to_convert.json"/>
+                <relationship type="details" target="plan.md"/>
+                <relationship type="guides" target="phased_plan.md"/>
+            </document>
+
+            <document id="specs/spec1.md" type="detailed-specification">
+                <description>Implementation specifications with low-level task details.</description>
+                <relationship type="references" target="to_convert.json,plan.md,phased_plan.md,architecture.md"/>
+                <relationship type="details" target="phased_plan.md"/>
+            </document>
+
+            <document id="project_rules.md" type="guidelines">
+                <description>Architectural constraints and project conventions.</description>
+                <relationship type="constrains" target="all-implementation"/>
+            </document>
+
+            <document id="progress.md" type="tracking">
+                <description>Implementation progress tracking with function-by-function status.</description>
+                <relationship type="implements" target="phased_plan.md"/>
+                <relationship type="tracks" target="to_convert.json"/>
+            </document>
+
+            <!-- Supporting Files and Code -->
+            <document id="run_debug.py" type="code">
+                <description>Original debugging script with run_np() function that generates ground truth data.</description>
+                <relationship type="generates" target="logs/eryx.*.log"/>
+            </document>
+
+            <document id="eryx/" type="codebase">
+                <description>Main codebase directory containing original NumPy implementation and stub files for PyTorch port.</description>
+                <relationship type="implements" target="to_convert.json"/>
+            </document>
+        </document-relationships>
+
+        <review-process>
+            <!-- Logical Order for Review -->
+            <step order="1">
+                <document>to_convert.json</document>
+                <purpose>Understand the exact scope of components to be ported</purpose>
+            </step>
+            <step order="2">
+                <document>project_rules.md</document>
+                <purpose>Understand the architectural constraints and conventions</purpose>
+            </step>
+            <step order="3">
+                <document>plan.md</document>
+                <purpose>Get a high-level overview of the implementation plan and system boundaries</purpose>
+            </step>
+            <step order="4">
+                <document>architecture.md</document>
+                <purpose>Understand component interactions and implementation details</purpose>
+            </step>
+            <step order="5">
+                <document>phased_plan.md</document>
+                <purpose>Review the detailed implementation plan with phases and tasks</purpose>
+            </step>
+            <step order="6">
+                <document>specs/spec1.md</document>
+                <purpose>Review the detailed implementation specifications</purpose>
+            </step>
+            <step order="7">
+                <document>progress.md</document>
+                <purpose>Check the current implementation status</purpose>
+            </step>
+            <step order="8">
+                <document>eryx/</document>
+                <purpose>Examine relevant source files to understand implementation details</purpose>
+            </step>
+            <step order="9">
+                <document>eryx/,progress.md</document>
+                <purpose>Verify implementation state is consistent with documentation</purpose>
+            </step>
+        </review-process>
+
+        <documentation-code-relation>
+            <!-- How Documentation Relates to Codebase -->
+            <category name="Original Implementation">
+                <files>eryx/models.py, eryx/scatter.py, eryx/map_utils.py, eryx/pdb.py</files>
+                <documentation>to_convert.json contains the functions to port from these files</documentation>
+            </category>
+            <category name="PyTorch Implementation">
+                <files>eryx/models_torch.py, eryx/scatter_torch.py, eryx/map_utils_torch.py</files>
+                <documentation>Guided by architecture.md, phased_plan.md, and specs/spec1.md</documentation>
+            </category>
+            <category name="Supporting Infrastructure">
+                <files>eryx/adapters.py, eryx/torch_utils.py</files>
+                <documentation>Specified in architecture.md and phased_plan.md</documentation>
+            </category>
+            <category name="Testing Framework">
+                <files>eryx/autotest/, tests/</files>
+                <documentation>Testing approach detailed in phased_plan.md</documentation>
+            </category>
+            <category name="Ground Truth Data">
+                <files>logs/eryx.*.log</files>
+                <documentation>Generated using @debug decorators as described in project_rules.md</documentation>
+            </category>
+        </documentation-code-relation>
+
+        <bootstrap-instructions>
+            <!-- Instructions for LLM Agent -->
+            <instruction>
+                1. Review the documents in the order specified in the review-process section.
+                2. Pay special attention to the definitive scope in to_convert.json.
+                3. Understand the system boundaries between NumPy and PyTorch parts in plan.md.
+                4. Study the component interactions in architecture.md.
+                5. Review the phased implementation plan in phased_plan.md.
+                6. Check the current implementation status in progress.md.
+                7. For implementation tasks, refer to the detailed specifications in specs/spec1.md.
+                8. When reviewing code, first check the original implementation, then the PyTorch stubs.
+                9. Note that ground truth data is available in logs/ directory but not directly accessible in the provided files.
+                10. Compare implementation state in source files with documentation (particularly progress.md) to ensure consistency.
+            </instruction>
+        </bootstrap-instructions>
+    </boot>
+
+    <update>
+        <!-- Process for Updating Documentation -->
+        <update-scenarios>
+            <!-- Scenario 1: Implementation Progress Update -->
+            <scenario id="implementation-progress">
+                <condition>One or more functions have been implemented or their status has changed</condition>
+                <process>
+                    <step order="1">
+                        <action>Update progress.md with the new implementation status</action>
+                        <details>
+                            - Update the function status in the appropriate phase section
+                            - Update the "Tests" column if tests have been implemented
+                            - Add any relevant notes about challenges or design decisions
+                            - Update the completion percentage for the affected phase
+                            - Update the overall completion percentage
+                            - Update the checkpoint status if a checkpoint has been reached
+                            - Add an entry to the update history section
+                        </details>
+                    </step>
+                    <step order="2">
+                        <action>Check if any checkpoint has been completed</action>
+                        <details>
+                            - If a checkpoint has been completed, update the checkpoint status in progress.md
+                            - Update the "Date Completed" field
+                        </details>
+                    </step>
+                    <step order="3">
+                        <action>Update the "Current Focus" and "Next Steps" sections in progress.md</action>
+                        <details>
+                            - Reflect the next implementation priorities based on the phased_plan.md
+                            - Update blockers and challenges if any have been identified
+                        </details>
+                    </step>
+                    <step order="4">
+                        <action>Add performance metrics if available</action>
+                        <details>
+                            - For completed components, add performance comparisons with NumPy
+                            - Include memory usage and execution time metrics
+                        </details>
+                    </step>
+                </process>
+            </scenario>
+
+            <!-- Scenario 2: Plan or Architecture Changes -->
+            <scenario id="plan-architecture-change">
+                <condition>Changes to implementation plan, architecture, or specifications</condition>
+                <process>
+                    <step order="1">
+                        <action>Update the source document (plan.md, architecture.md, phased_plan.md, or specs/spec1.md)</action>
+                        <details>
+                            - Make changes to the relevant document first
+                            - Ensure internal consistency within the document
+                            - Update version or date information if applicable
+                        </details>
+                    </step>
+                    <step order="2">
+                        <action>Identify affected documents</action>
+                        <details>
+                            - Use the document-relationships section to identify affected documents
+                            - Check documents that reference the changed document
+                            - Check documents that detail the changed document
+                        </details>
+                    </step>
+                    <step order="3">
+                        <action>Update affected documents for consistency</action>
+                        <details>
+                            - For plan.md changes, update phased_plan.md, architecture.md, and specs/spec1.md
+                            - For architecture.md changes, update specs/spec1.md
+                            - For phased_plan.md changes, update progress.md
+                            - Ensure all cross-references remain valid
+                        </details>
+                    </step>
+                    <step order="4">
+                        <action>Verify scope consistency with to_convert.json</action>
+                        <details>
+                            - Ensure all changes still align with the defined scope in to_convert.json
+                            - If scope has changed, update to_convert.json first
+                        </details>
+                    </step>
+                    <step order="5">
+                        <action>Update progress.md if implementation tasks have changed</action>
+                        <details>
+                            - Add or remove functions from the tracking tables
+                            - Update timeline if schedule has changed
+                            - Add an entry to the update history section
+                        </details>
+                    </step>
+                </process>
+            </scenario>
+
+            <!-- Scenario 3: Scope Changes -->
+            <scenario id="scope-change">
+                <condition>Changes to the components that need to be ported (to_convert.json)</condition>
+                <process>
+                    <step order="1">
+                        <action>Update to_convert.json with new scope</action>
+                        <details>
+                            - Add or remove functions as needed
+                            - Ensure the format is consistent
+                        </details>
+                    </step>
+                    <step order="2">
+                        <action>Update plan.md</action>
+                        <details>
+                            - Update the Function Mapping Table
+                            - Adjust system boundaries if needed
+                            - Update call structure analysis if new components are added
+                        </details>
+                    </step>
+                    <step order="3">
+                        <action>Update architecture.md</action>
+                        <details>
+                            - Update the Component-to-Function Mapping table
+                            - Modify the component interaction diagram
+                            - Add or remove component descriptions
+                            - Update data flows
+                        </details>
+                    </step>
+                    <step order="4">
+                        <action>Update phased_plan.md</action>
+                        <details>
+                            - Update the Function-to-Task Mapping table
+                            - Add or remove implementation tasks
+                            - Adjust timeline and dependencies
+                            - Update Component-to-Test Mapping
+                        </details>
+                    </step>
+                    <step order="5">
+                        <action>Update specs/spec1.md</action>
+                        <details>
+                            - Update the Function-to-Task Mapping
+                            - Modify Low-Level Tasks
+                            - Update Implementation Validation Strategy
+                        </details>
+                    </step>
+                    <step order="6">
+                        <action>Update progress.md</action>
+                        <details>
+                            - Add or remove functions from tracking tables
+                            - Adjust completion percentages
+                            - Update timeline
+                            - Add an entry to the update history section
+                        </details>
+                    </step>
+                </process>
+            </scenario>
+
+            <!-- Scenario 4: Documentation Consistency Check -->
+            <scenario id="consistency-check">
+                <condition>Periodic check or after multiple changes</condition>
+                <process>
+                    <step order="1">
+                        <action>Verify scope alignment</action>
+                        <details>
+                            - Ensure all documents accurately reflect the components in to_convert.json
+                            - Check for any mentions of components not in scope
+                        </details>
+                    </step>
+                    <step order="2">
+                        <action>Check cross-references</action>
+                        <details>
+                            - Verify all document cross-references are correct
+                            - Check links between documents
+                            - Ensure references to specific sections are valid
+                        </details>
+                    </step>
+                    <step order="3">
+                        <action>Validate implementation tracking</action>
+                        <details>
+                            - Ensure progress.md accurately reflects the actual implementation state
+                            - Verify all functions from to_convert.json are being tracked
+                            - Check completion percentages
+                        </details>
+                    </step>
+                    <step order="4">
+                        <action>Update timelines</action>
+                        <details>
+                            - Adjust implementation timelines in phased_plan.md if needed
+                            - Update the development timeline in progress.md
+                        </details>
+                    </step>
+                </process>
+            </scenario>
+
+            <!-- Scenario 5: Creating New Specification Document -->
+            <scenario id="new-spec-document">
+                <condition>Need to create a new detailed specification document for a component or phase</condition>
+                <process>
+                    <step order="1">
+                        <action>Determine the scope and purpose of the new specification document</action>
+                        <details>
+                            - Identify which component(s) or phase(s) need detailed specifications
+                            - Determine if it's for a specific implementation phase, component group, or specialized aspect
+                            - Ensure it aligns with components in to_convert.json
+                        </details>
+                    </step>
+                    <step order="2">
+                        <action>Create the new specification document</action>
+                        <details>
+                            - Use specs/spec1.md as a template for structure and formatting
+                            - Create file with naming convention: specs/spec[number].md
+                            - Include Document References and Relationships section
+                            - Include High-Level Objective, Mid-Level Objectives
+                            - Include Implementation Notes
+                            - Add Function-to-Task Mapping relevant to this spec
+                            - Include Low-Level Tasks with detailed implementation steps
+                            - Add Implementation Validation Strategy
+                            - Include Final Verification Checklist
+                        </details>
+                    </step>
+                    <step order="3">
+                        <action>Update the document-relationships in bootstrap.xml</action>
+                        <details>
+                            - Add the new spec document to the document-relationships section
+                            - Define its relationships with other documents
+                            - Update review-process section if needed
+                        </details>
+                    </step>
+                    <step order="4">
+                        <action>Update plan.md and phased_plan.md to reference the new spec</action>
+                        <details>
+                            - Add references to the new spec document in relevant sections
+                            - Ensure cross-references are consistent
+                        </details>
+                    </step>
+                    <step order="5">
+                        <action>Update progress.md if needed</action>
+                        <details>
+                            - If the spec introduces new tasks or reorganizes existing ones, update progress tracking
+                            - Add a note about the new specification document in the update history
+                        </details>
+                    </step>
+                    <step order="6">
+                        <action>Verify consistency with other specification documents</action>
+                        <details>
+                            - Ensure no overlap or contradictions with existing spec documents
+                            - Make clear the boundaries between different spec documents
+                            - Check for consistent terminology across all spec documents
+                        </details>
+                    </step>
+                </process>
+            </scenario>
+
+            <!-- Scenario 6: Implementation State Consistency Check -->
+            <scenario id="implementation-state-consistency">
+                <condition>Implementation state (source files) does not match documentation</condition>
+                <process>
+                    <step order="1">
+                        <action>Identify discrepancies between implementation and documentation</action>
+                        <details>
+                            - Compare implemented functions with progress.md
+                            - Check if implementation approaches match architecture.md
+                            - Verify stub files exist for all components in to_convert.json
+                            - Check that directory structure matches plan.md
+                        </details>
+                    </step>
+                    <step order="2">
+                        <action>Update progress.md to reflect actual implementation state</action>
+                        <details>
+                            - Update function status (Not Started/In Progress/Complete)
+                            - Update phase completion percentages
+                            - Update checkpoint status
+                            - Add an entry to the update history section
+                        </details>
+                    </step>
+                    <step order="3">
+                        <action>Update other documentation if implementation deviates from plan</action>
+                        <details>
+                            - If implementation approach differs from architecture.md, update it
+                            - If phase ordering has changed, update phased_plan.md
+                            - If scope has changed, update to_convert.json
+                        </details>
+                    </step>
+                </process>
+            </scenario>
+        </update-scenarios>
+
+        <update-instructions>
+            <!-- Instructions for LLM Agent -->
+            <instruction>
+                1. Identify which update scenario applies based on the changes made.
+                2. Follow the step-by-step process for that scenario.
+                3. If multiple scenarios apply, start with the most fundamental (scope changes first, then plan changes, then implementation progress).
+                4. After applying the specific scenario process, perform a consistency check (Scenario 4).
+                5. When updating documents:
+                   - Maintain the same formatting and structure
+                   - Update section numbers and references as needed
+                   - Preserve cross-references between documents
+                   - Ensure tables are properly aligned
+                   - Keep document tone and style consistent
+                6. Document all changes made in the update history section of progress.md.
+                7. When creating new specification documents, follow Scenario 5 process and ensure proper integration with existing documentation.
+                8. If implementation state doesn't match documentation, apply Scenario 6 process to bring them into alignment.
+            </instruction>
+        </update-instructions>
+    </update>
+</bootstrap>

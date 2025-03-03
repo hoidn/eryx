@@ -1,5 +1,25 @@
 # PyTorch Port Architecture Overview
 
+## Component-to-Function Mapping
+
+This table explicitly maps architectural components to functions specified in `to_convert.json`:
+
+| Component | Functions | Source File | Implementation Phase |
+|-----------|-----------|-------------|---------------------|
+| **ComplexTensorOps** | N/A (utility) | N/A | Phase 1 |
+| **EigenOps** | N/A (utility) | N/A | Phase 1 |
+| **GradientUtils** | N/A (utility) | N/A | Phase 1 |
+| **map_utils_torch** | generate_grid | map_utils.py | Phase 3 |
+| **map_utils_torch** | compute_resolution | map_utils.py | Phase 3 |
+| **map_utils_torch** | get_resolution_mask | map_utils.py | Phase 3 |
+| **scatter_torch** | compute_form_factors | scatter.py | Phase 3 |
+| **scatter_torch** | structure_factors_batch | scatter.py | Phase 3 |
+| **scatter_torch** | structure_factors | scatter.py | Phase 3 |
+| **OnePhonon** | All OnePhonon methods | models.py | Phase 4 |
+| **GaussianNetworkModel (partial)** | compute_hessian, compute_K, compute_Kinv | pdb.py | Phase 4 |
+| **Adapters for AtomicModel** | _get_xyz_asus, flatten_model | pdb.py | Phase 2 |
+| **Adapters for Crystal** | get_asu_xyz | pdb.py | Phase 2 |
+
 ## Component Interaction Diagram
 
 ```mermaid
@@ -17,40 +37,26 @@ graph TD
     GridAdapter --> |q-grid, resolution masks as tensors| MapUtils[map_utils_torch]
     
     %% Utility Components
-    MapUtils --> |q-grid, symmetry info| ScatterCalc[scatter_torch]
+    MapUtils --> |q-grid, resolution info| ScatterCalc[scatter_torch]
     
     %% Complex Operations
     ComplexOps[ComplexTensorOps] --> |Complex exponentials, multiplication| ScatterCalc
-    FFTOps[FFTOps] --> |FFT convolution| LiquidLike[LiquidLikeMotions Model]
     EigenOps[EigenOps] --> |Eigendecomposition| PhononCalc[Phonon Calculations]
     
     %% Structure Calculation
     ScatterCalc --> |Structure factors| OnePhonon[OnePhonon Model]
-    ScatterCalc --> |Structure factors| RigidTrans[RigidBodyTranslations Model]
-    ScatterCalc --> |Structure factors| RigidRot[RigidBodyRotations Model]
-    ScatterCalc --> |Structure factors| LiquidLike
     
     %% Phonon Subsystem
-    GNM[GaussianNetworkModel] --> |Hessian matrix| GNMTorch[GaussianNetworkModel_torch]
+    GNM[GaussianNetworkModel] --> |Hessian matrix| GNMTorch[GNM Methods in OnePhonon]
     GNMTorch --> |Differentiable matrices| PhononCalc
     PhononCalc --> |Phonon modes, frequencies| OnePhonon
     
     %% Model Outputs
     OnePhonon --> |Diffuse intensity tensor| ResultsAdapter[TensorToNumpy]
-    RigidTrans --> |Diffuse intensity tensor| ResultsAdapter
-    RigidRot --> |Diffuse intensity tensor| ResultsAdapter
-    LiquidLike --> |Diffuse intensity tensor| ResultsAdapter
-    
-    %% Statistics and Reference 
-    StatsTorch[stats_torch] --> |Correlation metrics| ModelEval[Model Evaluation]
-    ReferenceTorch[reference_torch] --> |Alternative implementations| Validation[Implementation Validation]
     
     %% Output and Gradients
     ResultsAdapter --> |NumPy arrays| Output[Diffuse Intensity Map]
     GradUtils[GradientUtils] -.-> |Gradient validation| OnePhonon
-    GradUtils -.-> |Gradient validation| RigidTrans
-    GradUtils -.-> |Gradient validation| RigidRot
-    GradUtils -.-> |Gradient validation| LiquidLike
     
     %% Testing Flow
     GroundTruth[Ground Truth Data] --> TestComp[TorchTesting]
@@ -58,39 +64,29 @@ graph TD
     
     %% Execution Flow
     RunTorch[run_torch.py] --> OnePhonon
-    RunTorch --> RigidTrans
-    RunTorch --> RigidRot
-    RunTorch --> LiquidLike
     
     %% Subcomponent details
-    subgraph "Core Utilities (torch_utils.py)"
+    subgraph "Core Utilities (torch_utils.py) - Phase 1"
         ComplexOps
-        FFTOps
         EigenOps
         GradUtils
     end
     
-    subgraph "Adapter Components (adapters.py)"
+    subgraph "Adapter Components (adapters.py) - Phase 2"
         PDBAdapter
         GridAdapter
         ResultsAdapter
-        ModelAdapters[ModelAdapters]
     end
     
-    subgraph "Physics Calculations"
+    subgraph "Physics Calculations - Phase 3"
         MapUtils
         ScatterCalc
-        PhononCalc
-        GNMTorch
-        StatsTorch
-        ReferenceTorch
     end
     
-    subgraph "Disorder Models (models_torch.py)"
+    subgraph "Disorder Models (models_torch.py) - Phase 4"
         OnePhonon
-        RigidTrans
-        RigidRot
-        LiquidLike
+        GNMTorch
+        PhononCalc
     end
     
     %% Test Framework
@@ -104,17 +100,11 @@ graph TD
         GradUtils --> GradTest
         GradTest --> GradResult[Gradient Validation]
     end
-    
-    %% Bidirectional flows
-    ModelAdapters <--> OnePhonon
-    ModelAdapters <--> RigidTrans
-    ModelAdapters <--> RigidRot
-    ModelAdapters <--> LiquidLike
 ```
 
 ## Component Descriptions
 
-### Core Utilities (`torch_utils.py`)
+### Core Utilities (`torch_utils.py`) - Phase 1
 
 #### ComplexTensorOps
 - **Purpose**: Provides differentiable complex number operations for structure factor calculations
@@ -124,14 +114,11 @@ graph TD
   - `complex_abs_squared(real, imag)`: Computes |z|² preserving gradients
   - `complex_exp_dwf(q_vec, u_vec)`: Computes Debye-Waller factor exp(-0.5*qUq)
 - **Gradient Requirements**: All operations must support backpropagation
-
-#### FFTOps
-- **Purpose**: Provides differentiable FFT operations for convolution and signal processing
-- **Key Methods**:
-  - `fft_convolve(signal, kernel)`: Convolves signal with kernel using FFT
-  - `fft_3d(input_tensor)`: Performs 3D FFT preserving gradients
-  - `ifft_3d(input_tensor)`: Performs 3D inverse FFT preserving gradients
-- **Used By**: LiquidLikeMotions model for diffuse scattering calculations
+- **Tensor Shapes**:
+  - `complex_exp`: Input (N,) → Output (N,), (N,)
+  - `complex_mul`: Input (N,), (N,), (N,), (N,) → Output (N,), (N,)
+  - `complex_abs_squared`: Input (N,), (N,) → Output (N,)
+  - `complex_exp_dwf`: Input (N,3), (N,3) → Output (N,)
 
 #### EigenOps
 - **Purpose**: Provides differentiable eigendecomposition and related operations
@@ -140,6 +127,10 @@ graph TD
   - `eigen_decomposition(matrix)`: Computes eigenvalues/vectors with gradient support
   - `solve_linear_system(A, b)`: Solves Ax=b with gradient support
 - **Used By**: Phonon calculations in OnePhonon model
+- **Tensor Shapes**:
+  - `svd_decomposition`: Input (N,M) → Output (N,K), (K,), (M,K)
+  - `eigen_decomposition`: Input (N,N) → Output (N,), (N,N)
+  - `solve_linear_system`: Input (N,N), (N,) → Output (N,)
 
 #### GradientUtils
 - **Purpose**: Validates gradients and provides gradient manipulation utilities
@@ -147,8 +138,9 @@ graph TD
   - `finite_differences(func, input_tensor)`: Computes numerical gradients for validation
   - `validate_gradients(analytical_grad, numerical_grad)`: Compares analytical and numerical gradients
   - `gradient_norm(gradient)`: Computes L2 norm of gradients
+- **Used By**: Testing framework for validating gradients
 
-### Adapter Components (`adapters.py`)
+### Adapter Components (`adapters.py`) - Phase 2
 
 #### PDBToTensor
 - **Purpose**: Converts AtomicModel and related data to PyTorch tensors
@@ -157,40 +149,45 @@ graph TD
   - `convert_crystal(crystal)`: Converts Crystal to tensor dictionary
   - `convert_gnm(gnm)`: Converts GaussianNetworkModel to tensor dictionary
 - **Gradient Requirements**: Preserves structure for backpropagation
+- **Maps to Functions**:
+  - Handles AtomicModel._get_xyz_asus
+  - Handles AtomicModel.flatten_model
+  - Handles Crystal.get_asu_xyz
 
 #### GridToTensor
 - **Purpose**: Converts grid data and related structures to PyTorch tensors
 - **Key Methods**:
   - `convert_grid(q_grid, map_shape)`: Converts q_grid to tensor
   - `convert_mask(mask)`: Converts boolean mask to tensor
-  - `convert_symmetry_ops(sym_ops)`: Converts symmetry operations to tensors
 - **Gradient Requirements**: Grid points need gradients, masks typically don't
+- **Tensor Shapes**:
+  - `convert_grid`: Input (N,3) → Output (N,3)
+  - `convert_mask`: Input (N,) → Output (N,)
 
 #### TensorToNumpy
 - **Purpose**: Converts PyTorch tensors back to NumPy arrays
 - **Key Methods**:
   - `tensor_to_array(tensor)`: Converts tensor to array
-  - `convert_dict_of_tensors(dict_tensors)`: Converts dictionary of tensors to arrays
   - `convert_intensity_map(intensity, map_shape)`: Converts intensity map to NumPy
 - **Gradient Requirements**: N/A (one-way conversion)
+- **Key Operations**:
+  - Detach tensors from computational graph
+  - Move tensors to CPU
+  - Convert to NumPy arrays
 
-#### ModelAdapters
-- **Purpose**: Provides model-specific conversion between NumPy and PyTorch
-- **Key Methods**:
-  - `adapt_one_phonon_inputs(np_model)`: Adapts OnePhonon inputs for PyTorch
-  - `adapt_one_phonon_outputs(torch_outputs)`: Adapts PyTorch outputs back to NumPy
-  - Similar methods for other model types
-- **Gradient Requirements**: Must preserve model structure for backpropagation
-
-### Physics Calculations
+### Physics Calculations - Phase 3
 
 #### map_utils_torch (`map_utils_torch.py`)
 - **Purpose**: Provides grid generation and related utilities
 - **Key Methods**:
   - `generate_grid(A_inv, hsampling, ksampling, lsampling)`: Creates q-grid tensor
-  - `get_symmetry_equivalents(hkl_grid, sym_ops)`: Gets symmetry equivalent indices
   - `compute_resolution(cell, hkl)`: Computes resolution in Angstroms
+  - `get_resolution_mask(cell, hkl_grid, res_limit)`: Creates resolution mask
 - **Gradient Requirements**: Grid generation must preserve gradients
+- **Tensor Shapes**:
+  - `generate_grid`: Input (3,3), tuples → Output (N,3), tuple
+  - `compute_resolution`: Input (6,), (N,3) → Output (N,)
+  - `get_resolution_mask`: Input (6,), (N,3), float → Output (N,), (N,)
 
 #### scatter_torch (`scatter_torch.py`)
 - **Purpose**: Provides structure factor calculations
@@ -199,141 +196,123 @@ graph TD
   - `structure_factors_batch(q_grid, xyz, ff_a, ff_b, ff_c)`: Batch structure factor calculation
   - `structure_factors(q_grid, xyz, ff_a, ff_b, ff_c)`: Overall structure factor calculation
 - **Gradient Requirements**: Complex exponentials must preserve gradients
+- **Tensor Shapes**:
+  - `compute_form_factors`: Input (N,3), (M,4), (M,4), (M,) → Output (N,M)
+  - `structure_factors_batch`: Input (N,3), (M,3), (M,4), (M,4), (M,) → Output (N,)
+  - `structure_factors`: Input (N,3), (M,3), (M,4), (M,4), (M,) → Output (N,)
 
-#### stats_torch (`stats_torch.py`)
-- **Purpose**: Provides correlation calculations and statistical utilities
-- **Key Methods**:
-  - `compute_cc(arr1, arr2, mask)`: Computes correlation coefficient between arrays
-  - `compute_cc_by_shell(arr1, arr2, res_map, mask)`: Computes CC by resolution shell
-  - `compute_cc_by_dq(arr1, arr2, dq_map, mask)`: Computes CC by distance to Bragg peak
-- **Gradient Requirements**: 
-  - For metrics calculation: No gradients typically needed
-  - For optimization objectives: Gradients needed from metrics to model outputs
+### OnePhonon Model (`models_torch.py`) - Phase 4
 
-#### reference_torch (`reference_torch.py`)
-- **Purpose**: Alternative implementations for validation and comparison
-- **Key Methods**:
-  - `structure_factors(q_grid, xyz, elements)`: Reference structure factor calculation
-  - `diffuse_covmat(q_grid, xyz, elements, V)`: Diffuse scattering from covariance matrix
-- **Gradient Requirements**: Must preserve gradients for validation purposes
-- **Usage**: For validation, testing, and comparison with primary implementations
-
-#### GaussianNetworkModel_torch (part of `pdb_torch.py`)
-- **Purpose**: PyTorch implementation of the Gaussian Network Model
-- **Key Methods**:
-  - `compute_hessian()`: Differentiable Hessian matrix calculation
-  - `compute_K(hessian, kvec)`: Computes dynamical matrix with gradient support
-  - `compute_Kinv(hessian, kvec)`: Computes inverse dynamical matrix with gradient support
-- **Gradient Requirements**: Matrix operations must preserve gradients
-- **NumPy/PyTorch Boundary**: 
-  - Uses NumPy for non-differentiable operations (build_neighbor_list)
-  - Uses PyTorch for differentiable physics calculations
-  - Adapters manage conversion between representations
-
-#### Phonon Calculations (part of `models_torch.py`)
-- **Purpose**: Calculates phonon modes and frequencies
-- **Key Methods**:
-  - `compute_gnm_phonons()`: Computes phonon modes from GNM
-  - `compute_hessian()`: Builds Hessian matrix
-  - `compute_covariance_matrix()`: Computes atomic displacement covariances
-- **Gradient Requirements**: Eigendecomposition must support backpropagation
-
-### Disorder Models (`models_torch.py`)
-
-#### OnePhonon
+#### OnePhonon Class
 - **Purpose**: Models diffuse scattering from phonons
 - **Key Methods**:
   - `_build_A()`, `_build_M()`: Build displacement and mass matrices
+  - `_build_M_allatoms()`, `_project_M()`: Mass matrix calculations
+  - `_build_kvec_Brillouin()`: Computes k-vectors in Brillouin zone
   - `compute_gnm_phonons()`: Compute phonon modes
+  - `compute_covariance_matrix()`: Compute covariance matrix
   - `apply_disorder()`: Apply disorder to get diffuse intensity
 - **Gradient Requirements**: End-to-end gradient flow from parameters to intensity
+- **Tensor Shapes** (key methods):
+  - `apply_disorder`: Input parameters → Output (N,)
+  - `compute_gnm_phonons`: No explicit input → Modifies self.V and self.Winv
+  - `compute_covariance_matrix`: No explicit input → Modifies self.covar
 
-#### RigidBodyTranslations
-- **Purpose**: Models disorder from rigid body translations
+#### GaussianNetworkModel Methods
+- **Purpose**: Provides elastic network model functionality
 - **Key Methods**:
-  - `apply_disorder(sigmas)`: Apply translational disorder
-  - `optimize(target, sigmas_min, sigmas_max)`: Optimize disorder parameters
-- **Gradient Requirements**: Gradients from intensity to sigma parameters
+  - `compute_hessian()`: Creates hessian matrix for elastic network
+  - `compute_K(hessian, kvec)`: Computes dynamical matrix
+  - `compute_Kinv(hessian, kvec)`: Computes inverse dynamical matrix
+- **Gradient Requirements**: Matrix operations must preserve gradients
+- **Implementation Approach**:
+  - These methods will be implemented within OnePhonon class, not as a separate class
+  - They will use tensor operations for differentiability
+  - Non-differentiable parts like building neighbor lists remain in NumPy
 
-#### LiquidLikeMotions
-- **Purpose**: Models liquid-like motion disorder
-- **Key Methods**:
-  - `fft_convolve(transform, kernel)`: Convolve with FFT
-  - `apply_disorder(sigmas, gammas)`: Apply disorder with parameters
-- **Gradient Requirements**: FFT convolution must preserve gradients
+## Device Management Strategy
 
-#### RigidBodyRotations
-- **Purpose**: Models disorder from rigid body rotations
-- **Key Methods**:
-  - `generate_rotations_around_axis(sigma, num_rot)`: Generate rotation matrices
-  - `apply_disorder(sigmas, num_rot)`: Apply rotational disorder
-- **Gradient Requirements**: Rotation generation must preserve gradients
+### Device Selection
+- All PyTorch components should accept an optional `device` parameter
+- Default device should be determined using:
+  ```python
+  device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+  ```
+- Device should be stored as an instance variable in classes
 
-### Testing Framework
+### Device Handling at Component Boundaries
+1. **Adapter Input Boundaries**:
+   - PDBToTensor and GridToTensor should place tensors on the specified device
+   - Example:
+     ```python
+     def array_to_tensor(self, array, requires_grad=True):
+         tensor = torch.tensor(array, dtype=torch.float32, device=self.device)
+         tensor.requires_grad_(requires_grad)
+         return tensor
+     ```
 
-#### Logger
-- **Purpose**: Handles ground truth data storage and retrieval
-- **Key Methods**:
-  - `searchLogDirectory(log_path_prefix)`: Finds relevant log files
-  - `loadLog(log_file_path)`: Loads serialized inputs and outputs
-- **Used By**: TorchTesting for accessing ground truth data
+2. **Inter-Component Transfers**:
+   - Components should ensure tensors are on the correct device before operations
+   - Example:
+     ```python
+     def some_operation(self, input_tensor):
+         input_tensor = input_tensor.to(self.device)
+         # perform operations
+         return result
+     ```
 
-#### TorchTesting
-- **Purpose**: Provides PyTorch-specific testing utilities
-- **Key Methods**:
-  - `testTorchCallable(log_path_prefix, torch_func)`: Tests PyTorch function against ground truth
-  - `check_gradients(torch_func, inputs)`: Validates gradient computation
-- **Used By**: Test scripts for validating PyTorch implementations
+3. **Output Boundaries**:
+   - TensorToNumpy should handle device transfer back to CPU
+   - Example:
+     ```python
+     def tensor_to_array(self, tensor):
+         if tensor.requires_grad:
+             tensor = tensor.detach()
+         return tensor.cpu().numpy()
+     ```
 
-## Ground Truth Testing Strategy
+4. **Batch Processing**:
+   - For large data processing, consider streaming batches to device
+   - Example:
+     ```python
+     for batch in batches:
+         batch_tensor = batch.to(device)
+         # process batch
+         result_list.append(result.cpu())  # Move result back to CPU if needed
+     ```
 
-### Component-to-Test Mapping
+## Tensor Shape Specifications
 
-The following table maps PyTorch components to their corresponding ground truth data and testing approaches:
+To ensure clear communication of tensor shapes at component boundaries, here are the detailed tensor shape specifications for key interfaces:
 
-| PyTorch Component | Ground Truth Data | Testing Approach | Tolerances |
-|-------------------|-------------------|------------------|------------|
-| `ComplexTensorOps` | N/A (utility class) | Unit tests with known values | rtol=1e-5, atol=1e-8 |
-| `EigenOps` | N/A (utility class) | Unit tests with known values | rtol=1e-5, atol=1e-8 |
-| `map_utils_torch.generate_grid` | `logs/eryx.map_utils.generate_grid.log` | Compare grid outputs | rtol=1e-5, atol=1e-8 |
-| `map_utils_torch.get_symmetry_equivalents` | `logs/eryx.map_utils.get_symmetry_equivalents.log` | Compare indices | exact match |
-| `scatter_torch.compute_form_factors` | `logs/eryx.scatter.compute_form_factors.log` | Compare form factors | rtol=1e-4, atol=1e-7 |
-| `scatter_torch.structure_factors_batch` | `logs/eryx.scatter.structure_factors_batch.log` | Compare structure factors | rtol=1e-4, atol=1e-7 |
-| `models_torch.OnePhonon.compute_gnm_phonons` | `logs/eryx.models.OnePhonon.compute_gnm_phonons.log` | Compare eigenvalues and vectors | rtol=1e-4, atol=1e-6 |
-| `models_torch.OnePhonon.apply_disorder` | `logs/eryx.models.OnePhonon.apply_disorder.log` | Compare diffuse intensity | rtol=1e-3, atol=1e-5 |
+### PDBToTensor Output Shapes
+- **atomic_positions**: (n_asu, n_atoms, 3)
+- **form_factors_a**: (n_asu, n_atoms, 4)
+- **form_factors_b**: (n_asu, n_atoms, 4)
+- **form_factors_c**: (n_asu, n_atoms)
+- **atomic_displacement**: (n_asu, n_atoms)
 
-For eigendecomposition and FFT operations, larger tolerances may be needed due to numerical differences between NumPy and PyTorch implementations.
+### GridToTensor Output Shapes
+- **q_grid**: (n_points, 3)
+- **resolution_mask**: (n_points,)
+- **map_shape**: tuple of (dim_h, dim_k, dim_l)
 
-### Testing Flow Diagram
+### Structure Factor Calculation Shapes
+- **Input**: 
+  - q_grid: (n_points, 3)
+  - xyz: (n_atoms, 3)
+  - ff_a, ff_b: (n_atoms, 4)
+  - ff_c: (n_atoms,)
+- **Output**:
+  - structure_factors: (n_points,) complex
 
-```mermaid
-graph TD
-    A[Ground Truth Data] --> B[Logger.searchLogDirectory]
-    B --> C[Logger.loadLog]
-    C --> D[Deserialized Inputs/Outputs]
-    
-    E[PyTorch Implementation] --> F[TorchTesting.testTorchCallable]
-    
-    D --> F
-    F --> G{Output Matches?}
-    
-    G -->|Yes| H[Test Passes]
-    G -->|No| I[Test Fails]
-    
-    J[Tensor Inputs with requires_grad] --> K[Forward Pass]
-    K --> L[Backward Pass]
-    L --> M[Analytical Gradients]
-    
-    J --> N[GradientUtils.finite_differences]
-    N --> O[Numerical Gradients]
-    
-    M --> P[GradientUtils.validate_gradients]
-    O --> P
-    
-    P --> Q{Gradients Valid?}
-    Q -->|Yes| R[Gradient Test Passes]
-    Q -->|No| S[Gradient Test Fails]
-```
+### OnePhonon Key Tensor Shapes
+- **Self.Amat**: (n_asu, n_atoms*3, 6)
+- **Self.Linv**: (n_dof_per_cell, n_dof_per_cell)
+- **Self.kvec**: (n_h, n_k, n_l, 3)
+- **Self.V**: (n_h, n_k, n_l, n_dof_per_cell, n_dof_per_cell)
+- **Self.Winv**: (n_h, n_k, n_l, n_dof_per_cell)
+- **apply_disorder output**: (n_points,) or (dim_h, dim_k, dim_l)
 
 ## Key Data Flows
 
@@ -343,7 +322,7 @@ graph TD
   - AtomicModel processes this into a structured object
   - PDBToTensor converts to differentiable tensor representation
   - PyTorch models receive tensor data with gradient capability
-  - **Critical for gradient flow**: Preserving relationships between atoms
+  - **Key Tensor Shapes**: (n_asu, n_atoms, 3) for coordinates
 
 ### 2. Grid Generation Flow
 - **Grid Parameters → GridToTensor → map_utils_torch → Physics Calculations**
@@ -351,72 +330,31 @@ graph TD
   - GridToTensor converts these to tensor representations
   - map_utils_torch generates differentiable q-grid tensors
   - Physics calculations use these for structure factor calculations
-  - **Critical for gradient flow**: Maintaining correct q-vector derivatives
+  - **Key Tensor Shapes**: (n_points, 3) for q-grid
 
 ### 3. Structure Factor Calculation Flow
 - **Atomic Data + q-grid → ComplexTensorOps + scatter_torch → Structure Factors**
   - Atomic coordinates and form factors combine with q-grid
   - ComplexTensorOps provides differentiable complex number operations
   - scatter_torch computes structure factors with gradient preservation
-  - Structure factors feed into disorder models
-  - **Critical for gradient flow**: Complex exponentials and Debye-Waller factors
+  - Structure factors feed into OnePhonon model
+  - **Key Tensor Shapes**: (n_points,) complex for structure factors
 
 ### 4. Phonon Calculation Flow
-- **GaussianNetworkModel → GaussianNetworkModel_torch → Phonon Calculations → OnePhonon Model**
-  - GNM provides spring constants and connectivity
-  - GaussianNetworkModel_torch provides differentiable matrix operations
-  - EigenOps enables differentiable eigendecomposition
+- **Matrix Construction → Phonon Calculations → OnePhonon Model**
+  - A and M matrices constructed for projections
+  - EigenOps performs differentiable eigendecomposition
   - Phonon calculations compute modes and frequencies
   - OnePhonon model uses these for diffuse scattering
-  - **Critical for gradient flow**: Eigendecomposition with backpropagation
+  - **Key Tensor Shapes**: (n_h, n_k, n_l, n_dof, n_dof) for phonon modes
 
-### 5. Model Execution Flow
-- **run_torch.py → Disorder Models → TensorToNumpy → Output Map**
-  - run_torch.py initializes parameters and models
-  - Disorder models perform physics calculations
+### 5. Diffuse Intensity Calculation Flow
+- **Structure Factors + Phonon Modes → apply_disorder → Diffuse Intensity**
+  - Structure factors provide atomic scattering
+  - Phonon modes provide displacement correlations
+  - apply_disorder combines these for diffuse intensity
   - TensorToNumpy converts results back to NumPy arrays
-  - Output maps represent diffuse scattering intensity
-  - **Critical for gradient flow**: End-to-end parameter to output gradient path
-
-### 6. Gradient Validation Flow
-- **Models → GradientUtils → Numerical Validation**
-  - Models compute diffuse scattering with gradient tracking
-  - GradientUtils computes numerical gradients via finite differences
-  - Comparison validates analytical gradient implementation
-  - **Critical for validation**: Appropriate tolerance selection
-
-### 7. Testing Flow
-- **Ground Truth Data → TorchTesting → Model Validation**
-  - Ground truth data from NumPy implementation provides reference
-  - TorchTesting compares PyTorch outputs to ground truth
-  - Validates both correctness and gradient computation
-  - **Critical for quality**: Proper tolerance selection for comparisons
-
-## Ground Truth Generation Strategy
-
-1. **Direct Decoration with @debug**
-   - Original NumPy functions directly decorated with `@debug` decorator
-   - No wrapper functions or duplicate implementations
-   - Import statement (`from eryx.autotest.debug import debug`) added to each file
-   - Ground truth captured with original NumPy implementations
-
-2. **Ground Truth Data Collection**
-   - Running `run_np()` with varied parameter sets
-   - `@debug` decorator automatically captures inputs/outputs to logs
-   - Multiple parameter configurations ensure comprehensive coverage
-   - Logs stored in standardized directory structure
-
-3. **Ground Truth Validation**
-   - Verification script checks log completeness
-   - Ensures all functions in to_convert.json have logs
-   - Confirms all inputs/outputs properly captured
-   - Summary report highlights any missing data
-
-4. **Testing Against Ground Truth**
-   - PyTorch implementations run with same inputs from logs
-   - Outputs compared against NumPy results with appropriate tolerances
-   - Both correctness and gradient computation validated
-   - Comprehensive test suite ensures all components verified
+  - **Key Tensor Shapes**: (n_points,) for diffuse intensity
 
 ## Critical Differentiability Points
 
@@ -425,30 +363,52 @@ graph TD
    - **Solution**: Implement ComplexTensorOps with explicit real/imaginary parts 
    - **Components affected**: scatter_torch.py, structure_factors_batch
    - **Implementation approach**: Use separate real and imaginary tensors with PyTorch autograd
+   - **Example**:
+     ```python
+     def complex_exp(phase):
+         return torch.cos(phase), torch.sin(phase)
+     ```
 
 2. **Eigendecomposition in Phonon Calculations**
    - **Challenge**: PyTorch's eigendecomposition has limited gradient support
    - **Solution**: Use SVD-based approach with manual gradient implementation where needed
    - **Components affected**: OnePhonon.compute_gnm_phonons(), EigenOps
    - **Implementation approach**: Leverage torch.svd with careful handling of degenerate eigenvalues
+   - **Example**:
+     ```python
+     def eigen_decomposition(matrix):
+         # Use SVD for better gradient support
+         U, S, V = torch.svd(matrix)
+         return S, U
+     ```
 
-3. **FFT Operations in LiquidLikeMotions**
-   - **Challenge**: Ensuring gradient flow through FFT operations
-   - **Solution**: Use PyTorch's native FFT functions with proper normalization
-   - **Components affected**: LiquidLikeMotions.fft_convolve(), FFTOps
-   - **Implementation approach**: Use torch.fft module with explicit handling of complex tensors
-
-4. **Adapter Conversions**
+3. **Adapter Conversions**
    - **Challenge**: Preserving gradient information during conversions
    - **Solution**: Careful design of adapter APIs to maintain computational graph
    - **Components affected**: All adapter classes in adapters.py
    - **Implementation approach**: Ensure tensor conversions retain requires_grad and device placement
+   - **Example**:
+     ```python
+     def convert_grid(self, q_grid, requires_grad=True):
+         tensor = torch.tensor(q_grid, dtype=torch.float32, device=self.device)
+         tensor.requires_grad_(requires_grad)
+         return tensor
+     ```
 
-5. **Batching and Memory Management**
+4. **Batching and Memory Management**
    - **Challenge**: Handling large datasets while preserving gradient flow
    - **Solution**: Implement efficient batching strategy with gradient accumulation
    - **Components affected**: structure_factors(), OnePhonon.apply_disorder()
    - **Implementation approach**: Use torch.no_grad() strategically, accumulate gradients across batches
+   - **Example**:
+     ```python
+     def process_large_data(self, data):
+         result = []
+         for batch in self._get_batches(data):
+             batch_result = self._process_batch(batch)
+             result.append(batch_result)
+         return torch.cat(result)
+     ```
 
 ## Implementation Guidelines
 
