@@ -89,11 +89,23 @@ The following table maps PyTorch components to their corresponding ground truth 
 | `scatter_torch.compute_form_factors` | `logs/eryx.scatter.compute_form_factors.log` | Compare form factors | rtol=1e-4, atol=1e-7 |
 | `scatter_torch.structure_factors_batch` | `logs/eryx.scatter.structure_factors_batch.log` | Compare structure factors | rtol=1e-4, atol=1e-7 |
 | `scatter_torch.structure_factors` | `logs/eryx.scatter.structure_factors.log` | Compare structure factors | rtol=1e-4, atol=1e-7 |
-| `models_torch.OnePhonon._build_A` | `logs/eryx.models.OnePhonon._build_A.log` | Compare matrices | rtol=1e-5, atol=1e-8 |
-| `models_torch.OnePhonon._build_M` | `logs/eryx.models.OnePhonon._build_M.log` | Compare matrices | rtol=1e-5, atol=1e-8 |
-| `models_torch.OnePhonon.compute_gnm_phonons` | `logs/eryx.models.OnePhonon.compute_gnm_phonons.log` | Compare eigenvalues and vectors | rtol=1e-4, atol=1e-6 |
-| `models_torch.OnePhonon.compute_covariance_matrix` | `logs/eryx.models.OnePhonon.compute_covariance_matrix.log` | Compare matrices | rtol=1e-4, atol=1e-6 |
-| `models_torch.OnePhonon.apply_disorder` | `logs/eryx.models.OnePhonon.apply_disorder.log` | Compare diffuse intensity | rtol=1e-3, atol=1e-5 |
+| `models_torch.OnePhonon._build_A` | `logs/eryx.models._build_A.log` | Compare matrices | rtol=1e-5, atol=1e-8 |
+| `models_torch.OnePhonon._build_M` | `logs/eryx.models._build_M.log` | Compare matrices | rtol=1e-5, atol=1e-8 |
+| `models_torch.OnePhonon.compute_gnm_phonons` | `logs/eryx.models.compute_gnm_phonons.log` | Compare eigenvalues and vectors | rtol=1e-4, atol=1e-6 |
+| `models_torch.OnePhonon.compute_covariance_matrix` | `logs/eryx.models.compute_covariance_matrix.log` | Compare matrices | rtol=1e-4, atol=1e-6 |
+| `models_torch.OnePhonon.apply_disorder` | `logs/eryx.models.apply_disorder.log` | Compare diffuse intensity | rtol=1e-3, atol=1e-5 |
+| `models_torch.OnePhonon._build_kvec_Brillouin` | `logs/eryx.models._build_kvec_Brillouin.log` | Compare vectors | rtol=1e-5, atol=1e-8 |
+| `models_torch.OnePhonon._center_kvec` | `logs/eryx.models._center_kvec.log` | Compare values | rtol=1e-5, atol=1e-8 |
+| `models_torch.OnePhonon._at_kvec_from_miller_points` | `logs/eryx.models._at_kvec_from_miller_points.log` | Compare indices | exact match |
+| `models_torch.OnePhonon._build_M_allatoms` | `logs/eryx.models._build_M_allatoms.log` | Compare matrices | rtol=1e-5, atol=1e-8 |
+| `models_torch.OnePhonon._project_M` | `logs/eryx.models._project_M.log` | Compare matrices | rtol=1e-5, atol=1e-8 |
+| `models_torch.GaussianNetworkModel.compute_hessian` | `logs/eryx.pdb.compute_hessian.log` | Compare matrices | rtol=1e-5, atol=1e-8 |
+| `models_torch.GaussianNetworkModel.compute_K` | `logs/eryx.pdb.compute_K.log` | Compare matrices | rtol=1e-5, atol=1e-8 |
+| `models_torch.GaussianNetworkModel.compute_Kinv` | `logs/eryx.pdb.compute_Kinv.log` | Compare matrices | rtol=1e-5, atol=1e-8 |
+| `models_torch.AtomicModel._get_xyz_asus` | `logs/eryx.pdb._get_xyz_asus.log` | Compare coordinates | rtol=1e-5, atol=1e-8 |
+| `models_torch.AtomicModel.flatten_model` | `logs/eryx.pdb.flatten_model.log` | Compare arrays | exact match |
+| `models_torch.Crystal.get_asu_xyz` | `logs/eryx.pdb.get_asu_xyz.log` | Compare coordinates | rtol=1e-5, atol=1e-8 |
+
 
 ## System Boundaries and Differentiability Constraints
 
