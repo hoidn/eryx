@@ -216,62 +216,64 @@ class TestOnePhononDisorder(unittest.TestCase):
         ))
     
     def test_apply_disorder_ground_truth(self):
-        """Test against ground truth data (simplified for mock objects)."""
-        # First, ensure it runs without errors with our mock setup
-        Id = self.model.apply_disorder()
-        self.assertTrue(torch.is_tensor(Id))
+        """Test against ground truth data."""
+        # Skip this test if the log file doesn't exist
+        log_file_path = f"{self.apply_disorder_log}.log"
+        if not os.path.exists(log_file_path):
+            self.skipTest(f"Ground truth data not found: {log_file_path}")
+            
+        # Load the ground truth data
+        logs = self.logger.loadLog(log_file_path)
+        if not logs or len(logs) < 2:  # Need at least one input/output pair
+            self.skipTest("Insufficient ground truth data in log file")
+            
+        # Get the input data from the first log entry
+        input_args = self.logger.serializer.deserialize(logs[0]['args'])
+        expected_output = self.logger.serializer.deserialize(logs[0]['result'])
         
-        # Now test against ground truth data if available
-        if os.path.exists(f"{self.apply_disorder_log}.log"):
-            # Load the ground truth data
-            logs = self.logger.loadLog(f"{self.apply_disorder_log}.log")
+        # Extract parameters from the input data
+        # Note: The exact structure depends on how apply_disorder was logged
+        rank = input_args[0] if len(input_args) > 0 else -1
+        outdir = input_args[1] if len(input_args) > 1 else None
+        use_data_adp = input_args[2] if len(input_args) > 2 else False
+        
+        # Run the apply_disorder method with the same parameters
+        actual_output = self.model.apply_disorder(rank=rank, outdir=outdir, use_data_adp=use_data_adp)
+        
+        # Convert the PyTorch tensor to NumPy for comparison with ground truth
+        actual_output_np = actual_output.detach().cpu().numpy()
+        
+        # Compare with expected output
+        # We need to handle NaN values specially
+        if isinstance(expected_output, np.ndarray):
+            # Create masks for non-NaN values in both arrays
+            expected_mask = ~np.isnan(expected_output)
+            actual_mask = ~np.isnan(actual_output_np)
             
-            # Skip if no logs found
-            if not logs:
-                self.skipTest("No ground truth data found in log file")
+            # Check that NaN positions match
+            self.assertTrue(np.array_equal(expected_mask, actual_mask),
+                           "NaN positions don't match between expected and actual outputs")
             
-            # Get the first input/output pair
-            input_data = self.logger.serializer.deserialize(logs[0]['args'])
-            expected_output = self.logger.serializer.deserialize(logs[0]['result'])
-            
-            # Configure mock structure_factors to return values similar to ground truth
-            def mock_ground_truth_sf(*args, **kwargs):
-                # Return a tensor with shape matching the expected output
-                batch_size = args[0].shape[0]
-                if kwargs.get('compute_qF', False):
-                    # Return structure factors with components
-                    return torch.complex(
-                        torch.rand((batch_size, 6), device=self.device),
-                        torch.rand((batch_size, 6), device=self.device)
-                    )
-                else:
-                    # Return simple structure factors
-                    return torch.complex(
-                        torch.rand(batch_size, device=self.device),
-                        torch.rand(batch_size, device=self.device)
-                    )
-            self.mock_structure_factors.side_effect = mock_ground_truth_sf
-            
-            # Run the method with our mock setup
-            Id = self.model.apply_disorder()
-            
-            # Verify basic properties match expected output
-            if isinstance(expected_output, np.ndarray):
-                # Check shape matches
-                self.assertEqual(Id.shape[0], expected_output.shape[0], 
-                                "Output shape doesn't match ground truth")
+            # Compare only non-NaN values
+            if np.any(expected_mask):
+                np.testing.assert_allclose(
+                    expected_output[expected_mask],
+                    actual_output_np[expected_mask],
+                    rtol=1e-3, atol=1e-5,
+                    err_msg="Output values don't match ground truth"
+                )
                 
-                # Check that non-NaN values exist where expected
-                if hasattr(self.model, 'res_mask'):
-                    mask = self.model.res_mask
-                    self.assertFalse(torch.any(torch.isnan(Id[mask])),
-                                    "Output contains unexpected NaN values")
-                
-                # For a full test with real data and no mocks, we would use:
-                # self.assertTrue(
-                #     self.torch_testing.testTorchCallable(self.apply_disorder_log, self.model.apply_disorder),
-                #     "apply_disorder failed ground truth test"
-                # )
+            # Check shapes match
+            self.assertEqual(expected_output.shape, actual_output_np.shape,
+                           "Output shape doesn't match ground truth")
+        else:
+            self.fail(f"Expected output is not a NumPy array: {type(expected_output)}")
+            
+        # Alternative approach using the TorchTesting framework
+        self.assertTrue(
+            self.torch_testing.testTorchCallable(self.apply_disorder_log, self.model.apply_disorder),
+            "apply_disorder failed ground truth test"
+        )
 
 if __name__ == '__main__':
     unittest.main()
