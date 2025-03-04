@@ -22,11 +22,11 @@ class TestOnePhononKvector(unittest.TestCase):
         self.build_kvec_brillouin_log = "logs/eryx.models._build_kvec_Brillouin"
         self.center_kvec_log = "logs/eryx.models._center_kvec"
         self.at_kvec_miller_log = "logs/eryx.models._at_kvec_from_miller_points"
-        # TODO add attribute for eryx.models.compute_covariance_matrix.log,
-        # mirror the previous three and their handling
+        self.compute_covariance_matrix_log = "logs/eryx.models.compute_covariance_matrix"
         
         # Ensure log files exist
-        for log_file in [self.build_kvec_brillouin_log, self.center_kvec_log, self.at_kvec_miller_log]:
+        for log_file in [self.build_kvec_brillouin_log, self.center_kvec_log, 
+                         self.at_kvec_miller_log, self.compute_covariance_matrix_log]:
             log_file_path = f"{log_file}.log"
             self.assertTrue(os.path.exists(log_file_path), f"Log file {log_file_path} not found")
         
