@@ -177,8 +177,9 @@ class TestOnePhononKvector(unittest.TestCase):
         # Get indices
         indices = model._at_kvec_from_miller_points(hkl_kvec)
         
-        # Create some dummy data to index into
-        dummy_data = torch.ones((np.prod(model.map_shape),), device=model.device, requires_grad=True)
+        # Create dummy data with enough space for all indices
+        max_index = torch.max(indices).item()
+        dummy_data = torch.ones((max_index + 1,), device=model.device, requires_grad=True)
         
         # Index into the dummy data using the indices
         # Use clone() to avoid in-place operations
