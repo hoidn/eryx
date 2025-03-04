@@ -21,10 +21,11 @@ class PDBToTensor:
     
     def __init__(self, device: Optional[torch.device] = None):
         """
-        Initialize the adapter.
+        Initialize the adapter for converting PDB data to PyTorch tensors.
         
         Args:
-            device: The PyTorch device to place tensors on
+            device: The PyTorch device to place tensors on. If None, uses CUDA if 
+                   available, otherwise CPU.
         """
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
@@ -37,13 +38,46 @@ class PDBToTensor:
             
         Returns:
             Dictionary containing PyTorch tensor versions of the model attributes
+            with gradient support for optimization.
+            
+        Note:
+            Converts key array attributes to tensors while preserving non-array attributes.
+            The returned dictionary can be used directly with PyTorch implementations.
         """
-        # TODO: Convert all NumPy arrays to PyTorch tensors
-        # TODO: Preserve crystallographic information
-        # TODO: Handle complex attributes like symmetry operations
-        # TODO: Return a dictionary with all the converted tensors
+        if model is None:
+            raise ValueError("Cannot convert None model")
+            
+        result = {}
         
-        raise NotImplementedError("convert_atomic_model not implemented")
+        # Convert key array attributes to tensors
+        tensor_attributes = {
+            'xyz': True,           # Atomic coordinates (n_conf, n_atoms, 3)
+            'ff_a': True,          # Form factor coefficients (n_conf, n_atoms, 4)
+            'ff_b': True,          # Form factor coefficients (n_conf, n_atoms, 4)
+            'ff_c': True,          # Form factor coefficients (n_conf, n_atoms)
+            'adp': True,           # Atomic displacement parameters
+            'cell': True,          # Unit cell parameters (6,)
+            'A_inv': True,         # Fractional cell matrix (3, 3)
+            'unit_cell_axes': True # Unit cell axes (3, 3)
+        }
+        
+        # Process each attribute
+        for attr_name, requires_grad in tensor_attributes.items():
+            if hasattr(model, attr_name):
+                attr_value = getattr(model, attr_name)
+                if attr_value is not None:
+                    result[attr_name] = self.array_to_tensor(attr_value, requires_grad=requires_grad)
+        
+        # Preserve non-array attributes
+        non_tensor_attributes = [
+            'space_group', 'n_asu', 'n_conf', 'sym_ops', 'transformations', 'elements'
+        ]
+        
+        for attr_name in non_tensor_attributes:
+            if hasattr(model, attr_name):
+                result[attr_name] = getattr(model, attr_name)
+        
+        return result
     
     def convert_crystal(self, crystal: Any) -> Dict[str, Any]:
         """
@@ -79,20 +113,35 @@ class PDBToTensor:
     
     def array_to_tensor(self, array: np.ndarray, requires_grad: bool = True) -> torch.Tensor:
         """
-        Convert a NumPy array to a PyTorch tensor.
+        Convert a NumPy array to a PyTorch tensor with gradient support.
         
         Args:
-            array: NumPy array to convert
-            requires_grad: Whether the tensor requires gradients
+            array: NumPy array to convert. Can be of any shape or dtype.
+            requires_grad: Whether the tensor requires gradients for backpropagation.
             
         Returns:
-            PyTorch tensor with the same data
+            PyTorch tensor with the same data, on the specified device with requires_grad set.
+            Returns None if input is None.
+            
+        Examples:
+            >>> adapter = PDBToTensor()
+            >>> x_np = np.array([[1.0, 2.0], [3.0, 4.0]])
+            >>> x_tensor = adapter.array_to_tensor(x_np, requires_grad=True)
+            >>> x_tensor.shape
+            torch.Size([2, 2])
+            >>> x_tensor.requires_grad
+            True
         """
         if array is None:
             return None
             
-        tensor = torch.from_numpy(array).to(self.device)
-        tensor.requires_grad = requires_grad
+        if array.size == 0:  # Handle empty arrays
+            tensor = torch.from_numpy(array.copy()).to(self.device)
+        else:
+            # Use clone to avoid memory sharing issues with NumPy
+            tensor = torch.from_numpy(array.copy()).to(self.device)
+            
+        tensor.requires_grad_(requires_grad)
         return tensor
     
     def convert_dict_of_arrays(self, dict_arrays: Dict[Any, np.ndarray], 
@@ -119,46 +168,80 @@ class GridToTensor:
     
     def __init__(self, device: Optional[torch.device] = None):
         """
-        Initialize the adapter.
+        Initialize the adapter for converting grid data to PyTorch tensors.
         
         Args:
-            device: The PyTorch device to place tensors on
+            device: The PyTorch device to place tensors on. If None, uses CUDA if 
+                   available, otherwise CPU.
         """
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    def convert_grid(self, q_grid: np.ndarray, map_shape: Tuple[int, int, int]) -> Tuple[torch.Tensor, Tuple[int, int, int]]:
+    def convert_grid(self, q_grid: np.ndarray, map_shape: Tuple[int, int, int], 
+                    requires_grad: bool = True) -> Tuple[torch.Tensor, Tuple[int, int, int]]:
         """
-        Convert a grid of q-vectors to PyTorch tensor.
+        Convert a grid of q-vectors to PyTorch tensor with gradient support.
         
         Args:
             q_grid: NumPy array of shape (n_points, 3) with q-vectors
-            map_shape: Tuple with 3D map shape
+            map_shape: Tuple with 3D map shape (dim_h, dim_k, dim_l)
+            requires_grad: Whether the tensor requires gradients for backpropagation
             
         Returns:
             Tuple containing:
-                - PyTorch tensor of q-vectors
+                - PyTorch tensor of q-vectors with shape (n_points, 3)
                 - Tuple with map shape (unchanged)
+                
+        Note:
+            The q-grid tensor will have requires_grad=True by default, as it's
+            typically used in gradient-based optimization.
         """
-        # TODO: Convert q_grid to PyTorch tensor
-        # TODO: Set requires_grad to True
-        # TODO: Return tensor and shape
+        if q_grid is None:
+            raise ValueError("q_grid cannot be None")
+            
+        if q_grid.size == 0:
+            # Handle empty grid
+            q_grid_tensor = torch.zeros((0, 3), dtype=torch.float32, device=self.device)
+            q_grid_tensor.requires_grad_(requires_grad)
+            return q_grid_tensor, map_shape
+            
+        # Convert to tensor with gradient support
+        q_grid_tensor = torch.tensor(q_grid, dtype=torch.float32, device=self.device)
+        q_grid_tensor.requires_grad_(requires_grad)
         
-        raise NotImplementedError("convert_grid not implemented")
+        return q_grid_tensor, map_shape
     
-    def convert_mask(self, mask: np.ndarray) -> torch.Tensor:
+    def convert_mask(self, mask: np.ndarray, requires_grad: bool = False) -> torch.Tensor:
         """
         Convert a boolean mask to PyTorch tensor.
         
         Args:
-            mask: NumPy boolean array
+            mask: NumPy boolean array of any shape
+            requires_grad: Whether the tensor requires gradients (defaults to False for masks)
             
         Returns:
-            PyTorch boolean tensor
+            PyTorch boolean tensor on the specified device
+            
+        Examples:
+            >>> adapter = GridToTensor()
+            >>> mask_np = np.array([True, False, True])
+            >>> mask_tensor = adapter.convert_mask(mask_np)
+            >>> mask_tensor.dtype
+            torch.bool
         """
-        # TODO: Convert mask to PyTorch tensor
-        # TODO: Ensure boolean dtype
+        if mask is None:
+            return None
+            
+        if mask.size == 0:
+            # Handle empty mask
+            mask_tensor = torch.zeros(mask.shape, dtype=torch.bool, device=self.device)
+        else:
+            # Ensure boolean dtype is preserved
+            mask_tensor = torch.tensor(mask, dtype=torch.bool, device=self.device)
         
-        raise NotImplementedError("convert_mask not implemented")
+        # Masks typically don't need gradients, but allow it to be set if needed
+        mask_tensor.requires_grad_(requires_grad)
+        
+        return mask_tensor
     
     def convert_symmetry_ops(self, sym_ops: Dict[int, np.ndarray]) -> Dict[int, torch.Tensor]:
         """
@@ -185,7 +268,11 @@ class TensorToNumpy:
     
     def __init__(self):
         """
-        Initialize the adapter.
+        Initialize the adapter for converting PyTorch tensors back to NumPy arrays.
+        
+        This adapter handles proper detachment of gradients and device transfer
+        to ensure safe conversion back to NumPy for visualization, saving, or
+        compatibility with existing code.
         """
         pass
     
@@ -194,18 +281,28 @@ class TensorToNumpy:
         Convert a PyTorch tensor to a NumPy array.
         
         Args:
-            tensor: PyTorch tensor to convert
+            tensor: PyTorch tensor to convert, can be of any shape or dtype
             
         Returns:
             NumPy array with the same data
+            
+        Note:
+            This method properly detaches gradients and moves the tensor to CPU
+            before conversion, ensuring safe conversion regardless of the tensor's
+            original device or gradient status.
         """
         if tensor is None:
             return None
             
+        # Detach from computation graph if it requires gradients
         if tensor.requires_grad:
             tensor = tensor.detach()
         
-        return tensor.cpu().numpy()
+        # Move to CPU if on another device
+        if tensor.device.type != 'cpu':
+            tensor = tensor.cpu()
+        
+        return tensor.numpy()
     
     def convert_dict_of_tensors(self, dict_tensors: Dict[Any, torch.Tensor]) -> Dict[Any, np.ndarray]:
         """
@@ -221,20 +318,48 @@ class TensorToNumpy:
     
     def convert_intensity_map(self, intensity: torch.Tensor, map_shape: Tuple[int, int, int]) -> np.ndarray:
         """
-        Convert an intensity map tensor to a NumPy array.
+        Convert an intensity map tensor to a NumPy array with proper shape.
         
         Args:
-            intensity: PyTorch tensor with intensity values
-            map_shape: Tuple with desired 3D shape
+            intensity: PyTorch tensor with intensity values, either flat (n_points,) 
+                      or already shaped (dim_h, dim_k, dim_l)
+            map_shape: Tuple with desired 3D shape (dim_h, dim_k, dim_l)
             
         Returns:
-            NumPy array with intensity map reshaped to 3D
+            NumPy array with intensity map reshaped to 3D with shape map_shape
+            
+        Note:
+            If the input tensor is already 3D and matches map_shape, it will be
+            returned as-is (after detaching and converting to NumPy).
         """
-        # TODO: Detach tensor if it requires gradients
-        # TODO: Convert to CPU NumPy array
-        # TODO: Reshape to 3D if necessary
+        if intensity is None:
+            return None
+            
+        # Detach from computation graph if it requires gradients
+        if intensity.requires_grad:
+            intensity = intensity.detach()
         
-        raise NotImplementedError("convert_intensity_map not implemented")
+        # Move to CPU if on another device
+        if intensity.device.type != 'cpu':
+            intensity = intensity.cpu()
+        
+        # Convert to NumPy
+        intensity_np = intensity.numpy()
+        
+        # Reshape if necessary
+        if intensity_np.ndim == 1:
+            # Flat array needs reshaping
+            total_points = map_shape[0] * map_shape[1] * map_shape[2]
+            if intensity_np.size != total_points:
+                raise ValueError(f"Intensity tensor size {intensity_np.size} doesn't match "
+                                f"map_shape total size {total_points}")
+            intensity_np = intensity_np.reshape(map_shape)
+        elif intensity_np.shape != map_shape:
+            # Already 3D but wrong shape
+            raise ValueError(f"Intensity tensor shape {intensity_np.shape} doesn't match "
+                            f"requested map_shape {map_shape}")
+        
+        return intensity_np
 
 class ModelAdapters:
     """
@@ -246,10 +371,15 @@ class ModelAdapters:
     
     def __init__(self, device: Optional[torch.device] = None):
         """
-        Initialize the adapters.
+        Initialize the adapters for high-level model conversion.
+        
+        This class provides integrated conversion between NumPy and PyTorch
+        implementations of the various model classes used in diffuse scattering
+        calculations.
         
         Args:
-            device: The PyTorch device to place tensors on
+            device: The PyTorch device to place tensors on. If None, uses CUDA if
+                   available, otherwise CPU.
         """
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.pdb_to_tensor = PDBToTensor(device)
@@ -260,33 +390,101 @@ class ModelAdapters:
         """
         Adapt inputs for the OnePhonon model from NumPy to PyTorch.
         
+        This method extracts the necessary inputs from a NumPy-based OnePhonon model
+        and converts them to PyTorch tensors for use with the PyTorch implementation.
+        
         Args:
             np_model: OnePhonon instance from eryx.models
             
         Returns:
-            Dictionary with PyTorch tensor versions of inputs
+            Dictionary with PyTorch tensor versions of inputs structured for
+            the PyTorch implementation
+            
+        Note:
+            Expected model attributes include:
+            - model: AtomicModel instance
+            - q_grid: Grid of q-vectors
+            - map_shape: Shape of the map
+            - hsampling, ksampling, lsampling: Sampling parameters
+            - gnm: GaussianNetworkModel instance (if available)
         """
-        # TODO: Extract necessary inputs
-        # TODO: Convert to PyTorch tensors
-        # TODO: Structure for easy passing to PyTorch implementation
+        if np_model is None:
+            raise ValueError("Cannot adapt None model")
+            
+        result = {}
         
-        raise NotImplementedError("adapt_one_phonon_inputs not implemented")
+        # Convert atomic model if available
+        if hasattr(np_model, 'model') and np_model.model is not None:
+            result['model'] = self.pdb_to_tensor.convert_atomic_model(np_model.model)
+        
+        # Convert grid data if available
+        if hasattr(np_model, 'q_grid') and hasattr(np_model, 'map_shape'):
+            result['q_grid'], result['map_shape'] = self.grid_to_tensor.convert_grid(
+                np_model.q_grid, np_model.map_shape
+            )
+        
+        # Convert sampling parameters
+        for param in ['hsampling', 'ksampling', 'lsampling']:
+            if hasattr(np_model, param):
+                result[param] = getattr(np_model, param)
+        
+        # Convert GNM if available
+        if hasattr(np_model, 'gnm') and np_model.gnm is not None:
+            # Extract key parameters from GNM
+            gnm_params = {}
+            for param in ['enm_cutoff', 'gamma_intra', 'gamma_inter']:
+                if hasattr(np_model.gnm, param):
+                    gnm_params[param] = getattr(np_model.gnm, param)
+            result['gnm_params'] = gnm_params
+        
+        # Convert other scalar parameters
+        scalar_params = ['res_limit', 'expand_p1', 'group_by', 'model']
+        for param in scalar_params:
+            if hasattr(np_model, param):
+                result[param] = getattr(np_model, param)
+        
+        return result
     
     def adapt_one_phonon_outputs(self, torch_outputs: Dict[str, torch.Tensor]) -> np.ndarray:
         """
         Adapt outputs from the PyTorch OnePhonon model back to NumPy.
         
+        This method extracts the intensity map from the PyTorch model outputs
+        and converts it back to a NumPy array for visualization or further processing.
+        
         Args:
-            torch_outputs: Dictionary with PyTorch tensor outputs
+            torch_outputs: Dictionary with PyTorch tensor outputs, containing at minimum:
+                          - 'intensity': The diffuse intensity tensor
+                          - 'map_shape': The shape for the output map
             
         Returns:
-            NumPy array with intensity map
+            NumPy array with intensity map in the appropriate shape
+            
+        Note:
+            The intensity tensor can be either flat (n_points,) or already shaped
+            (dim_h, dim_k, dim_l). This method handles both cases.
         """
-        # TODO: Extract intensity map
-        # TODO: Convert to NumPy array
-        # TODO: Reshape if necessary
+        if torch_outputs is None:
+            raise ValueError("Cannot adapt None outputs")
+            
+        # Extract intensity map and map shape
+        if 'intensity' not in torch_outputs:
+            raise ValueError("Output dictionary must contain 'intensity' key")
+            
+        intensity = torch_outputs['intensity']
         
-        raise NotImplementedError("adapt_one_phonon_outputs not implemented")
+        # Get map shape
+        if 'map_shape' in torch_outputs:
+            map_shape = torch_outputs['map_shape']
+        else:
+            # If intensity is already shaped, use its shape
+            if intensity.dim() == 3:
+                map_shape = tuple(intensity.shape)
+            else:
+                raise ValueError("Output dictionary must contain 'map_shape' key for flat intensity")
+        
+        # Convert to NumPy with proper shape
+        return self.tensor_to_numpy.convert_intensity_map(intensity, map_shape)
     
     def adapt_rigid_body_translations_inputs(self, np_model: Any) -> Dict[str, Any]:
         """
