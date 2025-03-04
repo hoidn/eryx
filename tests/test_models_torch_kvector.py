@@ -55,8 +55,18 @@ class TestOnePhononKvector(unittest.TestCase):
         # Process each input/output pair from logs
         for i in range(len(logs) // 2):
             # Get input data and expected output
-            args = self.logger.serializer.deserialize(logs[2*i]['args'])
-            expected_output = self.logger.serializer.deserialize(logs[2*i+1]['result'])
+            # Handle different log formats - some logs might have 'args' key, others might have the args directly
+            if 'args' in logs[2*i]:
+                args = self.logger.serializer.deserialize(logs[2*i]['args'])
+            else:
+                # Assume the log entry itself is the args
+                args = self.logger.serializer.deserialize(logs[2*i])
+                
+            if 'result' in logs[2*i+1]:
+                expected_output = self.logger.serializer.deserialize(logs[2*i+1]['result'])
+            else:
+                # Assume the log entry itself is the result
+                expected_output = self.logger.serializer.deserialize(logs[2*i+1])
             
             # Call the method
             actual_output = self.model._center_kvec(*args)
@@ -73,9 +83,19 @@ class TestOnePhononKvector(unittest.TestCase):
         # Process each input/output pair from logs
         for i in range(len(logs) // 2):
             # Get input data and expected output
-            instance_data = self.logger.serializer.deserialize(logs[2*i]['args'])[0]
-            expected_kvec = self.logger.serializer.deserialize(logs[2*i+1]['result'][0])
-            expected_kvec_norm = self.logger.serializer.deserialize(logs[2*i+1]['result'][1])
+            # Handle different log formats
+            if 'args' in logs[2*i]:
+                instance_data = self.logger.serializer.deserialize(logs[2*i]['args'])[0]
+            else:
+                instance_data = self.logger.serializer.deserialize(logs[2*i])[0]
+                
+            if 'result' in logs[2*i+1]:
+                result_data = self.logger.serializer.deserialize(logs[2*i+1]['result'])
+            else:
+                result_data = self.logger.serializer.deserialize(logs[2*i+1])
+                
+            expected_kvec = result_data[0]
+            expected_kvec_norm = result_data[1]
             
             # Create a partially initialized OnePhonon instance
             model = OnePhonon.__new__(OnePhonon)
@@ -112,10 +132,19 @@ class TestOnePhononKvector(unittest.TestCase):
         # Process each input/output pair from logs
         for i in range(len(logs) // 2):
             # Get input data and expected output
-            args = self.logger.serializer.deserialize(logs[2*i]['args'])
+            # Handle different log formats
+            if 'args' in logs[2*i]:
+                args = self.logger.serializer.deserialize(logs[2*i]['args'])
+            else:
+                args = self.logger.serializer.deserialize(logs[2*i])
+                
             instance_data = args[0]
             hkl_kvec = args[1]
-            expected_output = self.logger.serializer.deserialize(logs[2*i+1]['result'])
+            
+            if 'result' in logs[2*i+1]:
+                expected_output = self.logger.serializer.deserialize(logs[2*i+1]['result'])
+            else:
+                expected_output = self.logger.serializer.deserialize(logs[2*i+1])
             
             # Create a partially initialized OnePhonon instance
             model = OnePhonon.__new__(OnePhonon)
@@ -140,6 +169,9 @@ class TestOnePhononKvector(unittest.TestCase):
     
     def test_gradient_flow(self):
         """Test gradient flow through k-vector operations."""
+        # Enable anomaly detection to help debug gradient issues
+        torch.autograd.set_detect_anomaly(True)
+        
         # Test gradient flow through _build_kvec_Brillouin
         model = self._create_test_model()
         
@@ -150,7 +182,8 @@ class TestOnePhononKvector(unittest.TestCase):
         model._build_kvec_Brillouin()
         
         # Create a scalar output dependent on the results
-        output = model.kvec.sum() + model.kvec_norm.sum()
+        # Use clone() to avoid in-place operations that break gradient flow
+        output = model.kvec.clone().sum() + model.kvec_norm.clone().sum()
         
         # Compute gradients
         output.backward()
@@ -160,10 +193,14 @@ class TestOnePhononKvector(unittest.TestCase):
         self.assertFalse(torch.allclose(model.A_inv.grad, torch.zeros_like(model.A_inv.grad)),
                         "No gradient flow to A_inv")
         
-        # Reset grads and test _at_kvec_from_miller_points
-        # This is mostly for ensuring the method runs without error in backward pass
-        # rather than checking specific gradient values, as it's primarily an indexing operation
-        model.A_inv.grad = None
+        # Disable anomaly detection for the rest of the tests
+        torch.autograd.set_detect_anomaly(False)
+        
+        # Create a new model for the second test to avoid gradient issues
+        model = self._create_test_model()
+        model.A_inv.requires_grad_(True)
+        
+        # Test _at_kvec_from_miller_points
         hkl_kvec = (0, 0, 0)
         
         # Get indices
@@ -173,7 +210,8 @@ class TestOnePhononKvector(unittest.TestCase):
         dummy_data = torch.ones((np.prod(model.map_shape),), device=model.device, requires_grad=True)
         
         # Index into the dummy data using the indices
-        selected = dummy_data[indices]
+        # Use clone() to avoid in-place operations
+        selected = dummy_data[indices].clone()
         
         # Compute a scalar output and gradient
         output = selected.sum()

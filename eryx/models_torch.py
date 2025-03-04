@@ -344,17 +344,17 @@ class OnePhonon:
             - Original implementation: eryx/models.py:OnePhonon._build_kvec_Brillouin
         """
         # Initialize tensor arrays for k-vectors and their norms
-        self.kvec = torch.zeros((self.hsampling[2],
+        kvec = torch.zeros((self.hsampling[2],
+                           self.ksampling[2],
+                           self.lsampling[2],
+                           3), 
+                          device=self.device)
+        
+        kvec_norm = torch.zeros((self.hsampling[2],
                                 self.ksampling[2],
                                 self.lsampling[2],
-                                3), 
+                                1), 
                                device=self.device)
-        
-        self.kvec_norm = torch.zeros((self.hsampling[2],
-                                     self.ksampling[2],
-                                     self.lsampling[2],
-                                     1), 
-                                    device=self.device)
         
         # Get the appropriate A_inv tensor based on implementation
         A_inv = self.A_inv
@@ -372,10 +372,14 @@ class OnePhonon:
                     
                     # Compute k-vector in reciprocal space
                     # 2π * A_inv^T * k
-                    self.kvec[dh, dk, dl] = 2 * torch.pi * torch.matmul(A_inv.T, k_vec)
+                    kvec[dh, dk, dl] = 2 * torch.pi * torch.matmul(A_inv.T, k_vec)
                     
                     # Compute and store the norm
-                    self.kvec_norm[dh, dk, dl, 0] = torch.norm(self.kvec[dh, dk, dl])
+                    kvec_norm[dh, dk, dl, 0] = torch.norm(kvec[dh, dk, dl])
+        
+        # Assign to self attributes after all computations to avoid in-place operations
+        self.kvec = kvec
+        self.kvec_norm = kvec_norm
     
     def _center_kvec(self, x: int, L: int) -> float:
         """
