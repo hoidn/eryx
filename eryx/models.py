@@ -460,6 +460,7 @@ class OnePhonon:
         representation of the asymmetric units, optionally reduced
         to a set of interacting rigid bodies.
         """
+        import numpy as np  # Import numpy locally to avoid reference error
         if use_data_adp:
             ADP = self.model.adp[0] / (8 * np.pi * np.pi)
         else:
