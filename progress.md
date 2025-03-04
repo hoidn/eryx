@@ -8,10 +8,10 @@ This document tracks the implementation progress of the PyTorch port for the dif
 |-------|-------------|--------|------------|
 | Phase 1 | Core Utilities | In Progress | 77% |
 | Phase 2 | Adapter Components | Not Started | 0% |
-| Phase 3 | Core Functions | Not Started | 0% |
+| Phase 3 | Core Functions | In Progress | 50% |
 | Phase 4 | OnePhonon Model | Not Started | 0% |
 | Phase 5 | Integration | Not Started | 0% |
-| **Overall** | **All Phases** | **In Progress** | **15%** |
+| **Overall** | **All Phases** | **In Progress** | **25%** |
 
 ## Ground Truth Data
 
@@ -111,7 +111,7 @@ Additional debug runs with focused tests may be needed to generate these missing
 |------------|-------------|--------|----------------|
 | CP1 | Core Utilities Complete | In Progress (77%) | - |
 | CP2 | Adapters Complete | Not Started | - |
-| CP3 | Map Utils Complete | Not Started | - |
+| CP3 | Map Utils Complete | Complete | March 04, 2025 |
 | CP4 | Scatter Complete | Not Started | - |
 | CP5 | Matrix Construction Complete | Not Started | - |
 | CP6 | K-vector Methods Complete | Not Started | - |
@@ -122,14 +122,14 @@ Additional debug runs with focused tests may be needed to generate these missing
 
 ## Current Focus
 
-The current implementation focus is on completing Phase 1: Core Utilities.
+CP3 (Map Utils Complete) has been completed. The current implementation focus is now on CP4: Scatter Complete.
 
 ### Next Steps
-1. Complete FFTOps implementation in torch_utils.py
-2. Write unit tests for all FFTOps methods
-3. Generate missing log files for `eryx.models.compute_covariance_matrix` and `eryx.pdb.flatten_model`
-4. Begin implementation of Adapter Components (Phase 2)
-5. Create comprehensive test suite for Phase 1 components
+1. Implement `compute_form_factors` in scatter_torch.py
+2. Implement `structure_factors_batch` in scatter_torch.py
+3. Implement `structure_factors` in scatter_torch.py
+4. Create comprehensive test suite for scatter_torch.py components
+5. Generate missing log files for `eryx.models.compute_covariance_matrix` and `eryx.pdb.flatten_model`
 
 ### Blockers and Challenges
 - Missing log files for `eryx.models.compute_covariance_matrix` and `eryx.pdb.flatten_model` may affect testing

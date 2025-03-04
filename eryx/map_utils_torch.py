@@ -41,26 +41,23 @@ def generate_grid(A_inv: torch.Tensor, hsampling: Tuple[float, float, float],
     lsteps = int(lsampling[2] * (lsampling[1] - lsampling[0]) + 1)
     
     # Create linspace for each dimension
-    l_grid = torch.linspace(lsampling[0], lsampling[1], lsteps)
-    k_grid = torch.linspace(ksampling[0], ksampling[1], ksteps)
-    h_grid = torch.linspace(hsampling[0], hsampling[1], hsteps)
+    h_grid = torch.linspace(hsampling[0], hsampling[1], hsteps, device=A_inv.device)
+    k_grid = torch.linspace(ksampling[0], ksampling[1], ksteps, device=A_inv.device)
+    l_grid = torch.linspace(lsampling[0], lsampling[1], lsteps, device=A_inv.device)
     
-    # Create meshgrid
-    # Note: torch.meshgrid behavior changed in PyTorch 1.10
-    # Using indexing='ij' to match NumPy's default behavior
-    l_mesh, k_mesh, h_mesh = torch.meshgrid(l_grid, k_grid, h_grid, indexing='ij')
+    # Create meshgrid - using indexing='ij' to match NumPy's default behavior
+    h_mesh, k_mesh, l_mesh = torch.meshgrid(h_grid, k_grid, l_grid, indexing='ij')
     
     # Get map shape
-    map_shape = (h_mesh.size(2), k_mesh.size(1), l_mesh.size(0))
+    map_shape = (h_mesh.size(0), k_mesh.size(1), l_mesh.size(2))
     
-    # Reshape and reorder dimensions
+    # Reshape and reorder dimensions to match NumPy version
     hkl_grid = torch.stack([h_mesh.flatten(), k_mesh.flatten(), l_mesh.flatten()], dim=1)
     
     if return_hkl:
         return hkl_grid, map_shape
     else:
-        # Calculate q_grid using matrix multiplication
-        # q_grid = 2π * A_inv^T * hkl_grid^T
+        # Calculate q_grid using matrix multiplication: q_grid = 2π * A_inv^T * hkl_grid^T
         q_grid = 2 * torch.pi * torch.matmul(A_inv.T, hkl_grid.T).T
         return q_grid, map_shape
 
@@ -189,7 +186,7 @@ def compute_resolution(cell: torch.Tensor, hkl: torch.Tensor) -> torch.Tensor:
     # Extract Miller indices
     h, k, l = hkl[:, 0], hkl[:, 1], hkl[:, 2]
     
-    # Calculate terms
+    # Calculate terms for the formula
     pf = 1.0 - cos_sq(alpha) - cos_sq(beta) - cos_sq(gamma) + 2.0 * torch.cos(alpha) * torch.cos(beta) * torch.cos(gamma)
     
     n1 = torch.square(h) * sin_sq(alpha) / torch.square(a) + \
@@ -202,8 +199,9 @@ def compute_resolution(cell: torch.Tensor, hkl: torch.Tensor) -> torch.Tensor:
     
     # Calculate resolution with safe division
     denominator = (n1 + n2a + n2b + n2c) / pf
+    
     # Handle potential divide by zero
-    safe_denominator = torch.where(denominator > 0, denominator, torch.ones_like(denominator))
+    safe_denominator = torch.where(denominator > 0, denominator, torch.ones_like(denominator) * 1e-10)
     resolution = 1.0 / torch.sqrt(safe_denominator)
     
     # Set resolution to infinity where denominator is zero or negative
@@ -229,10 +227,11 @@ def get_resolution_mask(cell: torch.Tensor, hkl_grid: torch.Tensor,
     References:
         - Original implementation: eryx/map_utils.py:get_resolution_mask
     """
-    # Compute resolution map
+    # Compute resolution map for each grid point
     res_map = compute_resolution(cell, hkl_grid)
     
-    # Create mask by comparing to res_limit
+    # Create boolean mask by comparing to resolution limit
+    # Points with resolution > res_limit are kept (True)
     res_mask = res_map > res_limit
     
     return res_mask, res_map
