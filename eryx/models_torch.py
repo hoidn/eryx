@@ -772,7 +772,9 @@ class OnePhonon:
         
         # Extract ADPs from the diagonal of the reference cell covariance
         # Use torch.diagonal for gradient compatibility
-        self.ADP = torch.real(torch.diagonal(self.covar[:, id_cell_ref, :], dim1=0, dim2=2))
+        # For a tensor of shape (n_asu*n_dof_per_asu, n_cell, n_asu*n_dof_per_asu),
+        # we need to get the diagonal between the first and last dimensions
+        self.ADP = torch.real(torch.diagonal(self.covar[:, id_cell_ref, :], dim1=0, dim2=1))
         
         # Project ADPs using Amat
         # Transpose and reshape Amat for matrix multiplication
