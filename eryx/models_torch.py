@@ -804,29 +804,134 @@ class OnePhonon:
             self.n_cell, self.n_asu, self.n_dof_per_asu))
     
     def apply_disorder(self, rank: int = -1, outdir: Optional[str] = None, 
-                     use_data_adp: bool = False):
+                     use_data_adp: bool = False) -> torch.Tensor:
         """
-        Compute diffuse intensity map using PyTorch operations.
+        Compute diffuse intensity in the one-phonon approximation using PyTorch.
+        
+        This method produces the diffuse intensity map by applying the phonon-based
+        disorder model, combining structure factors with phonon modes and frequencies.
         
         Args:
-            rank: If -1, sum across ranks; else use specific rank
-            outdir: Directory to save results
-            use_data_adp: If True, use ADPs from data instead of computed ones
+            rank: Optional phonon mode selection. If -1 (default), use all modes.
+                  Otherwise, use only the specified mode.
+            outdir: Optional directory to save output files
+            use_data_adp: Whether to use experimental ADPs from input data instead
+                         of computed ADPs from the model
             
         Returns:
-            torch.Tensor: Diffuse intensity map
+            PyTorch tensor of shape (n_points,) containing diffuse intensity values.
+            Values outside the resolution mask are set to NaN.
+            
+        Note:
+            This is the final computational step in the diffuse scattering calculation,
+            combining all previous components:
+            - Structure factors from scatter_torch.py
+            - Phonon modes and frequencies from compute_gnm_phonons
+            - K-vector selection using _at_kvec_from_miller_points
             
         References:
             - Original implementation: eryx/models.py:OnePhonon.apply_disorder
         """
-        # TODO: Choose appropriate ADPs based on use_data_adp
-        # TODO: Initialize output tensor with complex dtype
-        # TODO: For each k-vector, compute structure factors
-        # TODO: Apply phonon mode calculations and summation
-        # TODO: Apply resolution mask
-        # TODO: Save results if outdir is provided
+        # Select appropriate ADPs based on flag
+        if use_data_adp:
+            ADP = self.model.adp[0] / (8 * torch.pi * torch.pi)
+        else:
+            ADP = self.ADP
+            
+        # Initialize diffuse intensity tensor with complex dtype
+        Id = torch.zeros(self.q_grid.shape[0], dtype=torch.complex64, device=self.device)
         
-        raise NotImplementedError("OnePhonon.apply_disorder not implemented")
+        # Import structure_factors from scatter_torch
+        from eryx.scatter_torch import structure_factors
+        
+        # Loop through all k-vectors in the Brillouin zone
+        for dh in range(self.hsampling[2]):
+            for dk in range(self.ksampling[2]):
+                for dl in range(self.lsampling[2]):
+                    # Get q-vector indices that are k-vector away from Miller indices
+                    q_indices = self._at_kvec_from_miller_points((dh, dk, dl))
+                    
+                    # Apply resolution mask
+                    mask = self.res_mask[q_indices]
+                    valid_indices = q_indices[mask]
+                    
+                    # Skip if no valid points after masking
+                    if valid_indices.shape[0] == 0:
+                        continue
+                        
+                    # Initialize structure factor tensor for all ASUs
+                    F = torch.zeros((valid_indices.shape[0], 
+                                   self.n_asu, 
+                                   self.n_dof_per_asu), 
+                                  dtype=torch.complex64, 
+                                  device=self.device)
+                    
+                    # Compute structure factors for each asymmetric unit
+                    for i_asu in range(self.n_asu):
+                        F[:, i_asu, :] = structure_factors(
+                            self.q_grid[valid_indices],
+                            self.model.xyz[i_asu],
+                            self.model.ff_a[i_asu],
+                            self.model.ff_b[i_asu],
+                            self.model.ff_c[i_asu],
+                            U=ADP,
+                            batch_size=self.batch_size,
+                            compute_qF=True,
+                            project_on_components=self.Amat[i_asu],
+                            sum_over_atoms=False
+                        )
+                    
+                    # Reshape for matrix multiplication with eigenvectors
+                    F = F.reshape((valid_indices.shape[0], self.n_asu * self.n_dof_per_asu))
+                    
+                    # Handle different rank modes
+                    if rank == -1:
+                        # Use all phonon modes (full calculation)
+                        # Multiply structure factors by eigenvectors
+                        FV = torch.matmul(F, self.V[dh, dk, dl])
+                        
+                        # Compute |F·V|² for all modes
+                        FV_abs_squared = torch.abs(FV)**2
+                        
+                        # Weight by eigenvalues (Winv) and sum
+                        weighted_intensity = torch.matmul(FV_abs_squared, self.Winv[dh, dk, dl])
+                        
+                        # Update diffuse intensity at valid indices
+                        # Using index_add_ for better gradient support than direct indexing
+                        Id.index_add_(0, valid_indices, weighted_intensity)
+                    else:
+                        # Use only the selected phonon mode (rank)
+                        # Select the specific eigenvector
+                        V_rank = self.V[dh, dk, dl, :, rank]
+                        
+                        # Multiply structure factors by the selected eigenvector
+                        FV = torch.matmul(F, V_rank)
+                        
+                        # Compute |F·V|² and weight by the eigenvalue
+                        weighted_intensity = torch.abs(FV)**2 * self.Winv[dh, dk, dl, rank]
+                        
+                        # Update diffuse intensity at valid indices
+                        Id.index_add_(0, valid_indices, weighted_intensity)
+        
+        # Apply resolution mask and take real part
+        # Set values outside resolution mask to NaN
+        Id_masked = torch.full_like(Id, float('nan'), dtype=torch.float32)
+        Id_masked[self.res_mask] = torch.real(Id[self.res_mask])
+        
+        # Save output if directory is provided
+        if outdir is not None:
+            import os
+            import numpy as np
+            
+            # Create output directory if it doesn't exist
+            os.makedirs(outdir, exist_ok=True)
+            
+            # Save as both PyTorch tensor and NumPy array
+            torch.save(Id_masked, os.path.join(outdir, f"rank_{rank:05d}_torch.pt"))
+            np.save(os.path.join(outdir, f"rank_{rank:05d}.npy"), 
+                   Id_masked.detach().cpu().numpy())
+        
+        return Id_masked
 
 # Add stubs for additional classes as well:
 

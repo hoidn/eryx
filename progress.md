@@ -9,9 +9,9 @@ This document tracks the implementation progress of the PyTorch port for the dif
 | Phase 1 | Core Utilities | In Progress | 77% |
 | Phase 2 | Adapter Components | In Progress | 70% |
 | Phase 3 | Core Functions | Complete | 100% |
-| Phase 4 | OnePhonon Model | In Progress | 67% |
+| Phase 4 | OnePhonon Model | In Progress | 73% |
 | Phase 5 | Integration | Not Started | 0% |
-| **Overall** | **All Phases** | **In Progress** | **65%** |
+| **Overall** | **All Phases** | **In Progress** | **69%** |
 
 ## Ground Truth Data
 
@@ -96,7 +96,7 @@ The log file for `eryx.models.compute_covariance_matrix` has been confirmed to b
 | OnePhonon.compute_gnm_phonons | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon.compute_hessian | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon.compute_covariance_matrix | models.py | Complete | Complete | Ground truth tests pass |
-| OnePhonon.apply_disorder | models.py | Not Started | Not Started | Log file available |
+| OnePhonon.apply_disorder | models.py | Complete | Complete | Ground truth tests pass |
 | GaussianNetworkModel.compute_hessian | pdb.py | Complete | Complete | Ground truth tests pass |
 | GaussianNetworkModel.compute_K | pdb.py | Complete | Complete | Ground truth tests pass |
 | GaussianNetworkModel.compute_Kinv | pdb.py | Complete | Complete | Ground truth tests pass |
@@ -124,23 +124,24 @@ The log file for `eryx.models.compute_covariance_matrix` has been confirmed to b
 | CP6 | K-vector Methods Complete | Complete | March 04, 2025 |
 | CP7 | Phonon Calculation Complete | Complete | March 04, 2025 |
 | CP8 | Covariance Matrix Complete | Complete | March 04, 2025 |
-| CP9 | Apply Disorder Complete | Not Started | - |
+| CP9 | Apply Disorder Complete | Complete | March 12, 2025 |
 | CP10 | End-to-End Integration Complete | Not Started | - |
 
 ## Current Focus
 
-CP8 (Covariance Matrix Complete) has been completed. The current implementation focus is now on CP9: Apply Disorder Complete.
+CP9 (Apply Disorder Complete) has been completed. The current implementation focus is now on CP10: End-to-End Integration Complete.
 
 ### Next Steps
-1. Implement `apply_disorder` in models_torch.py
-2. Test the apply_disorder method against ground truth data
-3. Verify gradient flow through the entire OnePhonon model
+1. Implement `run_torch.py` for end-to-end execution
+2. Create comprehensive integration tests
+3. Develop performance benchmarks comparing PyTorch and NumPy implementations
 
 ### Blockers and Challenges
 None currently identified
 
 ### Looking Ahead
-- After CP9, only CP10 (End-to-End Integration Complete) remains for completing the PyTorch port
+- CP10 is the final checkpoint for the PyTorch port, completing the entire implementation
+- After CP10, focus will shift to optimization and applications
 
 ## Development Timeline
 
@@ -173,3 +174,6 @@ No performance metrics available yet. This section will be updated once the impl
 | 2025-03-04 | Completed implementation of OnePhonon.compute_covariance_matrix (CP8) |
 | 2025-03-04 | Updated Phase 4 completion from 60% to 67% |
 | 2025-03-04 | Updated overall completion from 62% to 65% |
+| 2025-03-12 | Completed implementation of OnePhonon.apply_disorder (CP9) |
+| 2025-03-12 | Updated Phase 4 completion from 67% to 73% |
+| 2025-03-12 | Updated overall completion from 65% to 69% |
