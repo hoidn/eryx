@@ -414,27 +414,27 @@ class TestModelAdapters(unittest.TestCase):
             'res_limit': 2.0,
             'expand_p1': True,
             'group_by': 'asu',
-            'model': 'gnm'
+            'model_type': 'gnm'
         })
         
         # Test adapt_one_phonon_inputs
         inputs_dict = self.adapter.adapt_one_phonon_inputs(mock_model)
         
         # Verify key components are converted
-        self.assertIn('model', inputs_dict)
+        self.assertIn('atomic_model', inputs_dict)
         self.assertIn('q_grid', inputs_dict)
         self.assertIn('map_shape', inputs_dict)
         self.assertIn('gnm_params', inputs_dict)
         
         # Verify tensor conversion
-        self.assertIsInstance(inputs_dict['model']['xyz'], torch.Tensor)
+        self.assertIsInstance(inputs_dict['atomic_model']['xyz'], torch.Tensor)
         self.assertIsInstance(inputs_dict['q_grid'], torch.Tensor)
         
         # Verify scalar parameters are preserved
         self.assertEqual(inputs_dict['res_limit'], 2.0)
         self.assertEqual(inputs_dict['expand_p1'], True)
         self.assertEqual(inputs_dict['group_by'], 'asu')
-        self.assertEqual(inputs_dict['model'], 'gnm')
+        self.assertEqual(inputs_dict['model_type'], 'gnm')
         
         # Verify GNM parameters
         self.assertEqual(inputs_dict['gnm_params']['enm_cutoff'], 4.0)

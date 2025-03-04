@@ -118,6 +118,7 @@ class PDBToTensor:
         Args:
             array: NumPy array to convert. Can be of any shape or dtype.
             requires_grad: Whether the tensor requires gradients for backpropagation.
+                           Only applied to floating point tensors.
             
         Returns:
             PyTorch tensor with the same data, on the specified device with requires_grad set.
@@ -140,8 +141,11 @@ class PDBToTensor:
         else:
             # Use clone to avoid memory sharing issues with NumPy
             tensor = torch.from_numpy(array.copy()).to(self.device)
+        
+        # Only set requires_grad for floating point tensors
+        if requires_grad and tensor.dtype.is_floating_point:
+            tensor.requires_grad_(True)
             
-        tensor.requires_grad_(requires_grad)
         return tensor
     
     def convert_dict_of_arrays(self, dict_arrays: Dict[Any, np.ndarray], 
@@ -151,12 +155,17 @@ class PDBToTensor:
         
         Args:
             dict_arrays: Dictionary mapping keys to NumPy arrays
-            requires_grad: Whether tensors require gradients
+            requires_grad: Whether tensors require gradients (only applied to floating point tensors)
             
         Returns:
             Dictionary mapping the same keys to PyTorch tensors
         """
-        return {k: self.array_to_tensor(v, requires_grad) for k, v in dict_arrays.items()}
+        result = {}
+        for k, v in dict_arrays.items():
+            # Handle different dtypes appropriately
+            tensor = self.array_to_tensor(v, requires_grad=requires_grad)
+            result[k] = tensor
+        return result
 
 class GridToTensor:
     """
@@ -205,8 +214,12 @@ class GridToTensor:
             return q_grid_tensor, map_shape
             
         # Convert to tensor with gradient support
+        # Ensure we use float32 for consistent dtype
         q_grid_tensor = torch.tensor(q_grid, dtype=torch.float32, device=self.device)
-        q_grid_tensor.requires_grad_(requires_grad)
+        
+        # Only set requires_grad for floating point tensors
+        if requires_grad:
+            q_grid_tensor.requires_grad_(True)
         
         return q_grid_tensor, map_shape
     
@@ -217,6 +230,8 @@ class GridToTensor:
         Args:
             mask: NumPy boolean array of any shape
             requires_grad: Whether the tensor requires gradients (defaults to False for masks)
+                           Note: Boolean tensors cannot require gradients, this will be ignored
+                           for boolean masks.
             
         Returns:
             PyTorch boolean tensor on the specified device
@@ -238,8 +253,11 @@ class GridToTensor:
             # Ensure boolean dtype is preserved
             mask_tensor = torch.tensor(mask, dtype=torch.bool, device=self.device)
         
-        # Masks typically don't need gradients, but allow it to be set if needed
-        mask_tensor.requires_grad_(requires_grad)
+        # Boolean tensors cannot require gradients, so we ignore requires_grad
+        # If requires_grad is True and we need gradients, convert to float
+        if requires_grad:
+            # Convert to float tensor that can have gradients
+            return mask_tensor.to(torch.float32).requires_grad_(True)
         
         return mask_tensor
     
@@ -415,7 +433,8 @@ class ModelAdapters:
         
         # Convert atomic model if available
         if hasattr(np_model, 'model') and np_model.model is not None:
-            result['model'] = self.pdb_to_tensor.convert_atomic_model(np_model.model)
+            # Store the converted model in a separate key to avoid string indexing issues
+            result['atomic_model'] = self.pdb_to_tensor.convert_atomic_model(np_model.model)
         
         # Convert grid data if available
         if hasattr(np_model, 'q_grid') and hasattr(np_model, 'map_shape'):
@@ -438,10 +457,16 @@ class ModelAdapters:
             result['gnm_params'] = gnm_params
         
         # Convert other scalar parameters
-        scalar_params = ['res_limit', 'expand_p1', 'group_by', 'model']
+        scalar_params = ['res_limit', 'expand_p1', 'group_by']
         for param in scalar_params:
             if hasattr(np_model, param):
                 result[param] = getattr(np_model, param)
+        
+        # Handle the 'model' parameter separately to avoid confusion with the 'model' attribute
+        if hasattr(np_model, 'model_type'):
+            result['model_type'] = np_model.model_type
+        elif hasattr(np_model, 'model') and isinstance(np_model.model, str):
+            result['model_type'] = np_model.model
         
         return result
     
