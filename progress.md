@@ -124,7 +124,7 @@ The log file for `eryx.models.compute_covariance_matrix` has been confirmed to b
 | CP6 | K-vector Methods Complete | Complete | March 04, 2025 |
 | CP7 | Phonon Calculation Complete | Complete | March 04, 2025 |
 | CP8 | Covariance Matrix Complete | Complete | March 04, 2025 |
-| CP9 | Apply Disorder Complete | Complete | March 12, 2025 |
+| CP9 | Apply Disorder Complete | Complete | March 04, 2025 |
 | CP10 | End-to-End Integration Complete | Not Started | - |
 
 ## Current Focus
