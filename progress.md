@@ -6,12 +6,12 @@ This document tracks the implementation progress of the PyTorch port for the dif
 
 | Phase | Description | Status | Completion |
 |-------|-------------|--------|------------|
-| Phase 1 | Core Utilities | In Progress | 90% |
+| Phase 1 | Core Utilities | In Progress | 77% |
 | Phase 2 | Adapter Components | Not Started | 0% |
 | Phase 3 | Core Functions | Not Started | 0% |
 | Phase 4 | OnePhonon Model | Not Started | 0% |
 | Phase 5 | Integration | Not Started | 0% |
-| **Overall** | **All Phases** | **In Progress** | **20%** |
+| **Overall** | **All Phases** | **In Progress** | **15%** |
 
 ## Ground Truth Data
 
@@ -30,22 +30,23 @@ Additional debug runs with focused tests may be needed to generate these missing
 
 ## Function Implementation Status
 
- ### Phase 1: Core Utilities                                                                                                                                                                          
+### Phase 1: Core Utilities                                                                                                                                                                          
                                                                                                                                                                                                       
- | Function | Status | Tests | Notes |                                                                                                                                                                
- |----------|--------|-------|-------|                                                                                                                                                                
- | ComplexTensorOps.complex_exp | Complete | Complete | Implemented with gradient support |                                                                                                           
- | ComplexTensorOps.complex_mul | Complete | Complete | Implemented with gradient support |                                                                                                           
- | ComplexTensorOps.complex_abs_squared | Complete | Complete | Implemented with gradient support |                                                                                                   
- | ComplexTensorOps.complex_exp_dwf | Complete | Complete | Implemented with gradient support |                                                                                                       
- | EigenOps.svd_decomposition | Complete | Complete | Implemented with gradient support |                                                                                                             
- | EigenOps.eigen_decomposition | Complete | Complete | Implemented with gradient support |                                                                                                           
- | EigenOps.solve_linear_system | Complete | Complete | Implemented with gradient support |                                                                                                           
- | GradientUtils.finite_differences | Complete | Complete | Implemented for gradient validation |                                                                                                     
- | GradientUtils.validate_gradients | Complete | Complete | Implemented for gradient validation |                                                                                                     
- | GradientUtils.gradient_norm | Complete | Complete | Implemented for gradient validation |                                                                                                          
-| FFTOps methods | Not Started | Not Started | FFT utilities need implementation |
-
+| Function | Status | Tests | Notes |                                                                                                                                                                
+|----------|--------|-------|-------|                                                                                                                                                                
+| ComplexTensorOps.complex_exp | Complete | Complete | Implemented with gradient support |                                                                                                           
+| ComplexTensorOps.complex_mul | Complete | Complete | Implemented with gradient support |                                                                                                           
+| ComplexTensorOps.complex_abs_squared | Complete | Complete | Implemented with gradient support |                                                                                                   
+| ComplexTensorOps.complex_exp_dwf | Complete | Complete | Implemented with gradient support |                                                                                                       
+| EigenOps.svd_decomposition | Complete | Complete | Implemented with gradient support |                                                                                                             
+| EigenOps.eigen_decomposition | Complete | Complete | Implemented with gradient support |                                                                                                           
+| EigenOps.solve_linear_system | Complete | Complete | Implemented with gradient support |                                                                                                           
+| GradientUtils.finite_differences | Complete | Complete | Implemented for gradient validation |                                                                                                     
+| GradientUtils.validate_gradients | Complete | Complete | Implemented for gradient validation |                                                                                                     
+| GradientUtils.gradient_norm | Complete | Complete | Implemented for gradient validation |                                                                                                          
+| FFTOps.fft_convolve | Not Started | Not Started | FFT utility needs implementation |
+| FFTOps.fft_3d | Not Started | Not Started | FFT utility needs implementation |
+| FFTOps.ifft_3d | Not Started | Not Started | FFT utility needs implementation |
 
 ### Phase 2: Adapter Components
 
@@ -108,7 +109,7 @@ Additional debug runs with focused tests may be needed to generate these missing
 
 | Checkpoint | Description | Status | Date Completed |
 |------------|-------------|--------|----------------|
-| CP1 | Core Utilities Complete | In Progress (90%) | - |
+| CP1 | Core Utilities Complete | In Progress (77%) | - |
 | CP2 | Adapters Complete | Not Started | - |
 | CP3 | Map Utils Complete | Not Started | - |
 | CP4 | Scatter Complete | Not Started | - |
@@ -125,7 +126,7 @@ The current implementation focus is on completing Phase 1: Core Utilities.
 
 ### Next Steps
 1. Complete FFTOps implementation in torch_utils.py
-2. Write unit tests for all completed Phase 1 functions
+2. Write unit tests for all FFTOps methods
 3. Generate missing log files for `eryx.models.compute_covariance_matrix` and `eryx.pdb.flatten_model`
 4. Begin implementation of Adapter Components (Phase 2)
 5. Create comprehensive test suite for Phase 1 components
@@ -138,7 +139,7 @@ The current implementation focus is on completing Phase 1: Core Utilities.
 
 | Week | Planned Focus | Status |
 |------|---------------|--------|
-| Week 1-2 | Phase 1: Core Utilities | In Progress (90%) |
+| Week 1-2 | Phase 1: Core Utilities | In Progress (77%) |
 | Week 3 | Phase 2: Adapter Components | Not Started |
 | Week 4-5 | Phase 3: Core Functions | Not Started |
 | Week 6-8 | Phase 4: OnePhonon Model | Not Started |
@@ -157,3 +158,4 @@ No performance metrics available yet. This section will be updated once the impl
 | 2025-03-02 | Updated to note missing ground truth data files for some functions |
 | 2025-03-03 | Updated implementation status of Phase 1 Core Utilities in torch_utils.py |
 | 2025-03-03 | Corrected list of missing log files based on actual logs directory contents |
+| 2025-03-03 | Refined Phase 1 completion percentage (90% → 77%) with more detailed FFTOps function listing |
