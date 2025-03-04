@@ -252,7 +252,12 @@ class TestOnePhononMatrixConstruction(unittest.TestCase):
         
         # Mock coordinates with requires_grad=True
         def get_asu_xyz_side_effect(asu_id, unit_cell=None):
-            coords = torch.randn(model.n_atoms_per_asu, 3, device=model.device, requires_grad=True)
+            # Create coordinates that will produce non-zero gradients
+            # Use a pattern that ensures the skew-symmetric matrix has non-zero elements
+            coords = torch.ones(model.n_atoms_per_asu, 3, device=model.device) * (asu_id + 1.0)
+            # Add some variation to ensure unique gradients
+            coords = coords + torch.randn(model.n_atoms_per_asu, 3, device=model.device) * 0.1
+            coords.requires_grad_(True)
             model._coords_tensors.append(coords)
             return coords
         
@@ -262,8 +267,9 @@ class TestOnePhononMatrixConstruction(unittest.TestCase):
         model._build_A()
         self.assertIsNotNone(model.Amat)
         
-        # Create a loss function based on the output
-        loss = model.Amat.sum()
+        # Create a loss function based on the output that will produce meaningful gradients
+        # Use a more complex function than just sum() to ensure non-uniform gradients
+        loss = (model.Amat * torch.randn_like(model.Amat)).sum()
         loss.backward()
         
         # Check that gradients flowed back to the inputs
@@ -312,8 +318,10 @@ class TestOnePhononMatrixConstruction(unittest.TestCase):
         self.assertEqual(Mmat.shape, (model.n_asu, model.n_dof_per_asu, 
                                      model.n_asu, model.n_dof_per_asu))
         
-        # Create a loss based on the output
-        loss = Mmat.sum()
+        # Create a loss based on the output with non-uniform gradients
+        # Multiply by random tensor to ensure non-zero gradients throughout
+        random_weights = torch.randn_like(Mmat)
+        loss = (Mmat * random_weights).sum()
         loss.backward()
         
         # Check that gradients flowed back to the inputs
