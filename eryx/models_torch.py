@@ -894,7 +894,8 @@ class OnePhonon:
                         FV_abs_squared = torch.abs(FV)**2
                         
                         # Weight by eigenvalues (Winv) and sum
-                        weighted_intensity = torch.matmul(FV_abs_squared, self.Winv[dh, dk, dl])
+                        # Extract real part of Winv to ensure type compatibility
+                        weighted_intensity = torch.matmul(FV_abs_squared, torch.real(self.Winv[dh, dk, dl]))
                         
                         # Update diffuse intensity at valid indices
                         # Using index_add_ for better gradient support than direct indexing
@@ -908,7 +909,8 @@ class OnePhonon:
                         FV = torch.matmul(F, V_rank)
                         
                         # Compute |F·V|² and weight by the eigenvalue
-                        weighted_intensity = torch.abs(FV)**2 * self.Winv[dh, dk, dl, rank]
+                        # Extract real part of Winv to ensure type compatibility
+                        weighted_intensity = torch.abs(FV)**2 * torch.real(self.Winv[dh, dk, dl, rank])
                         
                         # Update diffuse intensity at valid indices
                         Id.index_add_(0, valid_indices, weighted_intensity)
