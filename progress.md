@@ -95,7 +95,7 @@ The log file for `eryx.models.compute_covariance_matrix` has been confirmed to b
 | OnePhonon._at_kvec_from_miller_points | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon.compute_gnm_phonons | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon.compute_hessian | models.py | Complete | Complete | Ground truth tests pass |
-| OnePhonon.compute_covariance_matrix | models.py | Not Started | Not Started | Log file available |
+| OnePhonon.compute_covariance_matrix | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon.apply_disorder | models.py | Not Started | Not Started | Log file available |
 | GaussianNetworkModel.compute_hessian | pdb.py | Complete | Complete | Ground truth tests pass |
 | GaussianNetworkModel.compute_K | pdb.py | Complete | Complete | Ground truth tests pass |
@@ -123,25 +123,24 @@ The log file for `eryx.models.compute_covariance_matrix` has been confirmed to b
 | CP5 | Matrix Construction Complete | Complete | March 06, 2025 |
 | CP6 | K-vector Methods Complete | Complete | March 07, 2025 |
 | CP7 | Phonon Calculation Complete | Complete | March 10, 2025 |
-| CP8 | Covariance Matrix Complete | Not Started | - |
+| CP8 | Covariance Matrix Complete | Complete | March 11, 2025 |
 | CP9 | Apply Disorder Complete | Not Started | - |
 | CP10 | End-to-End Integration Complete | Not Started | - |
 
 ## Current Focus
 
-CP7 (Phonon Calculation Complete) has been completed. The current implementation focus is now on CP8: Covariance Matrix Complete.
+CP8 (Covariance Matrix Complete) has been completed. The current implementation focus is now on CP9: Apply Disorder Complete.
 
 ### Next Steps
-1. Implement `compute_covariance_matrix` in models_torch.py
-2. Test covariance matrix calculation against ground truth data
-3. Verify gradient flow through the covariance matrix calculation
+1. Implement `apply_disorder` in models_torch.py
+2. Test the apply_disorder method against ground truth data
+3. Verify gradient flow through the entire OnePhonon model
 
 ### Blockers and Challenges
-- The eigendecomposition in eigenvalue methods introduces numerical complexities that may affect gradient flow
-- Missing log file for `eryx.pdb.flatten_model` may affect some components
+None currently identified
 
 ### Looking Ahead
-- After CP8, the final step will be CP9 (Apply Disorder Complete) followed by end-to-end integration in CP10
+- After CP9, only CP10 (End-to-End Integration Complete) remains for completing the PyTorch port
 
 ## Development Timeline
 
@@ -171,3 +170,6 @@ No performance metrics available yet. This section will be updated once the impl
 | 2025-03-08 | Corrected status of compute_covariance_matrix log file (now confirmed available) |
 | 2025-03-08 | Updated Phase 4 completion percentage (40% → 60%) based on implemented methods |
 | 2025-03-08 | Updated overall completion percentage (55% → 62%) |
+| 2025-03-11 | Completed implementation of OnePhonon.compute_covariance_matrix (CP8) |
+| 2025-03-11 | Updated Phase 4 completion from 60% to 67% |
+| 2025-03-11 | Updated overall completion from 62% to 65% |

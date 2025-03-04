@@ -709,17 +709,97 @@ class OnePhonon:
     
     def compute_covariance_matrix(self):
         """
-        Compute atomic displacement covariance matrix with PyTorch.
+        Compute covariance matrix for all asymmetric units with PyTorch operations.
         
+        This method calculates the atomic displacement covariance matrix from phonon modes
+        computed using the Gaussian Network Model. The covariance matrix is scaled to
+        match the ADPs (Atomic Displacement Parameters) in the input PDB file.
+        
+        The method populates the following instance variables:
+        - self.covar: Covariance matrix of shape (n_asu, n_dof_per_asu, n_cell, n_asu, n_dof_per_asu)
+        - self.ADP: Atomic displacement parameters derived from the covariance matrix
+        
+        Tensor shapes and dimensions:
+        - covar: (n_asu*n_dof_per_asu, n_cell, n_asu*n_dof_per_asu) initially,
+                then reshaped to (n_asu, n_dof_per_asu, n_cell, n_asu, n_dof_per_asu)
+        - kvec: (n_h, n_k, n_l, 3) - k-vectors in the Brillouin zone
+        - hessian: (n_asu, n_dof_per_asu, n_cell, n_asu, n_dof_per_asu) - Hessian matrix
+        
+        Returns:
+            None - results stored in instance variables
+            
         References:
             - Original implementation: eryx/models.py:OnePhonon.compute_covariance_matrix
         """
-        # TODO: Initialize covariance tensor with complex dtype
-        # TODO: Compute for each k-vector with phase factors
-        # TODO: Scale to match experimental ADPs
-        # TODO: Compute ADP values from covariance
+        # Initialize covariance tensor with complex dtype
+        self.covar = torch.zeros((self.n_asu*self.n_dof_per_asu,
+                                self.n_cell, self.n_asu*self.n_dof_per_asu),
+                               dtype=torch.complex64, device=self.device)
         
-        raise NotImplementedError("OnePhonon.compute_covariance_matrix not implemented")
+        # Import ComplexTensorOps if not already imported
+        from eryx.torch_utils import ComplexTensorOps
+        
+        # Compute the Hessian matrix
+        hessian = self.compute_hessian()
+        
+        # Loop through all k-vectors in the Brillouin zone
+        for dh in range(self.hsampling[2]):
+            for dk in range(self.ksampling[2]):
+                for dl in range(self.lsampling[2]):
+                    # Extract current k-vector
+                    kvec = self.kvec[dh, dk, dl]
+                    
+                    # Compute inverse dynamical matrix for this k-vector
+                    # Use compute_gnm_Kinv which supports gradients
+                    Kinv = self.compute_gnm_Kinv(hessian, kvec=kvec, reshape=False)
+                    
+                    # Add contribution for each unit cell with phase factor
+                    for j_cell in range(self.n_cell):
+                        # Get unit cell origin position
+                        r_cell = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
+                        
+                        # Calculate phase factor e^(i k·r)
+                        phase = torch.dot(kvec, r_cell)
+                        real_part, imag_part = ComplexTensorOps.complex_exp(phase)
+                        eikr = torch.complex(real_part, imag_part)
+                        
+                        # Add contribution to covariance matrix
+                        # Use addition to preserve gradient flow (not in-place += which can break gradients)
+                        self.covar[:, j_cell, :] = self.covar[:, j_cell, :] + Kinv * eikr
+        
+        # Get reference cell ID
+        id_cell_ref = self.crystal.hkl_to_id([0, 0, 0])
+        
+        # Extract ADPs from the diagonal of the reference cell covariance
+        # Use torch.diagonal for gradient compatibility
+        self.ADP = torch.real(torch.diagonal(self.covar[:, id_cell_ref, :], dim1=0, dim2=2))
+        
+        # Project ADPs using Amat
+        # Transpose and reshape Amat for matrix multiplication
+        Amat = torch.transpose(self.Amat, 0, 1).reshape(
+            self.n_dof_per_asu_actual, self.n_asu*self.n_dof_per_asu)
+        
+        # Apply projection
+        self.ADP = torch.matmul(Amat, self.ADP)
+        
+        # Sum over 3D components (x,y,z) for each atom
+        self.ADP = torch.sum(self.ADP.reshape(int(self.ADP.shape[0]/3), 3), dim=1)
+        
+        # Calculate scaling factor to match experimental ADPs
+        # Add small epsilon for numerical stability
+        epsilon = 1e-10
+        target_adp_mean = torch.mean(self.model.adp)
+        current_adp_mean = torch.mean(self.ADP) / 3
+        ADP_scale = target_adp_mean / (8*torch.pi*torch.pi*current_adp_mean + epsilon)
+        
+        # Apply scaling to ADP and covariance
+        self.ADP = self.ADP * ADP_scale
+        self.covar = self.covar * ADP_scale
+        
+        # Take real part and reshape to 5D tensor for the final output format
+        self.covar = torch.real(self.covar.reshape(
+            self.n_asu, self.n_dof_per_asu,
+            self.n_cell, self.n_asu, self.n_dof_per_asu))
     
     def apply_disorder(self, rank: int = -1, outdir: Optional[str] = None, 
                      use_data_adp: bool = False):
