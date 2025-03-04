@@ -9,9 +9,9 @@ This document tracks the implementation progress of the PyTorch port for the dif
 | Phase 1 | Core Utilities | In Progress | 77% |
 | Phase 2 | Adapter Components | In Progress | 70% |
 | Phase 3 | Core Functions | Complete | 100% |
-| Phase 4 | OnePhonon Model | In Progress | 60% |
+| Phase 4 | OnePhonon Model | In Progress | 67% |
 | Phase 5 | Integration | Not Started | 0% |
-| **Overall** | **All Phases** | **In Progress** | **62%** |
+| **Overall** | **All Phases** | **In Progress** | **65%** |
 
 ## Ground Truth Data
 
