@@ -176,13 +176,15 @@ class TestScatterTorch(unittest.TestCase):
         ff_c = torch.tensor([0.2159, 0.2159], dtype=torch.float32)
         
         # With compute_qF=False
-        sf_normal = structure_factors_batch(q_grid, xyz, ff_a, ff_b, ff_c, compute_qF=False)
+        sf_normal = structure_factors_batch(q_grid, xyz, ff_a, ff_b, ff_c, compute_qF=False, sum_over_atoms=True)
         
         # With compute_qF=True
-        sf_qF = structure_factors_batch(q_grid, xyz, ff_a, ff_b, ff_c, compute_qF=True)
+        sf_qF = structure_factors_batch(q_grid, xyz, ff_a, ff_b, ff_c, compute_qF=True, sum_over_atoms=False)
         
         # Shape should be different
         self.assertEqual(sf_normal.shape[0], q_grid.shape[0])
+        # When compute_qF=True and sum_over_atoms=False, shape should be (n_points, n_atoms*3)
+        self.assertEqual(sf_qF.shape[0], q_grid.shape[0])
         self.assertEqual(sf_qF.shape[1], xyz.shape[0] * 3)
 
 if __name__ == '__main__':
