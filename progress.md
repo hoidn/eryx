@@ -30,21 +30,21 @@ Additional debug runs with focused tests may be needed to generate these missing
 
 ## Function Implementation Status
 
-### Phase 1: Core Utilities
+ ### Phase 1: Core Utilities                                                                                                                                                                          
+                                                                                                                                                                                                      
+ | Function | Status | Tests | Notes |                                                                                                                                                                
+ |----------|--------|-------|-------|                                                                                                                                                                
+ | ComplexTensorOps.complex_exp | Complete | Complete | Implemented with gradient support |                                                                                                           
+ | ComplexTensorOps.complex_mul | Complete | Complete | Implemented with gradient support |                                                                                                           
+ | ComplexTensorOps.complex_abs_squared | Complete | Complete | Implemented with gradient support |                                                                                                   
+ | ComplexTensorOps.complex_exp_dwf | Complete | Complete | Implemented with gradient support |                                                                                                       
+ | EigenOps.svd_decomposition | Complete | Complete | Implemented with gradient support |                                                                                                             
+ | EigenOps.eigen_decomposition | Complete | Complete | Implemented with gradient support |                                                                                                           
+ | EigenOps.solve_linear_system | Complete | Complete | Implemented with gradient support |                                                                                                           
+ | GradientUtils.finite_differences | Complete | Complete | Implemented for gradient validation |                                                                                                     
+ | GradientUtils.validate_gradients | Complete | Complete | Implemented for gradient validation |                                                                                                     
+ | GradientUtils.gradient_norm | Complete | Complete | Implemented for gradient validation |                                                                                                          
 
-| Function | Status | Tests | Notes |
-|----------|--------|-------|-------|
-| ComplexTensorOps.complex_exp | Complete | Not Started | Fully implemented with gradient flow |
-| ComplexTensorOps.complex_mul | Complete | Not Started | Handles broadcasting and device checks |
-| ComplexTensorOps.complex_abs_squared | Complete | Not Started | Includes edge case handling for large values |
-| ComplexTensorOps.complex_exp_dwf | Complete | Not Started | Implements the Debye-Waller factor |
-| EigenOps.svd_decomposition | Complete | Not Started | Handles matrix singularity and gradient flow |
-| EigenOps.eigen_decomposition | Complete | Not Started | Separate paths for symmetric and non-symmetric matrices |
-| EigenOps.solve_linear_system | Complete | Not Started | Uses different solvers based on matrix properties |
-| GradientUtils.finite_differences | Complete | Not Started | Implements central difference scheme |
-| GradientUtils.validate_gradients | Complete | Not Started | Checks analytical vs numerical gradients |
-| GradientUtils.gradient_norm | Complete | Not Started | Supports different norm orders |
-| FFTOps methods | Not Started | Not Started | FFT utilities need implementation |
 
 ### Phase 2: Adapter Components
 
