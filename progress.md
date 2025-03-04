@@ -179,4 +179,3 @@ No performance metrics available yet. This section will be updated once the impl
 | 2025-03-12 | Updated overall completion from 65% to 69% |
 | 2025-03-04 | Fixed type mismatch issues in OnePhonon.apply_disorder implementation |
 | 2025-03-04 | Added debug_log.md documenting the debugging process for apply_disorder |
-| 2025-03-04 | Updated development timeline to reflect current implementation state |
