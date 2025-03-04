@@ -9,9 +9,9 @@ This document tracks the implementation progress of the PyTorch port for the dif
 | Phase 1 | Core Utilities | In Progress | 77% |
 | Phase 2 | Adapter Components | In Progress | 70% |
 | Phase 3 | Core Functions | Complete | 100% |
-| Phase 4 | OnePhonon Model | In Progress | 40% |
+| Phase 4 | OnePhonon Model | In Progress | 60% |
 | Phase 5 | Integration | Not Started | 0% |
-| **Overall** | **All Phases** | **In Progress** | **55%** |
+| **Overall** | **All Phases** | **In Progress** | **62%** |
 
 ## Ground Truth Data
 
@@ -26,6 +26,8 @@ The following function from `to_convert.json` is missing a log file:
 1. `eryx.pdb.flatten_model`
 
 Additional debug runs with focused tests may be needed to generate this missing log file.
+
+The log file for `eryx.models.compute_covariance_matrix` has been confirmed to be available, contrary to previous documentation.
 
 ## Function Implementation Status
 
@@ -93,7 +95,7 @@ Additional debug runs with focused tests may be needed to generate this missing 
 | OnePhonon._at_kvec_from_miller_points | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon.compute_gnm_phonons | models.py | Not Started | Not Started | Log file available |
 | OnePhonon.compute_hessian | models.py | Not Started | Not Started | Log file available |
-| OnePhonon.compute_covariance_matrix | models.py | Not Started | Not Started | **Log file missing** |
+| OnePhonon.compute_covariance_matrix | models.py | Not Started | Not Started | Log file available |
 | OnePhonon.apply_disorder | models.py | Not Started | Not Started | Log file available |
 | GaussianNetworkModel.compute_hessian | pdb.py | Not Started | Not Started | Log file available |
 | GaussianNetworkModel.compute_K | pdb.py | Not Started | Not Started | Log file available |
@@ -127,7 +129,7 @@ Additional debug runs with focused tests may be needed to generate this missing 
 
 ## Current Focus
 
-CP6 (K-vector Methods Complete) has been completed. The current implementation focus is now on CP7: Phonon Calculation Complete.
+CP6 (K-vector Methods Complete) has been completed and all tests in test_models_torch_kvector.py are passing. The current implementation focus is now on CP7: Phonon Calculation Complete.
 
 ### Next Steps
 1. Implement `compute_gnm_phonons` in models_torch.py
@@ -166,3 +168,7 @@ No performance metrics available yet. This section will be updated once the impl
 | 2025-03-03 | Updated implementation status of Phase 1 Core Utilities in torch_utils.py |
 | 2025-03-03 | Corrected list of missing log files based on actual logs directory contents |
 | 2025-03-03 | Refined Phase 1 completion percentage (90% → 77%) with more detailed FFTOps function listing |
+| 2025-03-08 | Updated to confirm all K-vector methods tests are passing in test_models_torch_kvector.py |
+| 2025-03-08 | Corrected status of compute_covariance_matrix log file (now confirmed available) |
+| 2025-03-08 | Updated Phase 4 completion percentage (40% → 60%) based on implemented methods |
+| 2025-03-08 | Updated overall completion percentage (55% → 62%) |
