@@ -121,64 +121,216 @@ class OnePhonon:
     
     def _build_A(self):
         """
-        Build the matrix A that projects small rigid-body displacements using PyTorch.
+        Build the matrix A that projects small rigid-body displacements to individual atoms.
         
+        This matrix converts from rigid-body displacements (translations and rotations)
+        to individual atomic displacements based on the atom positions relative to the
+        center of mass.
+        
+        For each atom i in group m, the conversion reads:
+        u_i = A(r_i - o_m).w_m
+        where A is a 3x6 matrix defined as:
+        A(x,y,z) = [[ 1 0 0  0  z -y ]
+                    [ 0 1 0 -z  0  x ]
+                    [ 0 0 1  y -x  0 ]]
+                    
+        Returns:
+            None - stores the matrix in self.Amat
+            
         References:
             - Original implementation: eryx/models.py:OnePhonon._build_A
         """
-        # TODO: Implement tensor-based projection matrix construction
-        # TODO: Handle the group_by='asu' case with PyTorch matrix operations
-        # TODO: Ensure gradient flow through all operations
-        
-        raise NotImplementedError("OnePhonon._build_A not implemented")
+        # Handle case where group_by is set to 'asu'
+        if self.group_by == 'asu':
+            # Initialize Amat tensor for all ASUs
+            self.Amat = torch.zeros((self.n_asu, self.n_atoms_per_asu, 3, 6), 
+                                   device=self.device)
+            
+            # Identity matrix for the first 3 columns of A
+            identity = torch.eye(3, device=self.device)
+            
+            # For each ASU
+            for i_asu in range(self.n_asu):
+                # Get coordinates for this ASU
+                xyz = self.crystal.get_asu_xyz(i_asu).clone()
+                
+                # Subtract center of mass
+                xyz -= torch.mean(xyz, dim=0)
+                
+                # For each atom in the ASU
+                for i_atom in range(self.n_atoms_per_asu):
+                    # Create the skew-symmetric matrix for rotational part
+                    # [  0  z -y ]
+                    # [ -z  0  x ]
+                    # [  y -x  0 ]
+                    skew = torch.zeros((3, 3), device=self.device)
+                    skew[0, 1] = xyz[i_atom, 2]     # z
+                    skew[0, 2] = -xyz[i_atom, 1]    # -y
+                    skew[1, 2] = xyz[i_atom, 0]     # x
+                    skew = skew - skew.transpose(0, 1)  # Make skew-symmetric
+                    
+                    # Combine translational (identity) and rotational (skew) parts
+                    self.Amat[i_asu, i_atom] = torch.cat([identity, skew], dim=1)
+            
+            # Reshape Amat to final dimensions
+            self.Amat = self.Amat.reshape((self.n_asu,
+                                          self.n_dof_per_asu_actual,
+                                          self.n_dof_per_asu))
+        else:
+            self.Amat = None
     
     def _build_M(self):
         """
-        Build the mass matrix M using PyTorch operations.
+        Build the mass matrix M and compute its Cholesky decomposition.
         
+        If all atoms are considered individually (group_by=None), M = M_0 is diagonal
+        and Linv = 1/sqrt(M_0) is also diagonal.
+        
+        If atoms are grouped as rigid bodies, the all-atoms M matrix is projected
+        using the A matrix: M = A.T M_0 A and Linv is obtained via Cholesky 
+        decomposition: M = LL.T, Linv = L^(-1)
+        
+        Returns:
+            None - stores the result in self.Linv
+            
         References:
             - Original implementation: eryx/models.py:OnePhonon._build_M
         """
-        # TODO: Get all-atoms mass matrix with _build_M_allatoms()
-        # TODO: Project if needed based on group_by parameter
-        # TODO: Implement Cholesky decomposition with PyTorch for Linv
+        # Get the all-atoms mass matrix
+        M_allatoms = self._build_M_allatoms()
         
-        raise NotImplementedError("OnePhonon._build_M not implemented")
+        # Handle different cases based on group_by parameter
+        if self.group_by is None:
+            # No grouping, reshape to 2D matrix
+            M_allatoms = M_allatoms.reshape((self.n_asu * self.n_dof_per_asu_actual,
+                                            self.n_asu * self.n_dof_per_asu_actual))
+            
+            # For diagonal mass matrix, Linv is simply 1/sqrt(M)
+            # Add small epsilon for numerical stability
+            epsilon = 1e-10
+            self.Linv = 1.0 / torch.sqrt(M_allatoms + epsilon)
+            
+        else:
+            # Project the mass matrix for rigid body case
+            Mmat = self._project_M(M_allatoms)
+            
+            # Reshape to 2D matrix for Cholesky decomposition
+            Mmat = Mmat.reshape((self.n_asu * self.n_dof_per_asu,
+                                self.n_asu * self.n_dof_per_asu))
+            
+            # Add small regularization for numerical stability
+            epsilon = 1e-10
+            eye = torch.eye(Mmat.shape[0], device=self.device)
+            Mmat = Mmat + epsilon * eye
+            
+            # Compute Cholesky decomposition: M = L*L^T
+            try:
+                L = torch.linalg.cholesky(Mmat)
+                
+                # Compute inverse of L
+                self.Linv = torch.linalg.inv(L)
+            except RuntimeError as e:
+                # Handle case where matrix is not positive definite
+                print(f"Warning: Cholesky decomposition failed: {e}")
+                print("Using SVD-based approach instead")
+                
+                # Alternative approach using SVD
+                U, S, Vh = torch.linalg.svd(Mmat)
+                
+                # Ensure S is positive
+                S = torch.clamp(S, min=epsilon)
+                
+                # Compute L = U * sqrt(S)
+                L = U * torch.sqrt(S).unsqueeze(0)
+                
+                # Compute inverse of L
+                self.Linv = torch.matmul(torch.diag(1.0 / torch.sqrt(S)), U.transpose(0, 1))
     
     def _build_M_allatoms(self) -> torch.Tensor:
         """
-        Build all-atom mass matrix using PyTorch operations.
-        
+        Build all-atom mass matrix M_0 from element weights.
+
         Returns:
-            torch.Tensor: Mass matrix for all atoms
+            torch.Tensor: Mass matrix with shape (n_asu, n_atoms*3, n_asu, n_atoms*3)
             
         References:
             - Original implementation: eryx/models.py:OnePhonon._build_M_allatoms
         """
-        # TODO: Convert mass array to tensor
-        # TODO: Create block diagonal mass matrix
-        # TODO: Reshape to the correct dimensions
+        # Extract atomic masses from the crystal model
+        # Flatten the nested structure to get a single array of masses
+        mass_array = torch.tensor([element.weight for structure in self.crystal.model.elements 
+                                 for element in structure], device=self.device)
         
-        raise NotImplementedError("OnePhonon._build_M_allatoms not implemented")
+        # Create a 3x3 identity matrix
+        eye3 = torch.eye(3, device=self.device)
+        
+        # Initialize a list to store block matrices
+        mass_blocks = []
+        
+        # For each atom, create a 3x3 block with the atom's mass on the diagonal
+        for i in range(self.n_asu * self.n_atoms_per_asu):
+            # Create a 3x3 matrix with the atom's mass on the diagonal
+            mass_block = mass_array[i] * eye3
+            
+            # Extract the rows for this atom
+            # For each atom i, we create rows for coordinates 3*i, 3*i+1, 3*i+2
+            start_row = 3 * i
+            
+            # For each row, add a block matrix
+            for j in range(3):
+                row_block = torch.zeros(3 * self.n_asu * self.n_atoms_per_asu, device=self.device)
+                
+                # Only populate the 3 elements corresponding to this atom
+                row_block[start_row:start_row + 3] = mass_block[j]
+                
+                mass_blocks.append(row_block)
+        
+        # Stack all blocks into a matrix
+        M_allatoms = torch.stack(mass_blocks)
+        
+        # Reshape to the required 4D shape
+        M_allatoms = M_allatoms.reshape((self.n_asu, self.n_dof_per_asu_actual,
+                                        self.n_asu, self.n_dof_per_asu_actual))
+        
+        return M_allatoms
     
     def _project_M(self, M_allatoms: torch.Tensor) -> torch.Tensor:
         """
-        Project all-atom mass matrix using PyTorch tensor operations.
-        
-        Args:
-            M_allatoms: All-atom mass matrix tensor
-            
+        Project all-atom mass matrix using the A matrix: M = A.T M_0 A
+
+        Parameters:
+            M_allatoms: torch.Tensor - All-atom mass matrix with shape 
+                        (n_asu, n_atoms*3, n_asu, n_atoms*3)
+
         Returns:
-            torch.Tensor: Projected mass matrix
+            torch.Tensor: Projected mass matrix with shape 
+                        (n_asu, n_dof_per_asu, n_asu, n_dof_per_asu)
             
         References:
             - Original implementation: eryx/models.py:OnePhonon._project_M
         """
-        # TODO: Initialize output tensor with correct shape
-        # TODO: Implement matrix multiplication with PyTorch for projection
-        # TODO: Ensure gradient flow through operations
+        # Initialize projected mass matrix with zeros
+        Mmat = torch.zeros((self.n_asu, self.n_dof_per_asu,
+                          self.n_asu, self.n_dof_per_asu), 
+                          device=self.device)
         
-        raise NotImplementedError("OnePhonon._project_M not implemented")
+        # For each pair of ASUs
+        for i_asu in range(self.n_asu):
+            for j_asu in range(self.n_asu):
+                # Perform the projection: A^T * M * A
+                # First multiply M_allatoms by A on the right
+                # M_allatoms[i_asu, :, j_asu, :] has shape (n_dof_per_asu_actual, n_dof_per_asu_actual)
+                # self.Amat[j_asu] has shape (n_dof_per_asu_actual, n_dof_per_asu)
+                intermediate = torch.matmul(M_allatoms[i_asu, :, j_asu, :],
+                                          self.Amat[j_asu])
+                
+                # Then multiply by A^T on the left
+                # self.Amat[i_asu].T has shape (n_dof_per_asu, n_dof_per_asu_actual)
+                # intermediate has shape (n_dof_per_asu_actual, n_dof_per_asu)
+                Mmat[i_asu, :, j_asu, :] = torch.matmul(self.Amat[i_asu].transpose(0, 1),
+                                                      intermediate)
+        
+        return Mmat
     
     def _build_kvec_Brillouin(self):
         """

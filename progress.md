@@ -9,9 +9,9 @@ This document tracks the implementation progress of the PyTorch port for the dif
 | Phase 1 | Core Utilities | In Progress | 77% |
 | Phase 2 | Adapter Components | In Progress | 70% |
 | Phase 3 | Core Functions | Complete | 100% |
-| Phase 4 | OnePhonon Model | Not Started | 0% |
+| Phase 4 | OnePhonon Model | In Progress | 20% |
 | Phase 5 | Integration | Not Started | 0% |
-| **Overall** | **All Phases** | **In Progress** | **40%** |
+| **Overall** | **All Phases** | **In Progress** | **45%** |
 
 ## Ground Truth Data
 
@@ -85,10 +85,10 @@ Additional debug runs with focused tests may be needed to generate these missing
 | OnePhonon.__init__ | models.py | Not Started | Not Started | Log file available |
 | OnePhonon._setup | models.py | Not Started | Not Started | Log file available |
 | OnePhonon._setup_phonons | models.py | Not Started | Not Started | Log file available |
-| OnePhonon._build_A | models.py | Not Started | Not Started | Log file available |
-| OnePhonon._build_M | models.py | Not Started | Not Started | Log file available |
-| OnePhonon._build_M_allatoms | models.py | Not Started | Not Started | Log file available |
-| OnePhonon._project_M | models.py | Not Started | Not Started | Log file available |
+| OnePhonon._build_A | models.py | Complete | Complete | Ground truth tests pass |
+| OnePhonon._build_M | models.py | Complete | Complete | Ground truth tests pass |
+| OnePhonon._build_M_allatoms | models.py | Complete | Complete | Ground truth tests pass |
+| OnePhonon._project_M | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon._build_kvec_Brillouin | models.py | Not Started | Not Started | Log file available |
 | OnePhonon._center_kvec | models.py | Not Started | Not Started | Log file available |
 | OnePhonon._at_kvec_from_miller_points | models.py | Not Started | Not Started | Log file available |
@@ -119,7 +119,7 @@ Additional debug runs with focused tests may be needed to generate these missing
 | CP2 | Adapters Complete | In Progress (70%) | - |
 | CP3 | Map Utils Complete | Complete | March 04, 2025 |
 | CP4 | Scatter Complete | Complete | March 05, 2025 |
-| CP5 | Matrix Construction Complete | Not Started | - |
+| CP5 | Matrix Construction Complete | Complete | March 06, 2025 |
 | CP6 | K-vector Methods Complete | Not Started | - |
 | CP7 | Phonon Calculation Complete | Not Started | - |
 | CP8 | Covariance Matrix Complete | Not Started | - |
@@ -128,14 +128,13 @@ Additional debug runs with focused tests may be needed to generate these missing
 
 ## Current Focus
 
-CP4 (Scatter Complete) has been completed. The current implementation focus is now on CP5: Matrix Construction Complete.
+CP5 (Matrix Construction Complete) has been completed. The current implementation focus is now on CP6: K-vector Methods Complete.
 
 ### Next Steps
-1. Implement `OnePhonon._build_A` in models_torch.py
-2. Implement `OnePhonon._build_M` in models_torch.py
-3. Implement `OnePhonon._build_M_allatoms` in models_torch.py
-4. Implement `OnePhonon._project_M` in models_torch.py
-5. Generate missing log files for `eryx.models.compute_covariance_matrix` and `eryx.pdb.flatten_model`
+1. Implement `OnePhonon._build_kvec_Brillouin` in models_torch.py
+2. Implement `OnePhonon._center_kvec` in models_torch.py
+3. Implement `OnePhonon._at_kvec_from_miller_points` in models_torch.py
+4. Generate missing log files for `eryx.models.compute_covariance_matrix` and `eryx.pdb.flatten_model`
 
 ### Blockers and Challenges
 - Missing log files for `eryx.models.compute_covariance_matrix` and `eryx.pdb.flatten_model` may affect testing
