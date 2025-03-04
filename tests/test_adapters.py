@@ -367,5 +367,112 @@ class TestDictConversion(unittest.TestCase):
             self.assertIsInstance(array, np.ndarray)
             self.assertTrue(np.allclose(array, arrays_dict[key]))
 
+class TestModelAdapters(unittest.TestCase):
+    """Tests for the ModelAdapters class."""
+    
+    def setUp(self):
+        """Set up test fixtures."""
+        self.adapter = ModelAdapters()
+        # Create a device that's guaranteed to work for testing
+        self.device = torch.device('cpu')
+        self.adapter_with_device = ModelAdapters(device=self.device)
+    
+    def test_model_adapters_initialization(self):
+        """Test initialization of ModelAdapters."""
+        # Verify sub-adapters are correctly initialized
+        self.assertIsInstance(self.adapter.pdb_to_tensor, PDBToTensor)
+        self.assertIsInstance(self.adapter.grid_to_tensor, GridToTensor)
+        self.assertIsInstance(self.adapter.tensor_to_numpy, TensorToNumpy)
+        
+        # Check device propagation
+        self.assertEqual(self.adapter_with_device.device, self.device)
+        self.assertEqual(self.adapter_with_device.pdb_to_tensor.device, self.device)
+        self.assertEqual(self.adapter_with_device.grid_to_tensor.device, self.device)
+    
+    def test_model_adapters_integration(self):
+        """Test integration of adapter components in ModelAdapters."""
+        # Create a simple mock model
+        mock_model = type('MockOnePhonon', (), {
+            'model': type('MockAtomicModel', (), {
+                'xyz': np.random.rand(1, 10, 3),
+                'ff_a': np.random.rand(1, 10, 4),
+                'ff_b': np.random.rand(1, 10, 4),
+                'ff_c': np.random.rand(1, 10),
+                'cell': np.array([10.0, 10.0, 10.0, 90.0, 90.0, 90.0]),
+                'A_inv': np.random.rand(3, 3)
+            }),
+            'q_grid': np.random.rand(100, 3),
+            'map_shape': (10, 10, 10),
+            'hsampling': (0, 10, 1),
+            'ksampling': (0, 10, 1),
+            'lsampling': (0, 10, 1),
+            'gnm': type('MockGNM', (), {
+                'enm_cutoff': 4.0,
+                'gamma_intra': 1.0,
+                'gamma_inter': 0.5
+            }),
+            'res_limit': 2.0,
+            'expand_p1': True,
+            'group_by': 'asu',
+            'model': 'gnm'
+        })
+        
+        # Test adapt_one_phonon_inputs
+        inputs_dict = self.adapter.adapt_one_phonon_inputs(mock_model)
+        
+        # Verify key components are converted
+        self.assertIn('model', inputs_dict)
+        self.assertIn('q_grid', inputs_dict)
+        self.assertIn('map_shape', inputs_dict)
+        self.assertIn('gnm_params', inputs_dict)
+        
+        # Verify tensor conversion
+        self.assertIsInstance(inputs_dict['model']['xyz'], torch.Tensor)
+        self.assertIsInstance(inputs_dict['q_grid'], torch.Tensor)
+        
+        # Verify scalar parameters are preserved
+        self.assertEqual(inputs_dict['res_limit'], 2.0)
+        self.assertEqual(inputs_dict['expand_p1'], True)
+        self.assertEqual(inputs_dict['group_by'], 'asu')
+        self.assertEqual(inputs_dict['model'], 'gnm')
+        
+        # Verify GNM parameters
+        self.assertEqual(inputs_dict['gnm_params']['enm_cutoff'], 4.0)
+        self.assertEqual(inputs_dict['gnm_params']['gamma_intra'], 1.0)
+        self.assertEqual(inputs_dict['gnm_params']['gamma_inter'], 0.5)
+        
+        # Create mock output data
+        mock_output = {
+            'intensity': torch.rand(100),
+            'map_shape': (10, 10, 10)
+        }
+        
+        # Test adapt_one_phonon_outputs
+        intensity_map = self.adapter.adapt_one_phonon_outputs(mock_output)
+        
+        # Verify output conversion
+        self.assertIsInstance(intensity_map, np.ndarray)
+        self.assertEqual(intensity_map.shape, (10, 10, 10))
+        
+        # Test with already shaped intensity
+        mock_output_shaped = {
+            'intensity': torch.rand((10, 10, 10))
+        }
+        intensity_map = self.adapter.adapt_one_phonon_outputs(mock_output_shaped)
+        self.assertEqual(intensity_map.shape, (10, 10, 10))
+        
+        # Test with None outputs
+        with self.assertRaises(ValueError):
+            self.adapter.adapt_one_phonon_outputs(None)
+        
+        # Test with missing intensity
+        with self.assertRaises(ValueError):
+            self.adapter.adapt_one_phonon_outputs({})
+        
+        # Test with missing map_shape for flat intensity
+        with self.assertRaises(ValueError):
+            self.adapter.adapt_one_phonon_outputs({'intensity': torch.rand(100)})
+
+
 if __name__ == '__main__':
     unittest.main()
