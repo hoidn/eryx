@@ -46,8 +46,6 @@ class TestOnePhononMatrixConstruction(unittest.TestCase):
         model.n_dof_per_asu_actual = model.n_atoms_per_asu * 3
         model.n_dof_per_asu = 6  # For 'asu' group_by
         
-        # Other attributes would be set in a real test
-        
         return model
     
     def test_build_A(self):
