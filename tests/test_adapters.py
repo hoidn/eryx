@@ -443,7 +443,7 @@ class TestModelAdapters(unittest.TestCase):
         
         # Create mock output data
         mock_output = {
-            'intensity': torch.rand(100),
+            'intensity': torch.rand(1000),
             'map_shape': (10, 10, 10)
         }
         

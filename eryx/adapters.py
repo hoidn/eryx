@@ -163,7 +163,15 @@ class PDBToTensor:
         result = {}
         for k, v in dict_arrays.items():
             # Handle different dtypes appropriately
-            tensor = self.array_to_tensor(v, requires_grad=requires_grad)
+            if v.dtype == bool:
+                # Convert boolean arrays to float tensors if requires_grad is True
+                if requires_grad:
+                    tensor = torch.tensor(v, dtype=torch.float32, device=self.device)
+                    tensor.requires_grad_(True)
+                else:
+                    tensor = torch.tensor(v, dtype=torch.bool, device=self.device)
+            else:
+                tensor = self.array_to_tensor(v, requires_grad=requires_grad)
             result[k] = tensor
         return result
 
@@ -214,8 +222,9 @@ class GridToTensor:
             return q_grid_tensor, map_shape
             
         # Convert to tensor with gradient support
-        # Ensure we use float32 for consistent dtype
-        q_grid_tensor = torch.tensor(q_grid, dtype=torch.float32, device=self.device)
+        # Ensure we use the same dtype as the input for consistency
+        input_dtype = torch.get_default_dtype() if q_grid.dtype == np.float64 else torch.float32
+        q_grid_tensor = torch.tensor(q_grid, dtype=input_dtype, device=self.device)
         
         # Only set requires_grad for floating point tensors
         if requires_grad:
