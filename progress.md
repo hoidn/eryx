@@ -65,9 +65,9 @@ Additional debug runs with focused tests may be needed to generate these missing
 
 | Function | Source | Status | Tests | Notes |
 |----------|--------|--------|-------|-------|
-| generate_grid | map_utils.py | Not Started | Not Started | Log file available |
-| compute_resolution | map_utils.py | Not Started | Not Started | Log file available |
-| get_resolution_mask | map_utils.py | Not Started | Not Started | Log file available |
+| generate_grid | map_utils.py | Complete | Complete | Ground truth tests pass |
+| compute_resolution | map_utils.py | Complete | Complete | Ground truth tests pass |
+| get_resolution_mask | map_utils.py | Complete | Complete | Ground truth tests pass |
 | compute_form_factors | scatter.py | Not Started | Not Started | Log file available |
 | structure_factors_batch | scatter.py | Not Started | Not Started | Log file available |
 | structure_factors | scatter.py | Not Started | Not Started | Log file available |
