@@ -8,10 +8,10 @@ This document tracks the implementation progress of the PyTorch port for the dif
 |-------|-------------|--------|------------|
 | Phase 1 | Core Utilities | In Progress | 77% |
 | Phase 2 | Adapter Components | In Progress | 70% |
-| Phase 3 | Core Functions | In Progress | 50% |
+| Phase 3 | Core Functions | Complete | 100% |
 | Phase 4 | OnePhonon Model | Not Started | 0% |
 | Phase 5 | Integration | Not Started | 0% |
-| **Overall** | **All Phases** | **In Progress** | **30%** |
+| **Overall** | **All Phases** | **In Progress** | **40%** |
 
 ## Ground Truth Data
 
@@ -74,9 +74,9 @@ Additional debug runs with focused tests may be needed to generate these missing
 | generate_grid | map_utils.py | Complete | Complete | Ground truth tests pass |
 | compute_resolution | map_utils.py | Complete | Complete | Ground truth tests pass |
 | get_resolution_mask | map_utils.py | Complete | Complete | Ground truth tests pass |
-| compute_form_factors | scatter.py | Not Started | Not Started | Log file available |
-| structure_factors_batch | scatter.py | Not Started | Not Started | Log file available |
-| structure_factors | scatter.py | Not Started | Not Started | Log file available |
+| compute_form_factors | scatter.py | Complete | Complete | Ground truth tests pass |
+| structure_factors_batch | scatter.py | Complete | Complete | Ground truth tests pass |
+| structure_factors | scatter.py | Complete | Complete | Ground truth tests pass |
 
 ### Phase 4: OnePhonon Model
 
@@ -118,7 +118,7 @@ Additional debug runs with focused tests may be needed to generate these missing
 | CP1 | Core Utilities Complete | In Progress (77%) | - |
 | CP2 | Adapters Complete | In Progress (70%) | - |
 | CP3 | Map Utils Complete | Complete | March 04, 2025 |
-| CP4 | Scatter Complete | Not Started | - |
+| CP4 | Scatter Complete | Complete | March 05, 2025 |
 | CP5 | Matrix Construction Complete | Not Started | - |
 | CP6 | K-vector Methods Complete | Not Started | - |
 | CP7 | Phonon Calculation Complete | Not Started | - |
@@ -128,13 +128,13 @@ Additional debug runs with focused tests may be needed to generate these missing
 
 ## Current Focus
 
-CP3 (Map Utils Complete) has been completed. The current implementation focus is now on CP4: Scatter Complete.
+CP4 (Scatter Complete) has been completed. The current implementation focus is now on CP5: Matrix Construction Complete.
 
 ### Next Steps
-1. Implement `compute_form_factors` in scatter_torch.py
-2. Implement `structure_factors_batch` in scatter_torch.py
-3. Implement `structure_factors` in scatter_torch.py
-4. Create comprehensive test suite for scatter_torch.py components
+1. Implement `OnePhonon._build_A` in models_torch.py
+2. Implement `OnePhonon._build_M` in models_torch.py
+3. Implement `OnePhonon._build_M_allatoms` in models_torch.py
+4. Implement `OnePhonon._project_M` in models_torch.py
 5. Generate missing log files for `eryx.models.compute_covariance_matrix` and `eryx.pdb.flatten_model`
 
 ### Blockers and Challenges
