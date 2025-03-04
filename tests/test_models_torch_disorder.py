@@ -155,6 +155,23 @@ class TestOnePhononDisorder(unittest.TestCase):
         self.model.V.requires_grad_(True)
         self.model.Winv.requires_grad_(True)
         
+        # Configure mock structure_factors to return a tensor with gradients
+        def mock_sf_with_grad(*args, **kwargs):
+            batch_size = args[0].shape[0]
+            if kwargs.get('compute_qF', False):
+                # Return structure factors with components that depend on q_grid
+                q_grid = args[0]  # This is the q_grid tensor that needs gradients
+                real_part = torch.sin(torch.sum(q_grid, dim=1)).unsqueeze(1).expand(batch_size, 6)
+                imag_part = torch.cos(torch.sum(q_grid, dim=1)).unsqueeze(1).expand(batch_size, 6)
+                return torch.complex(real_part, imag_part)
+            else:
+                # Return simple structure factors that depend on q_grid
+                q_grid = args[0]
+                real_part = torch.sin(torch.sum(q_grid, dim=1))
+                imag_part = torch.cos(torch.sum(q_grid, dim=1))
+                return torch.complex(real_part, imag_part)
+        self.mock_structure_factors.side_effect = mock_sf_with_grad
+        
         # Run the method
         Id = self.model.apply_disorder()
         
