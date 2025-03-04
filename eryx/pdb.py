@@ -130,6 +130,7 @@ def get_unit_cell_axes(cell):
 
 class AtomicModel:
     
+    @debug
     def __init__(self, pdb_file, expand_p1=False, frame=0, clean_pdb=True):
         self._get_gemmi_structure(pdb_file, clean_pdb)
         self._extract_cell()
@@ -364,6 +365,8 @@ class AtomicModel:
 
 class Crystal:
 
+
+    @debug
     def __init__(self, atomic_model):
         """
         Parameters

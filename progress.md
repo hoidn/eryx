@@ -44,6 +44,7 @@ Additional debug runs with focused tests may be needed to generate these missing
  | GradientUtils.finite_differences | Complete | Complete | Implemented for gradient validation |                                                                                                     
  | GradientUtils.validate_gradients | Complete | Complete | Implemented for gradient validation |                                                                                                     
  | GradientUtils.gradient_norm | Complete | Complete | Implemented for gradient validation |                                                                                                          
+| FFTOps methods | Not Started | Not Started | FFT utilities need implementation |
 
 
 ### Phase 2: Adapter Components

@@ -1,0 +1,1 @@
+- fix the __init__() name collision in logging
