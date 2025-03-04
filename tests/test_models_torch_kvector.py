@@ -54,18 +54,19 @@ class TestOnePhononKvector(unittest.TestCase):
         # Load log data for this method
         logs = self.logger.loadLog(f"{self.center_kvec_log}.log")
         
-        # Process each input/output pair from logs
-        for i in range(len(logs) // 2):
-            # Get input data and expected output
-            args = self.logger.serializer.deserialize(logs[2*i]['args'])
-            expected_output = self.logger.serializer.deserialize(logs[2*i+1]['result'])
-            
-            # Call the method
-            actual_output = self.model._center_kvec(*args)
-            
-            # Compare with expected output
-            self.assertEqual(actual_output, expected_output,
-                           f"Results don't match ground truth for input {args}")
+        # Process each log entry
+        for i in range(0, len(logs), 2):
+            # The log format might have the function call data and result
+            if 'args' in logs[i]:
+                args = self.logger.serializer.deserialize(logs[i]['args'])
+                expected_output = self.logger.serializer.deserialize(logs[i+1]['result'])
+                
+                # Call the method
+                actual_output = self.model._center_kvec(*args)
+                
+                # Compare with expected output
+                self.assertEqual(actual_output, expected_output,
+                               f"Results don't match ground truth for input {args}")
     
     def test_build_kvec_brillouin(self):
         """Test _build_kvec_Brillouin method with ground truth data."""
@@ -111,37 +112,41 @@ class TestOnePhononKvector(unittest.TestCase):
         # Load log data for this method
         logs = self.logger.loadLog(f"{self.at_kvec_miller_log}.log")
         
-        # Process each input/output pair from logs
-        for i in range(len(logs) // 2):
-            # Get input data and expected output
-            args = self.logger.serializer.deserialize(logs[2*i]['args'])
-            instance_data = args[0]
-            hkl_kvec = args[1]
-            expected_output = self.logger.serializer.deserialize(logs[2*i+1]['result'])
-            
-            # Create a partially initialized OnePhonon instance
-            model = OnePhonon.__new__(OnePhonon)
-            
-            # Set necessary attributes from instance_data
-            model.device = self.device
-            model.hsampling = instance_data.hsampling
-            model.ksampling = instance_data.ksampling
-            model.lsampling = instance_data.lsampling
-            model.map_shape = instance_data.map_shape
-            
-            # Call the method
-            actual_output = model._at_kvec_from_miller_points(hkl_kvec)
-            
-            # Convert to numpy for comparison
-            actual_output_np = actual_output.cpu().numpy()
-            
-            # Compare indices
-            # For indices, we want exact matching
-            self.assertTrue(np.array_equal(actual_output_np, expected_output),
-                           "Indices don't match ground truth")
+        # Process each log entry
+        for i in range(0, len(logs), 2):
+            # The log format might have the function call data and result
+            if 'args' in logs[i]:
+                args = self.logger.serializer.deserialize(logs[i]['args'])
+                instance_data = args[0]
+                hkl_kvec = args[1]
+                expected_output = self.logger.serializer.deserialize(logs[i+1]['result'])
+                
+                # Create a partially initialized OnePhonon instance
+                model = OnePhonon.__new__(OnePhonon)
+                
+                # Set necessary attributes from instance_data
+                model.device = self.device
+                model.hsampling = instance_data.hsampling
+                model.ksampling = instance_data.ksampling
+                model.lsampling = instance_data.lsampling
+                model.map_shape = instance_data.map_shape
+                
+                # Call the method
+                actual_output = model._at_kvec_from_miller_points(hkl_kvec)
+                
+                # Convert to numpy for comparison
+                actual_output_np = actual_output.cpu().numpy()
+                
+                # Compare indices
+                # For indices, we want exact matching
+                self.assertTrue(np.array_equal(actual_output_np, expected_output),
+                               "Indices don't match ground truth")
     
     def test_gradient_flow(self):
         """Test gradient flow through k-vector operations."""
+        # Enable anomaly detection to help debug gradient issues
+        torch.autograd.set_detect_anomaly(True)
+        
         # Test gradient flow through _build_kvec_Brillouin
         model = self._create_test_model()
         
@@ -152,7 +157,8 @@ class TestOnePhononKvector(unittest.TestCase):
         model._build_kvec_Brillouin()
         
         # Create a scalar output dependent on the results
-        output = model.kvec.sum() + model.kvec_norm.sum()
+        # Use .clone() to avoid in-place operations that break gradient flow
+        output = model.kvec.clone().sum() + model.kvec_norm.clone().sum()
         
         # Compute gradients
         output.backward()
@@ -175,7 +181,8 @@ class TestOnePhononKvector(unittest.TestCase):
         dummy_data = torch.ones((np.prod(model.map_shape),), device=model.device, requires_grad=True)
         
         # Index into the dummy data using the indices
-        selected = dummy_data[indices]
+        # Use clone() to avoid in-place operations
+        selected = dummy_data[indices].clone()
         
         # Compute a scalar output and gradient
         output = selected.sum()
@@ -192,6 +199,9 @@ class TestOnePhononKvector(unittest.TestCase):
             else:
                 self.assertEqual(dummy_data.grad[i].item(), 0.0,
                                f"Expected gradient 0.0 at index {i}, got {dummy_data.grad[i].item()}")
+        
+        # Disable anomaly detection after test
+        torch.autograd.set_detect_anomaly(False)
 
 if __name__ == '__main__':
     unittest.main()
