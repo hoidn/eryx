@@ -22,6 +22,8 @@ class TestOnePhononKvector(unittest.TestCase):
         self.build_kvec_brillouin_log = "logs/eryx.models._build_kvec_Brillouin"
         self.center_kvec_log = "logs/eryx.models._center_kvec"
         self.at_kvec_miller_log = "logs/eryx.models._at_kvec_from_miller_points"
+        # TODO add attribute for eryx.models.compute_covariance_matrix.log,
+        # mirror the previous three and their handling
         
         # Ensure log files exist
         for log_file in [self.build_kvec_brillouin_log, self.center_kvec_log, self.at_kvec_miller_log]:
