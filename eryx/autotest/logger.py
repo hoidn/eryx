@@ -1,88 +1,4 @@
 from .serializer import Serializer
-# spec
-#    @depends_on(Serializer)
-#    interface Logger {
-#        """
-#        Logs function call details to a specified log file.
-#
-#        Preconditions:
-#        - `args` and `kwargs` are serialized using pickle.
-#        - `log_file_path` must be a valid file path with write permissions.
-#          The directory containing the file must exist.
-#
-#        Postconditions:
-#        - The serialized function arguments and keyword arguments are written to the log file.
-#          The log entry is formatted as a single line JSON string.
-#        - If there is an error during logging, an error message is printed to stderr.
-#        """
-#        void logCall(bytes args, bytes kwargs, string log_file_path);
-#
-#        """
-#        Logs function return details to the specified log file.
-#
-#        Preconditions:
-#        - `result` is serialized using pickle.
-#        - `log_file_path` must be a valid file path with write permissions.
-#          The directory containing the file must exist.
-#
-#        Postconditions:
-#        - The serialized `result` and `execution_time` are appended to the log file.
-#          The log entry is formatted as a single line JSON string.
-#        - If there is an error during logging, an error message is printed to stderr.
-#        """
-#        void logReturn(bytes result, float execution_time, string log_file_path);
-#
-#        """
-#        Logs an error message to the specified log file.
-#
-#        Preconditions:
-#        - `log_file_path` must be a valid file path with write permissions.
-#          The directory containing the file must exist.
-#
-#        Postconditions:
-#        - The `error` message is written to the log file.
-#          The log entry is formatted as a single line JSON string.
-#        - If there is an error during logging, an error message is printed to stderr.
-#        """
-#        void logError(string error, string log_file_path);
-#
-#        """
-#        Loads a logged dataset from a log file.
-#
-#        Preconditions:
-#        - `log_file_path` must be a valid file path with read permissions.
-#          The file must contain valid JSON-formatted log entries.
-#
-#        Postconditions:
-#        - Returns a list or tuple containing the logged inputs and output.
-#        - If there is an error during loading, returns an empty list or tuple.
-#        """
-#        Union[list, tuple] loadLog(Configuration configuration);
-#
-#        """
-#        Searches the log directory and returns all valid log file paths.
-#
-#        Preconditions:
-#        - `log_directory` must be a valid directory path with read permissions.
-#
-#        Postconditions:
-#        - Returns a list of valid log file paths adhering to the format ^(?P<log_path_prefix>[a-z0-9]+)/(?P<python_namespace_path>([a-z0-9]+\.)+)log$.?
-#        - Invalid log file paths are filtered out using the validateLogFilePath method.
-#        - If there are no valid log files or an error occurs during searching, returns an empty list.
-#        """
-#        list[str] searchLogDirectory(string log_directory);
-#
-#        """
-#        Validates a log file path against the expected format.
-#
-#        Preconditions:
-#        - `log_file_path` must be a string representing a file path.
-#
-#        Postconditions:
-#        - Returns True if the `log_file_path` adheres to the format '^(?P<log_path_prefix>[a-z0-9]+)/(?P<python_namespace_path>([a-z0-9]+\.)+)log$.', False otherwise.
-#        """
-#        bool validateLogFilePath(string log_file_path);
-#    };
 
 import json
 import os
@@ -119,14 +35,6 @@ class Logger:
 
     def logError(self, error: str, log_file_path: str) -> None:
         pass
-#        try:
-#            with open(log_file_path, 'a') as log_file:
-#                log_entry = json.dumps({
-#                    "error": error
-#                })
-#                log_file.write(log_entry + "\n")
-#        except Exception as e:
-#            print(f"Error logging error: {e}", file=sys.stderr)
 
     def loadLog(self, log_file_path: str) -> Union[List, tuple]:
         logs = []
