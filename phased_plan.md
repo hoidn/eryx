@@ -191,6 +191,7 @@ Based on the components specified in `to_convert.json`, we distinguish between c
 - No ground truth data needed (pure utility class)
 
 ### Phase 2: Adapter Implementation (1 week)
+Status Update: PDBToTensor (methods convert_atomic_model, array_to_tensor, and convert_dict_of_arrays) is fully implemented, while convert_crystal() and convert_gnm() remain unimplemented. GridToTensor’s convert_grid() and convert_mask() as well as TensorToNumpy are implemented; however, convert_symmetry_ops() is not implemented. In ModelAdapters, adapt_one_phonon_inputs and adapt_one_phonon_outputs are complete while adapt_rigid_body_translations_inputs is not implemented.
 
 #### Task 2.1: Implement PDBToTensor in adapters.py
 - Implement convert_atomic_model() method with specific tensor conversions
