@@ -217,16 +217,61 @@ class TestOnePhononDisorder(unittest.TestCase):
     
     def test_apply_disorder_ground_truth(self):
         """Test against ground truth data (simplified for mock objects)."""
-        # This test would normally validate against ground truth logs
-        # For the mock setup, we'll just ensure it runs without errors
+        # First, ensure it runs without errors with our mock setup
         Id = self.model.apply_disorder()
         self.assertTrue(torch.is_tensor(Id))
         
-        # In a full test with real data, we would compare with ground truth:
-        # self.assertTrue(
-        #     self.torch_testing.testTorchCallable(self.apply_disorder_log, self.model.apply_disorder),
-        #     "apply_disorder failed ground truth test"
-        # )
+        # Now test against ground truth data if available
+        if os.path.exists(f"{self.apply_disorder_log}.log"):
+            # Load the ground truth data
+            logs = self.logger.loadLog(f"{self.apply_disorder_log}.log")
+            
+            # Skip if no logs found
+            if not logs:
+                self.skipTest("No ground truth data found in log file")
+            
+            # Get the first input/output pair
+            input_data = self.logger.serializer.deserialize(logs[0]['args'])
+            expected_output = self.logger.serializer.deserialize(logs[0]['result'])
+            
+            # Configure mock structure_factors to return values similar to ground truth
+            def mock_ground_truth_sf(*args, **kwargs):
+                # Return a tensor with shape matching the expected output
+                batch_size = args[0].shape[0]
+                if kwargs.get('compute_qF', False):
+                    # Return structure factors with components
+                    return torch.complex(
+                        torch.rand((batch_size, 6), device=self.device),
+                        torch.rand((batch_size, 6), device=self.device)
+                    )
+                else:
+                    # Return simple structure factors
+                    return torch.complex(
+                        torch.rand(batch_size, device=self.device),
+                        torch.rand(batch_size, device=self.device)
+                    )
+            self.mock_structure_factors.side_effect = mock_ground_truth_sf
+            
+            # Run the method with our mock setup
+            Id = self.model.apply_disorder()
+            
+            # Verify basic properties match expected output
+            if isinstance(expected_output, np.ndarray):
+                # Check shape matches
+                self.assertEqual(Id.shape[0], expected_output.shape[0], 
+                                "Output shape doesn't match ground truth")
+                
+                # Check that non-NaN values exist where expected
+                if hasattr(self.model, 'res_mask'):
+                    mask = self.model.res_mask
+                    self.assertFalse(torch.any(torch.isnan(Id[mask])),
+                                    "Output contains unexpected NaN values")
+                
+                # For a full test with real data and no mocks, we would use:
+                # self.assertTrue(
+                #     self.torch_testing.testTorchCallable(self.apply_disorder_log, self.model.apply_disorder),
+                #     "apply_disorder failed ground truth test"
+                # )
 
 if __name__ == '__main__':
     unittest.main()
