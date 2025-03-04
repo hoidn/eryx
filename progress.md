@@ -7,11 +7,11 @@ This document tracks the implementation progress of the PyTorch port for the dif
 | Phase | Description | Status | Completion |
 |-------|-------------|--------|------------|
 | Phase 1 | Core Utilities | In Progress | 77% |
-| Phase 2 | Adapter Components | In Progress | 60% |
+| Phase 2 | Adapter Components | In Progress | 70% |
 | Phase 3 | Core Functions | In Progress | 50% |
 | Phase 4 | OnePhonon Model | Not Started | 0% |
 | Phase 5 | Integration | Not Started | 0% |
-| **Overall** | **All Phases** | **In Progress** | **25%** |
+| **Overall** | **All Phases** | **In Progress** | **30%** |
 
 ## Ground Truth Data
 
@@ -52,14 +52,20 @@ Additional debug runs with focused tests may be needed to generate these missing
 
 | Function | Status | Tests | Notes |
 |----------|--------|-------|-------|
-| PDBToTensor.convert_atomic_model | Not Started | Not Started | |
-| PDBToTensor.convert_crystal | Not Started | Not Started | |
-| PDBToTensor.convert_gnm | Not Started | Not Started | |
-| PDBToTensor.array_to_tensor | Not Started | Not Started | |
-| GridToTensor.convert_grid | Not Started | Not Started | |
-| GridToTensor.convert_mask | Not Started | Not Started | |
-| TensorToNumpy.tensor_to_array | Not Started | Not Started | |
-| TensorToNumpy.convert_intensity_map | Not Started | Not Started | |
+| PDBToTensor.convert_atomic_model | Complete | Not Started | Implemented with gradient support |
+| PDBToTensor.convert_crystal | Not Started | Not Started | NotImplementedError |
+| PDBToTensor.convert_gnm | Not Started | Not Started | NotImplementedError |
+| PDBToTensor.array_to_tensor | Complete | Not Started | Implemented with gradient support |
+| PDBToTensor.convert_dict_of_arrays | Complete | Not Started | Implemented with gradient support |
+| GridToTensor.convert_grid | Complete | Not Started | Implemented with gradient support |
+| GridToTensor.convert_mask | Complete | Not Started | Implemented with gradient support |
+| GridToTensor.convert_symmetry_ops | Not Started | Not Started | NotImplementedError |
+| TensorToNumpy.tensor_to_array | Complete | Not Started | Implemented with detachment |
+| TensorToNumpy.convert_dict_of_tensors | Complete | Not Started | Implemented with detachment |
+| TensorToNumpy.convert_intensity_map | Complete | Not Started | Implemented with detachment |
+| ModelAdapters.adapt_one_phonon_inputs | Complete | Not Started | Implemented with proper conversion |
+| ModelAdapters.adapt_one_phonon_outputs | Complete | Not Started | Implemented with proper conversion |
+| ModelAdapters.adapt_rigid_body_translations_inputs | Not Started | Not Started | NotImplementedError |
 
 ### Phase 3: Core Functions
 
@@ -110,7 +116,7 @@ Additional debug runs with focused tests may be needed to generate these missing
 | Checkpoint | Description | Status | Date Completed |
 |------------|-------------|--------|----------------|
 | CP1 | Core Utilities Complete | In Progress (77%) | - |
-| CP2 | Adapters Complete | Not Started | - |
+| CP2 | Adapters Complete | In Progress (70%) | - |
 | CP3 | Map Utils Complete | Complete | March 04, 2025 |
 | CP4 | Scatter Complete | Not Started | - |
 | CP5 | Matrix Construction Complete | Not Started | - |
