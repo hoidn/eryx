@@ -838,8 +838,8 @@ class OnePhonon:
         else:
             ADP = self.ADP
             
-        # Initialize diffuse intensity tensor with complex dtype
-        Id = torch.zeros(self.q_grid.shape[0], dtype=torch.complex64, device=self.device)
+        # Initialize diffuse intensity tensor with float dtype
+        Id = torch.zeros(self.q_grid.shape[0], dtype=torch.float32, device=self.device)
         
         # Import structure_factors from scatter_torch
         from eryx.scatter_torch import structure_factors
