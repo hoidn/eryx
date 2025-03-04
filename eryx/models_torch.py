@@ -343,39 +343,33 @@ class OnePhonon:
         References:
             - Original implementation: eryx/models.py:OnePhonon._build_kvec_Brillouin
         """
-        # Initialize tensor arrays for k-vectors and their norms
-        self.kvec = torch.zeros((self.hsampling[2],
-                                self.ksampling[2],
-                                self.lsampling[2],
-                                3), 
-                               device=self.device)
+        # Get dimensions
+        h_dim = self.hsampling[2]
+        k_dim = self.ksampling[2]
+        l_dim = self.lsampling[2]
         
-        self.kvec_norm = torch.zeros((self.hsampling[2],
-                                     self.ksampling[2],
-                                     self.lsampling[2],
-                                     1), 
-                                    device=self.device)
+        # Create centered coordinates for h, k, l
+        h_vals = torch.tensor([self._center_kvec(dh, h_dim) for dh in range(h_dim)], device=self.device)
+        k_vals = torch.tensor([self._center_kvec(dk, k_dim) for dk in range(k_dim)], device=self.device)
+        l_vals = torch.tensor([self._center_kvec(dl, l_dim) for dl in range(l_dim)], device=self.device)
         
-        # Get the appropriate A_inv tensor based on implementation
-        A_inv = self.A_inv
+        # Create meshgrid
+        h_grid, k_grid, l_grid = torch.meshgrid(h_vals, k_vals, l_vals, indexing='ij')
         
-        # For each point in the grid, compute the k-vector and its norm
-        for dh in range(self.hsampling[2]):
-            k_dh = self._center_kvec(dh, self.hsampling[2])
-            for dk in range(self.ksampling[2]):
-                k_dk = self._center_kvec(dk, self.ksampling[2])
-                for dl in range(self.lsampling[2]):
-                    k_dl = self._center_kvec(dl, self.lsampling[2])
-                    
-                    # Create k-vector tensor
-                    k_vec = torch.tensor([k_dh, k_dk, k_dl], device=self.device)
-                    
-                    # Compute k-vector in reciprocal space
-                    # 2π * A_inv^T * k
-                    self.kvec[dh, dk, dl] = 2 * torch.pi * torch.matmul(A_inv.T, k_vec)
-                    
-                    # Compute and store the norm
-                    self.kvec_norm[dh, dk, dl, 0] = torch.norm(self.kvec[dh, dk, dl])
+        # Stack to create k-vectors
+        k_vecs = torch.stack([h_grid, k_grid, l_grid], dim=-1)
+        
+        # Reshape for matrix multiplication
+        k_vecs_flat = k_vecs.reshape(-1, 3)
+        
+        # Compute 2π * A_inv^T * k for all k-vectors at once
+        q_vecs_flat = 2 * torch.pi * torch.matmul(self.A_inv.T, k_vecs_flat.T).T
+        
+        # Reshape back to grid
+        self.kvec = q_vecs_flat.reshape(h_dim, k_dim, l_dim, 3)
+        
+        # Compute norms
+        self.kvec_norm = torch.norm(self.kvec, dim=-1, keepdim=True)
     
     def _center_kvec(self, x: int, L: int) -> float:
         """
