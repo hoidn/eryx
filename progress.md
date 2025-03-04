@@ -166,10 +166,10 @@ No performance metrics available yet. This section will be updated once the impl
 | 2025-03-03 | Updated implementation status of Phase 1 Core Utilities in torch_utils.py |
 | 2025-03-03 | Corrected list of missing log files based on actual logs directory contents |
 | 2025-03-03 | Refined Phase 1 completion percentage (90% → 77%) with more detailed FFTOps function listing |
-| 2025-03-08 | Updated to confirm all K-vector methods tests are passing in test_models_torch_kvector.py |
-| 2025-03-08 | Corrected status of compute_covariance_matrix log file (now confirmed available) |
-| 2025-03-08 | Updated Phase 4 completion percentage (40% → 60%) based on implemented methods |
-| 2025-03-08 | Updated overall completion percentage (55% → 62%) |
-| 2025-03-11 | Completed implementation of OnePhonon.compute_covariance_matrix (CP8) |
-| 2025-03-11 | Updated Phase 4 completion from 60% to 67% |
-| 2025-03-11 | Updated overall completion from 62% to 65% |
+| 2025-03-04 | Updated to confirm all K-vector methods tests are passing in test_models_torch_kvector.py |
+| 2025-03-04 | Corrected status of compute_covariance_matrix log file (now confirmed available) |
+| 2025-03-04 | Updated Phase 4 completion percentage (40% → 60%) based on implemented methods |
+| 2025-03-04 | Updated overall completion percentage (55% → 62%) |
+| 2025-03-04 | Completed implementation of OnePhonon.compute_covariance_matrix (CP8) |
+| 2025-03-04 | Updated Phase 4 completion from 60% to 67% |
+| 2025-03-04 | Updated overall completion from 62% to 65% |
