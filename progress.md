@@ -9,9 +9,9 @@ This document tracks the implementation progress of the PyTorch port for the dif
 | Phase 1 | Core Utilities | In Progress | 77% |
 | Phase 2 | Adapter Components | In Progress | 70% |
 | Phase 3 | Core Functions | Complete | 100% |
-| Phase 4 | OnePhonon Model | In Progress | 20% |
+| Phase 4 | OnePhonon Model | In Progress | 40% |
 | Phase 5 | Integration | Not Started | 0% |
-| **Overall** | **All Phases** | **In Progress** | **45%** |
+| **Overall** | **All Phases** | **In Progress** | **55%** |
 
 ## Ground Truth Data
 
@@ -21,12 +21,11 @@ The data is available in the `logs/` directory but is not included in the source
 
 ### Missing Ground Truth Data
 
-The following functions from `to_convert.json` are missing log files:
+The following function from `to_convert.json` is missing a log file:
 
-1. `eryx.models.compute_covariance_matrix`
-2. `eryx.pdb.flatten_model`
+1. `eryx.pdb.flatten_model`
 
-Additional debug runs with focused tests may be needed to generate these missing log files.
+Additional debug runs with focused tests may be needed to generate this missing log file.
 
 ## Function Implementation Status
 
@@ -89,9 +88,9 @@ Additional debug runs with focused tests may be needed to generate these missing
 | OnePhonon._build_M | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon._build_M_allatoms | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon._project_M | models.py | Complete | Complete | Ground truth tests pass |
-| OnePhonon._build_kvec_Brillouin | models.py | Not Started | Not Started | Log file available |
-| OnePhonon._center_kvec | models.py | Not Started | Not Started | Log file available |
-| OnePhonon._at_kvec_from_miller_points | models.py | Not Started | Not Started | Log file available |
+| OnePhonon._build_kvec_Brillouin | models.py | Complete | Complete | Ground truth tests pass |
+| OnePhonon._center_kvec | models.py | Complete | Complete | Ground truth tests pass |
+| OnePhonon._at_kvec_from_miller_points | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon.compute_gnm_phonons | models.py | Not Started | Not Started | Log file available |
 | OnePhonon.compute_hessian | models.py | Not Started | Not Started | Log file available |
 | OnePhonon.compute_covariance_matrix | models.py | Not Started | Not Started | **Log file missing** |
@@ -120,7 +119,7 @@ Additional debug runs with focused tests may be needed to generate these missing
 | CP3 | Map Utils Complete | Complete | March 04, 2025 |
 | CP4 | Scatter Complete | Complete | March 05, 2025 |
 | CP5 | Matrix Construction Complete | Complete | March 06, 2025 |
-| CP6 | K-vector Methods Complete | Not Started | - |
+| CP6 | K-vector Methods Complete | Complete | March 07, 2025 |
 | CP7 | Phonon Calculation Complete | Not Started | - |
 | CP8 | Covariance Matrix Complete | Not Started | - |
 | CP9 | Apply Disorder Complete | Not Started | - |
@@ -128,17 +127,20 @@ Additional debug runs with focused tests may be needed to generate these missing
 
 ## Current Focus
 
-CP5 (Matrix Construction Complete) has been completed. The current implementation focus is now on CP6: K-vector Methods Complete.
+CP6 (K-vector Methods Complete) has been completed. The current implementation focus is now on CP7: Phonon Calculation Complete.
 
 ### Next Steps
-1. Implement `OnePhonon._build_kvec_Brillouin` in models_torch.py
-2. Implement `OnePhonon._center_kvec` in models_torch.py
-3. Implement `OnePhonon._at_kvec_from_miller_points` in models_torch.py
-4. Generate missing log files for `eryx.models.compute_covariance_matrix` and `eryx.pdb.flatten_model`
+1. Implement `compute_gnm_phonons` in models_torch.py
+2. Implement `compute_hessian` in models_torch.py
+3. Implement `GaussianNetworkModel.compute_hessian`, `compute_K`, and `compute_Kinv` in models_torch.py
+4. Test all phonon calculation methods against ground truth data
 
 ### Blockers and Challenges
-- Missing log files for `eryx.models.compute_covariance_matrix` and `eryx.pdb.flatten_model` may affect testing
-- FFT operations may require special handling for gradient flow
+- The eigendecomposition in `compute_gnm_phonons` requires careful handling for gradient flow
+- Missing log file for `eryx.pdb.flatten_model` may affect testing of some components
+
+### Looking Ahead
+- With ground truth data for `compute_covariance_matrix` now confirmed available, we're well positioned for CP8 (Covariance Matrix Complete) implementation
 
 ## Development Timeline
 

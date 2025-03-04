@@ -334,24 +334,59 @@ class OnePhonon:
     
     def _build_kvec_Brillouin(self):
         """
-        Compute k-vectors and their norm in the first Brillouin zone using PyTorch.
+        Compute all k-vectors and their norm in the first Brillouin zone.
+        
+        This is achieved by regularly sampling [-0.5,0.5[ for h, k and l,
+        computing the corresponding vectors in reciprocal space, and storing
+        their norms.
         
         References:
             - Original implementation: eryx/models.py:OnePhonon._build_kvec_Brillouin
         """
-        # TODO: Generate k-vector grid using PyTorch's meshgrid
-        # TODO: Compute k-vector norms with torch.norm
-        # TODO: Store as tensors for differentiable computations
+        # Initialize tensor arrays for k-vectors and their norms
+        self.kvec = torch.zeros((self.hsampling[2],
+                                self.ksampling[2],
+                                self.lsampling[2],
+                                3), 
+                               device=self.device)
         
-        raise NotImplementedError("OnePhonon._build_kvec_Brillouin not implemented")
+        self.kvec_norm = torch.zeros((self.hsampling[2],
+                                     self.ksampling[2],
+                                     self.lsampling[2],
+                                     1), 
+                                    device=self.device)
+        
+        # Get the appropriate A_inv tensor based on implementation
+        A_inv = self.A_inv
+        
+        # For each point in the grid, compute the k-vector and its norm
+        for dh in range(self.hsampling[2]):
+            k_dh = self._center_kvec(dh, self.hsampling[2])
+            for dk in range(self.ksampling[2]):
+                k_dk = self._center_kvec(dk, self.ksampling[2])
+                for dl in range(self.lsampling[2]):
+                    k_dl = self._center_kvec(dl, self.lsampling[2])
+                    
+                    # Create k-vector tensor
+                    k_vec = torch.tensor([k_dh, k_dk, k_dl], device=self.device)
+                    
+                    # Compute k-vector in reciprocal space
+                    # 2π * A_inv^T * k
+                    self.kvec[dh, dk, dl] = 2 * torch.pi * torch.matmul(A_inv.T, k_vec)
+                    
+                    # Compute and store the norm
+                    self.kvec_norm[dh, dk, dl, 0] = torch.norm(self.kvec[dh, dk, dl])
     
     def _center_kvec(self, x: int, L: int) -> float:
         """
         Center k-vector components.
         
+        For x and L integers such that 0 < x < L, return -L/2 < x < L/2
+        by applying periodic boundary condition in L/2
+        
         Args:
             x: Index to center
-            L: Length of periodic box
+            L: Length of the periodic box
             
         Returns:
             float: Centered k-vector component
@@ -359,28 +394,49 @@ class OnePhonon:
         References:
             - Original implementation: eryx/models.py:OnePhonon._center_kvec
         """
-        # This function can remain the same as it's a simple calculation
-        # that doesn't need tensor operations
+        # This function is essentially identical to the NumPy implementation
+        # as it's a simple calculation not requiring tensor operations
         return int(((x - L / 2) % L) - L / 2) / L
     
-    def _at_kvec_from_miller_points(self, hkl_kvec: Tuple[int, int, int]):
+    def _at_kvec_from_miller_points(self, hkl_kvec: tuple):
         """
-        Return indices of q-vectors that are k-vector away from Miller indices.
+        Return the indices of all q-vector that are k-vector away from any
+        Miller index in the map.
         
         Args:
-            hkl_kvec: Fractional Miller index tuple
+            hkl_kvec: Tuple of ints with fractional Miller index of the desired k-vector
             
         Returns:
-            torch.Tensor: Indices of q-vectors
+            torch.Tensor: Indices of q-vectors in raveled form
             
         References:
             - Original implementation: eryx/models.py:OnePhonon._at_kvec_from_miller_points
         """
-        # TODO: Calculate index grid
-        # TODO: Convert to PyTorch tensor for output
-        # TODO: Handle ravel operation with PyTorch
+        # Calculate steps for each dimension
+        hsteps = int(self.hsampling[2] * (self.hsampling[1] - self.hsampling[0]) + 1)
+        ksteps = int(self.ksampling[2] * (self.ksampling[1] - self.ksampling[0]) + 1)
+        lsteps = int(self.lsampling[2] * (self.lsampling[1] - self.lsampling[0]) + 1)
         
-        raise NotImplementedError("OnePhonon._at_kvec_from_miller_points not implemented")
+        # Create meshgrid equivalent to NumPy's mgrid
+        h_indices = torch.arange(hkl_kvec[0], hsteps, self.hsampling[2], device=self.device, dtype=torch.long)
+        k_indices = torch.arange(hkl_kvec[1], ksteps, self.ksampling[2], device=self.device, dtype=torch.long)
+        l_indices = torch.arange(hkl_kvec[2], lsteps, self.lsampling[2], device=self.device, dtype=torch.long)
+        
+        # Create meshgrid
+        h_grid, k_grid, l_grid = torch.meshgrid(h_indices, k_indices, l_indices, indexing='ij')
+        
+        # Flatten indices
+        h_flat = h_grid.reshape(-1)
+        k_flat = k_grid.reshape(-1)
+        l_flat = l_grid.reshape(-1)
+        
+        # Create a PyTorch equivalent to np.ravel_multi_index
+        # Formula: index = h * (dim_k * dim_l) + k * dim_l + l
+        indices = (h_flat * (self.map_shape[1] * self.map_shape[2]) + 
+                  k_flat * self.map_shape[2] + 
+                  l_flat)
+        
+        return indices
     
     def compute_hessian(self) -> torch.Tensor:
         """
