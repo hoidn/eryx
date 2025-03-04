@@ -369,6 +369,7 @@ class OnePhonon:
 
         return hessian
 
+    @debug
     def compute_covariance_matrix(self):
         """
         Compute covariance matrix for all asymmetric units.
