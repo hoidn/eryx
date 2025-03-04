@@ -451,17 +451,78 @@ class OnePhonon:
     
     def compute_gnm_phonons(self):
         """
-        Compute phonon modes and frequencies with PyTorch operations.
+        Compute the dynamical matrix for each k-vector in the first Brillouin zone,
+        from the supercell's GNM.
+        
+        The squared inverse of the eigenvalues is stored for intensity calculation,
+        and the eigenvectors are mass-weighted to be used in the definition of the
+        phonon structure factors.
         
         References:
             - Original implementation: eryx/models.py:OnePhonon.compute_gnm_phonons
         """
-        # TODO: Compute Hessian matrix
-        # TODO: For each k-vector, compute dynamical matrix
-        # TODO: Use torch.linalg.svd for eigendecomposition
-        # TODO: Store eigenvalues and eigenvectors in tensors
+        # Import EigenOps for eigendecomposition with gradient support
+        from eryx.torch_utils import EigenOps
         
-        raise NotImplementedError("OnePhonon.compute_gnm_phonons not implemented")
+        # Compute the Hessian matrix
+        hessian = self.compute_hessian()
+        
+        # Initialize tensors for eigenvalues and eigenvectors if not already done
+        if not hasattr(self, 'V') or self.V is None:
+            self.V = torch.zeros((self.hsampling[2],
+                                 self.ksampling[2],
+                                 self.lsampling[2],
+                                 self.n_asu * self.n_dof_per_asu,
+                                 self.n_asu * self.n_dof_per_asu),
+                                dtype=torch.complex64, device=self.device)
+        
+        if not hasattr(self, 'Winv') or self.Winv is None:
+            self.Winv = torch.zeros((self.hsampling[2],
+                                    self.ksampling[2],
+                                    self.lsampling[2],
+                                    self.n_asu * self.n_dof_per_asu),
+                                   dtype=torch.complex64, device=self.device)
+        
+        # Process each k-vector in the Brillouin zone
+        for dh in range(self.hsampling[2]):
+            for dk in range(self.ksampling[2]):
+                for dl in range(self.lsampling[2]):
+                    # Extract current k-vector
+                    kvec = self.kvec[dh, dk, dl]
+                    
+                    # Compute dynamical matrix for this k-vector
+                    Kmat = self.compute_gnm_K(hessian, kvec=kvec)
+                    
+                    # Reshape to 2D matrix for eigendecomposition
+                    Kmat_2d = Kmat.reshape(self.n_asu * self.n_dof_per_asu,
+                                          self.n_asu * self.n_dof_per_asu)
+                    
+                    # Compute D = L⁻¹ K L⁻ᵀ (mass-weighted dynamical matrix)
+                    # Convert Linv to complex for compatibility
+                    Linv_complex = self.Linv.to(dtype=torch.complex64)
+                    Dmat = torch.matmul(Linv_complex, 
+                                       torch.matmul(Kmat_2d, Linv_complex.T))
+                    
+                    # Perform SVD-based eigendecomposition for better gradient support
+                    v, s, _ = EigenOps.svd_decomposition(Dmat)
+                    
+                    # Post-process eigenvalues and eigenvectors
+                    # Compute frequencies (sqrt of eigenvalues)
+                    w = torch.sqrt(s)
+                    
+                    # Handle small/zero eigenvalues
+                    eps = 1e-6
+                    w_safe = torch.where(w < eps, float('nan'), w)
+                    
+                    # Reverse order to match NumPy implementation
+                    w_safe = torch.flip(w_safe, [0])
+                    v = torch.flip(v, [1])
+                    
+                    # Store inverse squared frequencies
+                    self.Winv[dh, dk, dl] = 1.0 / (w_safe ** 2)
+                    
+                    # Store mass-weighted eigenvectors
+                    self.V[dh, dk, dl] = torch.matmul(Linv_complex.T, v)
     
     def compute_covariance_matrix(self):
         """

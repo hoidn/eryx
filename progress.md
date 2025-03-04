@@ -93,13 +93,13 @@ The log file for `eryx.models.compute_covariance_matrix` has been confirmed to b
 | OnePhonon._build_kvec_Brillouin | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon._center_kvec | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon._at_kvec_from_miller_points | models.py | Complete | Complete | Ground truth tests pass |
-| OnePhonon.compute_gnm_phonons | models.py | Not Started | Not Started | Log file available |
-| OnePhonon.compute_hessian | models.py | Not Started | Not Started | Log file available |
+| OnePhonon.compute_gnm_phonons | models.py | Complete | Complete | Ground truth tests pass |
+| OnePhonon.compute_hessian | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon.compute_covariance_matrix | models.py | Not Started | Not Started | Log file available |
 | OnePhonon.apply_disorder | models.py | Not Started | Not Started | Log file available |
-| GaussianNetworkModel.compute_hessian | pdb.py | Not Started | Not Started | Log file available |
-| GaussianNetworkModel.compute_K | pdb.py | Not Started | Not Started | Log file available |
-| GaussianNetworkModel.compute_Kinv | pdb.py | Not Started | Not Started | Log file available |
+| GaussianNetworkModel.compute_hessian | pdb.py | Complete | Complete | Ground truth tests pass |
+| GaussianNetworkModel.compute_K | pdb.py | Complete | Complete | Ground truth tests pass |
+| GaussianNetworkModel.compute_Kinv | pdb.py | Complete | Complete | Ground truth tests pass |
 | AtomicModel._get_xyz_asus | pdb.py | Not Started | Not Started | Log file available |
 | AtomicModel.flatten_model | pdb.py | Not Started | Not Started | **Log file missing** |
 | Crystal.get_asu_xyz | pdb.py | Not Started | Not Started | Log file available |
@@ -122,27 +122,26 @@ The log file for `eryx.models.compute_covariance_matrix` has been confirmed to b
 | CP4 | Scatter Complete | Complete | March 05, 2025 |
 | CP5 | Matrix Construction Complete | Complete | March 06, 2025 |
 | CP6 | K-vector Methods Complete | Complete | March 07, 2025 |
-| CP7 | Phonon Calculation Complete | Not Started | - |
+| CP7 | Phonon Calculation Complete | Complete | March 10, 2025 |
 | CP8 | Covariance Matrix Complete | Not Started | - |
 | CP9 | Apply Disorder Complete | Not Started | - |
 | CP10 | End-to-End Integration Complete | Not Started | - |
 
 ## Current Focus
 
-CP6 (K-vector Methods Complete) has been completed and all tests in test_models_torch_kvector.py are passing. The current implementation focus is now on CP7: Phonon Calculation Complete.
+CP7 (Phonon Calculation Complete) has been completed. The current implementation focus is now on CP8: Covariance Matrix Complete.
 
 ### Next Steps
-1. Implement `compute_gnm_phonons` in models_torch.py
-2. Implement `compute_hessian` in models_torch.py
-3. Implement `GaussianNetworkModel.compute_hessian`, `compute_K`, and `compute_Kinv` in models_torch.py
-4. Test all phonon calculation methods against ground truth data
+1. Implement `compute_covariance_matrix` in models_torch.py
+2. Test covariance matrix calculation against ground truth data
+3. Verify gradient flow through the covariance matrix calculation
 
 ### Blockers and Challenges
-- The eigendecomposition in `compute_gnm_phonons` requires careful handling for gradient flow
-- Missing log file for `eryx.pdb.flatten_model` may affect testing of some components
+- The eigendecomposition in eigenvalue methods introduces numerical complexities that may affect gradient flow
+- Missing log file for `eryx.pdb.flatten_model` may affect some components
 
 ### Looking Ahead
-- With ground truth data for `compute_covariance_matrix` now confirmed available, we're well positioned for CP8 (Covariance Matrix Complete) implementation
+- After CP8, the final step will be CP9 (Apply Disorder Complete) followed by end-to-end integration in CP10
 
 ## Development Timeline
 
