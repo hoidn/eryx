@@ -916,8 +916,12 @@ class OnePhonon:
                      use_data_adp: bool = False) -> torch.Tensor:
         # Print some diagnostic information
         import logging
-#        logging.info(f"PyTorch apply_disorder - gamma_intra: {self.gamma_intra.item()}, gamma_inter: {self.gamma_inter.item()}")
+        logging.basicConfig(level=logging.INFO)
+        logging.info(f"PyTorch apply_disorder - rank: {rank}, use_data_adp: {use_data_adp}")
+        if hasattr(self, 'gamma_intra') and hasattr(self, 'gamma_inter'):
+            logging.info(f"PyTorch apply_disorder - gamma_intra: {self.gamma_intra.item()}, gamma_inter: {self.gamma_inter.item()}")
         logging.info(f"PyTorch apply_disorder - device: {self.device}, dtype: {self.q_grid.dtype}")
+        logging.info(f"PyTorch apply_disorder - res_mask shape: {self.res_mask.shape}, True count: {torch.sum(self.res_mask)}")
         if hasattr(self, 'V'):
             logging.info(f"PyTorch apply_disorder - V shape: {self.V.shape}, Winv shape: {self.Winv.shape}")
             logging.info(f"PyTorch apply_disorder - V min/max real: {torch.min(torch.real(self.V))}/{torch.max(torch.real(self.V))}")
@@ -970,11 +974,11 @@ class OnePhonon:
                     # Get q-vector indices that are k-vector away from Miller indices
                     q_indices = self._at_kvec_from_miller_points((dh, dk, dl))
                     
-                    # Apply resolution mask
-                    mask = self.res_mask[q_indices]
-                    valid_indices = q_indices[mask]
+                    # Apply resolution mask - match NumPy implementation exactly
+                    # In NumPy, the mask is applied after computing structure factors
+                    valid_indices = q_indices
                     
-                    # Skip if no valid points after masking
+                    # Skip if no valid points
                     if valid_indices.shape[0] == 0:
                         continue
                         
@@ -1053,8 +1057,10 @@ class OnePhonon:
         
         # Apply resolution mask and take real part
         # Set values outside resolution mask to NaN
-        Id_masked = torch.full_like(Id, float('nan'), dtype=torch.float64)
-        Id_masked[self.res_mask] = torch.real(Id[self.res_mask])
+        # This matches the NumPy implementation exactly
+        Id = torch.real(Id)
+        Id_masked = Id.clone()
+        Id_masked[~self.res_mask] = float('nan')
         
         # Convert back to float32 for compatibility with NumPy implementation
         Id_masked = Id_masked.to(dtype=torch.float32)
