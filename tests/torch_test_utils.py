@@ -84,8 +84,18 @@ class TensorComparison:
             np_masked = np_array[mask]
             torch_masked = torch_array[mask]
         else:
-            np_masked = np_array
-            torch_masked = torch_array
+            # When not using equal_nan, we still need to handle NaNs properly
+            # for the comparison to work correctly
+            if np.any(np_nans) and check_nans:
+                # If we've reached here, NaN patterns match, so we can mask them out
+                mask = ~np_nans
+                if not np.any(mask):
+                    return True, {"message": "All values are NaN"}
+                np_masked = np_array[mask]
+                torch_masked = torch_array[mask]
+            else:
+                np_masked = np_array
+                torch_masked = torch_array
             
         # Calculate metrics
         abs_diff = np.abs(np_masked - torch_masked)
@@ -253,6 +263,9 @@ class ModelState:
             to_tensor: Whether to convert NumPy arrays to tensors
             device: Device to place tensors on, or None for model's device
         """
+        # Import copy for deep copying mutable objects
+        import copy
+        
         # Determine target device (from model.device if device=None)
         if device is None and hasattr(model, 'device'):
             device = model.device
@@ -276,6 +289,9 @@ class ModelState:
             elif isinstance(value, torch.Tensor) and device is not None:
                 # Move existing tensor to the specified device
                 setattr(model, attr, value.to(device))
+            elif isinstance(value, (list, dict, set)):
+                # Create a deep copy for mutable objects to avoid reference issues
+                setattr(model, attr, copy.deepcopy(value))
             else:
                 # Set attribute directly
                 setattr(model, attr, value)

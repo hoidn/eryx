@@ -99,22 +99,26 @@ class InfrastructureTest(unittest.TestCase):
                 self.attr1 = 1
                 self.attr2 = np.array([1.0, 2.0, 3.0])
                 self.attr3 = "test"
+                self.attr4 = [1, 2, 3]  # Add a mutable object
                 self.device = torch.device('cpu')
         
         mock_model = MockModel()
         
         # Capture state
-        state = ModelState.capture_model_state(mock_model, attributes=['attr1', 'attr2', 'attr3'])
+        state = ModelState.capture_model_state(mock_model, 
+                                              attributes=['attr1', 'attr2', 'attr3', 'attr4'])
         
         # Verify state was captured correctly
         self.assertEqual(state['attr1'], 1)
         self.assertTrue(np.array_equal(state['attr2'], np.array([1.0, 2.0, 3.0])))
         self.assertEqual(state['attr3'], "test")
+        self.assertEqual(state['attr4'], [1, 2, 3])
         
         # Modify object
         mock_model.attr1 = 2
         mock_model.attr2 = np.array([4.0, 5.0, 6.0])
         mock_model.attr3 = "modified"
+        mock_model.attr4 = [4, 5, 6]
         
         # Inject original state
         ModelState.inject_model_state(mock_model, state, to_tensor=False)
@@ -123,6 +127,7 @@ class InfrastructureTest(unittest.TestCase):
         self.assertEqual(mock_model.attr1, 1)
         self.assertTrue(np.array_equal(mock_model.attr2, np.array([1.0, 2.0, 3.0])))
         self.assertEqual(mock_model.attr3, "test")
+        self.assertEqual(mock_model.attr4, [1, 2, 3])
         
         # Test conversion to tensors
         mock_model.attr2 = np.array([7.0, 8.0, 9.0])
@@ -243,20 +248,18 @@ class InfrastructureTest(unittest.TestCase):
                     def __init__(self):
                         self.value = 1
                         self.array = np.array([1.0, 2.0, 3.0])
+                        self.list_attr = [1, 2, 3]  # Add a mutable object
                         self.device = torch.device('cpu')
                 
                 obj = SimpleObject()
                 
-                # Capture state
-                state = self.capture_model_state(obj)
+                # Capture state - explicitly include all attributes
+                state = self.capture_model_state(obj, attributes=['value', 'array', 'list_attr'])
                 
                 # Modify object
                 obj.value = 2
                 obj.array = np.array([4.0, 5.0, 6.0])
-                
-                # Capture current state before modification
-                original_value = obj.value
-                original_array = obj.array.copy()
+                obj.list_attr = [4, 5, 6]
                 
                 # Inject state
                 self.inject_model_state(obj, state, to_tensor=False)
@@ -264,6 +267,7 @@ class InfrastructureTest(unittest.TestCase):
                 # Verify restoration
                 self.assertEqual(obj.value, 1)
                 self.assertTrue(np.array_equal(obj.array, np.array([1.0, 2.0, 3.0])))
+                self.assertEqual(obj.list_attr, [1, 2, 3])
         
         # Run the test case
         test_case = TestCase()
