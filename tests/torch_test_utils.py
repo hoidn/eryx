@@ -103,7 +103,13 @@ class TensorComparison:
             mean_rel_diff = 0
             
         # Check if arrays are close
-        is_close = np.allclose(np_masked, torch_masked, rtol=rtol, atol=atol)
+        try:
+            is_close = np.allclose(np_masked, torch_masked, rtol=rtol, atol=atol)
+        except:
+            # Handle case where comparison might fail due to type issues
+            is_close = np.allclose(np_masked.astype(np.float64), 
+                                  torch_masked.astype(np.float64), 
+                                  rtol=rtol, atol=atol)
         
         # Prepare detailed metrics
         metrics = {
