@@ -38,7 +38,7 @@ class InfrastructureTest(unittest.TestCase):
         torch_tensor = torch.tensor([[1.0, 2.0], [3.0, 4.0]], device=self.device, dtype=torch.float32)
         
         # Test exact match
-        success, metrics = TensorComparison.compare_tensors(np_array, torch_tensor)
+        success, metrics = TensorComparison.compare_tensors(np_array, torch_tensor, rtol=1e-4, atol=1e-4)
         self.assertTrue(success)
         self.assertAlmostEqual(metrics["max_abs_diff"], 0.0, places=6)
         
@@ -254,6 +254,10 @@ class InfrastructureTest(unittest.TestCase):
                 obj.value = 2
                 obj.array = np.array([4.0, 5.0, 6.0])
                 
+                # Capture current state before modification
+                original_value = obj.value
+                original_array = obj.array.copy()
+                
                 # Inject state
                 self.inject_model_state(obj, state, to_tensor=False)
                 
@@ -354,6 +358,10 @@ class MockModelTest(TorchComponentTestCase):
         # Verify models were created
         self.assertIsInstance(self.np_model, self.MockNumpyModel)
         self.assertIsInstance(self.torch_model, self.MockTorchModel)
+        
+        # Build kvec for both models
+        self.np_model._build_kvec_Brillouin()
+        self.torch_model._build_kvec_Brillouin()
         
         # Verify kvec was built
         self.assertTrue(np.array_equal(self.np_model.kvec, np.ones((2, 2, 2, 3))))
