@@ -14,7 +14,7 @@ import sys
 from typing import Dict, Any, Tuple, List, Optional
 
 # Import testing utilities
-from torch_test_utils import TensorComparison, ModelState
+from tests.torch_test_utils import TensorComparison, ModelState
 from torch_test_base import TorchComponentTestCase
 from test_helpers.mock_data import (
     create_mock_kvectors, create_mock_hessian, create_mock_eigendecomposition,

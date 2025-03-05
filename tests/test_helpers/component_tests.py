@@ -10,10 +10,7 @@ import torch
 from typing import Dict, Any, Tuple, List, Optional, Union, Callable
 
 # Import tensor comparison utilities
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from torch_test_utils import TensorComparison
+from tests.torch_test_utils import TensorComparison
 
 
 class KVectorTests:
