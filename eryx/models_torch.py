@@ -987,16 +987,26 @@ class OnePhonon:
                     
                     # Compute structure factors for each asymmetric unit
                     for i_asu in range(self.n_asu):
+                        # Ensure consistent dtype for all inputs to structure_factors
+                        q_grid = self.q_grid[valid_indices]
+                        xyz = self.model_dict['xyz'][i_asu]
+                        ff_a = self.model_dict['ff_a'][i_asu]
+                        ff_b = self.model_dict['ff_b'][i_asu]
+                        ff_c = self.model_dict['ff_c'][i_asu]
+                        
+                        # Convert Amat to the same dtype as ADP to avoid dtype mismatch
+                        amat = self.Amat[i_asu].to(dtype=ADP.dtype)
+                        
                         F[:, i_asu, :] = structure_factors(
-                            self.q_grid[valid_indices],
-                            self.model_dict['xyz'][i_asu],
-                            self.model_dict['ff_a'][i_asu],
-                            self.model_dict['ff_b'][i_asu],
-                            self.model_dict['ff_c'][i_asu],
+                            q_grid,
+                            xyz,
+                            ff_a,
+                            ff_b,
+                            ff_c,
                             U=ADP,
                             batch_size=self.batch_size,
                             compute_qF=True,
-                            project_on_components=self.Amat[i_asu],
+                            project_on_components=amat,
                             sum_over_atoms=False
                         )
                     
