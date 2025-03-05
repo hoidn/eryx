@@ -445,6 +445,19 @@ class OnePhonon:
         Compute k-vectors in the first Brillouin zone with exactly the same
         centering behavior as the NumPy implementation.
         """
+        # Initialize tensor arrays for k-vectors if they don't exist yet
+        if not hasattr(self, 'kvec') or self.kvec is None:
+            self.kvec = torch.zeros((self.hsampling[2],
+                                   self.ksampling[2],
+                                   self.lsampling[2],
+                                   3), device=self.device)
+            
+        if not hasattr(self, 'kvec_norm') or self.kvec_norm is None:
+            self.kvec_norm = torch.zeros((self.hsampling[2],
+                                        self.ksampling[2],
+                                        self.lsampling[2],
+                                        1), device=self.device)
+        
         # Use exactly the same formula for centering k-vectors
         for dh in range(self.hsampling[2]):
             h_dh = self._center_kvec(dh, self.hsampling[2])
