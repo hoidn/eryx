@@ -10,6 +10,10 @@ class TestTorchAllComponents(TorchComponentTestCase):
         """Set up test environment with very minimal parameters for quick testing."""
         super().setUp()
         
+        # Initialize test parameters if not already done by parent class
+        if not hasattr(self, 'test_params'):
+            self.test_params = self.default_test_params.copy()
+        
         # Override with minimal test parameters
         self.test_params.update({
             'hsampling': [-1, 1, 2],
