@@ -89,11 +89,33 @@ class PDBToTensor:
         Returns:
             Dictionary containing PyTorch tensor versions of the crystal attributes
         """
-        # TODO: Convert relevant attributes to PyTorch tensors
-        # TODO: Handle unit cell information
-        # TODO: Preserve crystallographic metadata
+        if crystal is None:
+            raise ValueError("Cannot convert None crystal")
+            
+        result = {
+            # Convert essential tensor attributes
+            'unit_cell_axes': self.array_to_tensor(crystal.unit_cell_axes, requires_grad=True),
+            
+            # Key scalar attributes
+            'n_cell': crystal.n_cell,
+            'n_asu': crystal.n_asu,
+            'n_atoms_per_asu': crystal.get_asu_xyz().shape[0],
+            
+            # Method access
+            'hkl_to_id': crystal.hkl_to_id,
+            'id_to_hkl': crystal.id_to_hkl,
+            'get_asu_xyz': lambda asu_id=0, unit_cell=None: self.array_to_tensor(
+                crystal.get_asu_xyz(asu_id, unit_cell), requires_grad=True
+            ),
+            'get_unitcell_origin': lambda unit_cell=None: self.array_to_tensor(
+                crystal.get_unitcell_origin(unit_cell), requires_grad=True
+            ),
+            
+            # Reference to original for other attributes
+            '_original_crystal': crystal
+        }
         
-        raise NotImplementedError("convert_crystal not implemented")
+        return result
     
     def convert_gnm(self, gnm: Any) -> Dict[str, Any]:
         """
@@ -105,11 +127,33 @@ class PDBToTensor:
         Returns:
             Dictionary containing PyTorch tensor versions of the GNM attributes
         """
-        # TODO: Convert gamma matrix to tensor
-        # TODO: Convert neighbor lists to tensor format
-        # TODO: Preserve parameter information
+        if gnm is None:
+            raise ValueError("Cannot convert None GNM")
+            
+        result = {
+            # Basic parameters
+            'enm_cutoff': gnm.enm_cutoff,
+            'gamma_intra': gnm.gamma_intra,
+            'gamma_inter': gnm.gamma_inter,
+            
+            # Convert gamma tensor
+            'gamma': self.array_to_tensor(gnm.gamma, requires_grad=True),
+            
+            # Simple function to access neighbors
+            'get_neighbors': lambda i_asu, i_cell, j_asu, i_at: self.array_to_tensor(
+                gnm.asu_neighbors[i_asu][i_cell][j_asu][i_at], 
+                requires_grad=False
+            ),
+            
+            # Reference to original object for complex attributes
+            '_original_gnm': gnm
+        }
         
-        raise NotImplementedError("convert_gnm not implemented")
+        # Handle crystal reference if present
+        if hasattr(gnm, 'crystal'):
+            result['crystal'] = self.convert_crystal(gnm.crystal)
+        
+        return result
     
     def array_to_tensor(self, array: np.ndarray, requires_grad: bool = True) -> torch.Tensor:
         """
@@ -280,10 +324,13 @@ class GridToTensor:
         Returns:
             Dictionary mapping IDs to tensor rotation matrices
         """
-        # TODO: Convert each symmetry operation matrix to tensor
-        # TODO: Maintain dictionary structure
+        if sym_ops is None:
+            return {}
         
-        raise NotImplementedError("convert_symmetry_ops not implemented")
+        return {
+            key: torch.tensor(matrix, device=self.device, dtype=torch.float32)
+            for key, matrix in sym_ops.items()
+        }
 
 class TensorToNumpy:
     """

@@ -35,7 +35,7 @@ class OnePhonon:
                  expand_p1: bool = True, group_by: str = 'asu',
                  res_limit: float = 0., model: str = 'gnm',
                  gnm_cutoff: float = 4., gamma_intra: float = 1., gamma_inter: float = 1.,
-                 batch_size: int = 10000, n_processes: int = 8):
+                 batch_size: int = 10000, n_processes: int = 8, device: Optional[torch.device] = None):
         """
         Initialize the OnePhonon model with PyTorch tensors.
         
@@ -53,29 +53,22 @@ class OnePhonon:
             gamma_inter: Spring constant for atom pairs in different molecules
             batch_size: Number of q-vectors to evaluate per batch
             n_processes: Number of processes for parallel computation
-            
-        References:
-            - Original implementation: eryx/models.py:OnePhonon.__init__
+            device: PyTorch device to use
         """
-        # TODO: Initialize class attributes similar to the NumPy implementation
-        # TODO: Convert sampling tuples to PyTorch compatible formats
-        # TODO: Call self._setup() and self._setup_phonons() to initialize tensors
+        # Set device
+        self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
+        # Store parameters
         self.hsampling = hsampling
         self.ksampling = ksampling
         self.lsampling = lsampling
         self.batch_size = batch_size
         self.n_processes = n_processes
+        self.model_type = model
         
-        # These will be initialized in _setup() and _setup_phonons()
-        self.model = None
-        self.q_grid = None
-        self.crystal = None
-        self.res_mask = None
-        self.group_by = group_by
-        
-        # Placeholder for a proper implementation
-        raise NotImplementedError("OnePhonon.__init__ not implemented")
+        # Setup model and compute phonons
+        self._setup(pdb_path, expand_p1, res_limit, group_by)
+        self._setup_phonons(pdb_path, model, gnm_cutoff, gamma_intra, gamma_inter)
     
     def _setup(self, pdb_path: str, expand_p1: bool, res_limit: float, group_by: str):
         """
@@ -86,16 +79,51 @@ class OnePhonon:
             expand_p1: If True, expand to p1 (if PDB is asymmetric unit)
             res_limit: High-resolution limit in Angstrom
             group_by: Level of rigid-body assembly, 'asu' or None
-            
-        References:
-            - Original implementation: eryx/models.py:OnePhonon._setup
         """
-        # TODO: Create AtomicModel using adapter
-        # TODO: Generate reciprocal space grid and convert to torch.Tensor
-        # TODO: Calculate q vectors and q magnitudes as torch tensors
-        # TODO: Set up Crystal object and compute necessary dimensions
+        # Import here to avoid circular imports
+        from eryx.adapters import PDBToTensor
+        from eryx.map_utils_torch import generate_grid, get_resolution_mask
+        from eryx.pdb import AtomicModel, Crystal
         
-        raise NotImplementedError("OnePhonon._setup not implemented")
+        # Create atomic model using PDBToTensor adapter
+        model_adapter = PDBToTensor(device=self.device)
+        atomic_model = AtomicModel(pdb_path, expand_p1)
+        self.model_dict = model_adapter.convert_atomic_model(atomic_model)
+        
+        # Extract key attributes from model dictionary
+        self.A_inv = self.model_dict['A_inv']
+        self.cell = self.model_dict['cell']
+        
+        # Generate grid using PyTorch implementations
+        self.hkl_grid, self.map_shape = generate_grid(self.A_inv, 
+                                                     self.hsampling,
+                                                     self.ksampling,
+                                                     self.lsampling,
+                                                     return_hkl=True)
+        self.res_mask, res_map = get_resolution_mask(self.cell,
+                                                    self.hkl_grid,
+                                                    res_limit)
+        self.q_grid = 2 * torch.pi * torch.matmul(self.A_inv.T, self.hkl_grid.T).T
+        
+        # Setup Crystal and compute dimensions
+        crystal_adapter = PDBToTensor(device=self.device)
+        crystal = Crystal(atomic_model)
+        self.crystal_dict = crystal_adapter.convert_crystal(crystal)
+        
+        # Set key dimensions
+        self.id_cell_ref = self.crystal_dict['hkl_to_id']([0,0,0])
+        self.n_cell = self.crystal_dict['n_cell']
+        self.n_asu = self.crystal_dict['n_asu']
+        self.n_atoms_per_asu = self.crystal_dict['n_atoms_per_asu']
+        self.n_dof_per_asu_actual = self.n_atoms_per_asu * 3
+        
+        # Set grouping strategy
+        self.group_by = group_by
+        if self.group_by is None:
+            self.n_dof_per_asu = self.n_dof_per_asu_actual
+        else:
+            self.n_dof_per_asu = 6
+        self.n_dof_per_cell = self.n_asu * self.n_dof_per_asu
     
     def _setup_phonons(self, pdb_path: str, model: str, 
                      gnm_cutoff: float, gamma_intra: float, gamma_inter: float):
@@ -108,16 +136,56 @@ class OnePhonon:
             gnm_cutoff: Distance cutoff for GNM in Angstrom
             gamma_intra: Spring constant for atom pairs in same molecule
             gamma_inter: Spring constant for atom pairs in different molecules
-            
-        References:
-            - Original implementation: eryx/models.py:OnePhonon._setup_phonons
         """
-        # TODO: Initialize tensor arrays for phonon calculations
-        # TODO: Build A and M matrices using PyTorch operations
-        # TODO: Compute k-vectors in Brillouin zone as tensors
-        # TODO: Setup GNM and compute phonon modes
+        # Import here to avoid circular imports
+        from eryx.adapters import PDBToTensor
+        from eryx.pdb import GaussianNetworkModel
         
-        raise NotImplementedError("OnePhonon._setup_phonons not implemented")
+        # Initialize tensor arrays for phonon calculations
+        # Use torch.zeros with proper device placement
+        self.kvec = torch.zeros((self.hsampling[2],
+                               self.ksampling[2],
+                               self.lsampling[2],
+                               3), device=self.device)
+        
+        self.kvec_norm = torch.zeros((self.hsampling[2],
+                                    self.ksampling[2],
+                                    self.lsampling[2],
+                                    1), device=self.device)
+        
+        self.V = torch.zeros((self.hsampling[2],
+                            self.ksampling[2],
+                            self.lsampling[2],
+                            self.n_asu * self.n_dof_per_asu,
+                            self.n_asu * self.n_dof_per_asu),
+                           dtype=torch.complex64, device=self.device)
+        
+        self.Winv = torch.zeros((self.hsampling[2],
+                               self.ksampling[2],
+                               self.lsampling[2],
+                               self.n_asu * self.n_dof_per_asu),
+                              dtype=torch.complex64, device=self.device)
+        
+        # Build matrix A and M
+        self._build_A()
+        self._build_M()
+        
+        # Build k-vectors in Brillouin zone
+        self._build_kvec_Brillouin()
+        
+        # Setup GNM and compute phonons if model is 'gnm'
+        if model == 'gnm':
+            # Convert GNM using adapter
+            gnm_adapter = PDBToTensor(device=self.device)
+            gnm = GaussianNetworkModel(pdb_path, gnm_cutoff, gamma_intra, gamma_inter)
+            self.gnm_dict = gnm_adapter.convert_gnm(gnm)
+            
+            # Compute phonon modes and covariance matrix
+            self.compute_gnm_phonons()
+            self.compute_covariance_matrix()
+        else:
+            # Handle alternative model types
+            self.compute_rb_phonons()
     
     def _build_A(self):
         """

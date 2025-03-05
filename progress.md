@@ -7,11 +7,11 @@ This document tracks the implementation progress of the PyTorch port for the dif
 | Phase | Description | Status | Completion |
 |-------|-------------|--------|------------|
 | Phase 1 | Core Utilities | In Progress | 77% |
-| Phase 2 | Adapter Components | In Progress | 70% |
+| Phase 2 | Adapter Components | In Progress | 100% |
 | Phase 3 | Core Functions | Complete | 100% |
-| Phase 4 | OnePhonon Model | In Progress | 73% |
+| Phase 4 | OnePhonon Model | In Progress | 82% |
 | Phase 5 | Integration | Not Started | 0% |
-| **Overall** | **All Phases** | **In Progress** | **69%** |
+| **Overall** | **All Phases** | **In Progress** | **75%** |
 
 ## Ground Truth Data
 
@@ -83,9 +83,9 @@ The log file for `eryx.models.compute_covariance_matrix` has been confirmed to b
 
 | Function | Source | Status | Tests | Notes |
 |----------|--------|--------|-------|-------|
-| OnePhonon.__init__ | models.py | Not Started | Not Started | Log file available |
-| OnePhonon._setup | models.py | Not Started | Not Started | Log file available |
-| OnePhonon._setup_phonons | models.py | Not Started | Not Started | Log file available |
+| OnePhonon.__init__ | models.py | Complete | Complete | Unit tests pass |
+| OnePhonon._setup | models.py | Complete | Complete | Unit tests pass |
+| OnePhonon._setup_phonons | models.py | Complete | Complete | Unit tests pass |
 | OnePhonon._build_A | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon._build_M | models.py | Complete | Complete | Ground truth tests pass |
 | OnePhonon._build_M_allatoms | models.py | Complete | Complete | Ground truth tests pass |
@@ -179,3 +179,6 @@ No performance metrics available yet. This section will be updated once the impl
 | 2025-03-04 | Updated overall completion from 65% to 69% |
 | 2025-03-04 | Fixed type mismatch issues in OnePhonon.apply_disorder implementation |
 | 2025-03-04 | Added debug_log.md documenting the debugging process for apply_disorder |
+| 2025-03-05 | Completed OnePhonon initialization methods (__init__, _setup, _setup_phonons) |
+| 2025-03-05 | Completed adapter methods (convert_crystal, convert_gnm, convert_symmetry_ops) |
+| 2025-03-05 | Updated Phase 2 completion to 100%, Phase 4 to 82%, overall to 75% |
