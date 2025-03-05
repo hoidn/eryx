@@ -187,11 +187,29 @@ class OnePhonon:
         
         # Setup GNM and compute phonons if model is 'gnm'
         if model == 'gnm':
+            # Store parameters as tensors to ensure gradient flow
+            self.gnm_cutoff = gnm_cutoff
+                
+            # Convert input parameters to tensors if they aren't already
+            if isinstance(gamma_intra, torch.Tensor):
+                self.gamma_intra = gamma_intra.to(device=self.device)
+            else:
+                self.gamma_intra = torch.tensor(gamma_intra, dtype=torch.float32, device=self.device)
+                
+            if isinstance(gamma_inter, torch.Tensor):
+                self.gamma_inter = gamma_inter.to(device=self.device)
+            else:
+                self.gamma_inter = torch.tensor(gamma_inter, dtype=torch.float32, device=self.device)
+                
+            # Ensure these parameters require gradients
+            self.gamma_intra.requires_grad_(True)
+            self.gamma_inter.requires_grad_(True)
+                
             # Convert GNM using adapter
             gnm_adapter = PDBToTensor(device=self.device)
             gnm = GaussianNetworkModel(pdb_path, gnm_cutoff, gamma_intra, gamma_inter)
             self.gnm_dict = gnm_adapter.convert_gnm(gnm)
-            
+                
             # Compute phonon modes and covariance matrix
             self.compute_gnm_phonons()
             self.compute_covariance_matrix()
@@ -231,12 +249,11 @@ class OnePhonon:
             
             # For each ASU
             for i_asu in range(self.n_asu):
-                # Get coordinates for this ASU - convert from NumPy to PyTorch
-                xyz_np = self.crystal['get_asu_xyz'](i_asu)
-                xyz = torch.tensor(xyz_np, device=self.device)
+                # Get coordinates for this ASU - already a tensor from the adapter
+                xyz = self.crystal['get_asu_xyz'](i_asu)
                 
                 # Subtract center of mass
-                xyz -= torch.mean(xyz, dim=0)
+                xyz = xyz - torch.mean(xyz, dim=0)  # Use assignment instead of in-place op to preserve gradients
                 
                 # For each atom in the ASU
                 for i_atom in range(self.n_atoms_per_asu):
@@ -529,6 +546,9 @@ class OnePhonon:
         References:
             - Original implementation: eryx/pdb.py:GaussianNetworkModel.compute_hessian
         """
+        # Ensure gamma parameters are available
+        if not hasattr(self, 'gamma_intra') or not hasattr(self, 'gamma_inter'):
+            raise ValueError("gamma_intra and gamma_inter must be set before calling compute_gnm_hessian")
         # Initialize Hessian tensor with complex dtype for later operations with phase factors
         hessian = torch.zeros((self.n_asu, self.n_atoms_per_asu,
                               self.n_cell, self.n_asu, self.n_atoms_per_asu),
@@ -573,9 +593,14 @@ class OnePhonon:
         return []
     
     def _get_gamma(self, i_asu, i_cell, j_asu):
-        """Mock implementation to get gamma values for testing."""
-        # Return default value for now - will be replaced in tests with mock data
-        return torch.tensor(1.0, device=self.device, dtype=torch.complex64)
+        """Get gamma values based on whether atoms are in the same ASU or different ASUs."""
+        # Use the tensor parameters to ensure gradient flow
+        if i_asu == j_asu:
+            # Same ASU - use gamma_intra
+            return self.gamma_intra.to(dtype=torch.complex64, device=self.device)
+        else:
+            # Different ASUs - use gamma_inter
+            return self.gamma_inter.to(dtype=torch.complex64, device=self.device)
     
     def compute_gnm_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
         """
@@ -889,6 +914,14 @@ class OnePhonon:
     
     def apply_disorder(self, rank: int = -1, outdir: Optional[str] = None, 
                      use_data_adp: bool = False) -> torch.Tensor:
+        # Print some diagnostic information
+        import logging
+        logging.info(f"PyTorch apply_disorder - gamma_intra: {self.gamma_intra.item()}, gamma_inter: {self.gamma_inter.item()}")
+        logging.info(f"PyTorch apply_disorder - device: {self.device}, dtype: {self.q_grid.dtype}")
+        if hasattr(self, 'V'):
+            logging.info(f"PyTorch apply_disorder - V shape: {self.V.shape}, Winv shape: {self.Winv.shape}")
+            logging.info(f"PyTorch apply_disorder - V min/max real: {torch.min(torch.real(self.V))}/{torch.max(torch.real(self.V))}")
+            logging.info(f"PyTorch apply_disorder - Winv min/max real: {torch.min(torch.real(self.Winv))}/{torch.max(torch.real(self.Winv))}")
         """
         Compute diffuse intensity in the one-phonon approximation using PyTorch.
         
@@ -916,14 +949,16 @@ class OnePhonon:
         References:
             - Original implementation: eryx/models.py:OnePhonon.apply_disorder
         """
-        # Select appropriate ADPs based on flag
+        # Select appropriate ADPs based on flag with higher precision
         if use_data_adp:
+            # Use consistent dtype when creating tensors
             ADP = self.model_dict['adp'][0] / (8 * torch.pi * torch.pi)
+            ADP = ADP.to(dtype=torch.float64, device=self.device)  # Use float64 for higher precision
         else:
-            ADP = self.ADP
+            ADP = self.ADP.to(dtype=torch.float64, device=self.device)  # Use float64 for higher precision
             
-        # Initialize diffuse intensity tensor with float dtype
-        Id = torch.zeros(self.q_grid.shape[0], dtype=torch.float32, device=self.device)
+        # Initialize diffuse intensity tensor with higher precision
+        Id = torch.zeros(self.q_grid.shape[0], dtype=torch.float64, device=self.device)
         
         # Import structure_factors from scatter_torch
         from eryx.scatter_torch import structure_factors
@@ -979,7 +1014,11 @@ class OnePhonon:
                         
                         # Weight by eigenvalues (Winv) and sum
                         # Extract real part of Winv to ensure type compatibility
-                        weighted_intensity = torch.matmul(FV_abs_squared, torch.real(self.Winv[dh, dk, dl]))
+                        # Convert to float64 for higher precision
+                        weighted_intensity = torch.matmul(
+                            FV_abs_squared.to(dtype=torch.float64), 
+                            torch.real(self.Winv[dh, dk, dl]).to(dtype=torch.float64)
+                        )
                         
                         # Update diffuse intensity at valid indices
                         # Using index_add_ for better gradient support than direct indexing
@@ -994,15 +1033,19 @@ class OnePhonon:
                         
                         # Compute |F·V|² and weight by the eigenvalue
                         # Extract real part of Winv to ensure type compatibility
-                        weighted_intensity = torch.abs(FV)**2 * torch.real(self.Winv[dh, dk, dl, rank])
+                        # Convert to float64 for higher precision
+                        weighted_intensity = torch.abs(FV)**2 * torch.real(self.Winv[dh, dk, dl, rank]).to(dtype=torch.float64)
                         
                         # Update diffuse intensity at valid indices
                         Id.index_add_(0, valid_indices, weighted_intensity)
         
         # Apply resolution mask and take real part
         # Set values outside resolution mask to NaN
-        Id_masked = torch.full_like(Id, float('nan'), dtype=torch.float32)
+        Id_masked = torch.full_like(Id, float('nan'), dtype=torch.float64)
         Id_masked[self.res_mask] = torch.real(Id[self.res_mask])
+        
+        # Convert back to float32 for compatibility with NumPy implementation
+        Id_masked = Id_masked.to(dtype=torch.float32)
         
         # Save output if directory is provided
         if outdir is not None:
