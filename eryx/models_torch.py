@@ -578,7 +578,7 @@ class OnePhonon:
         
         Returns:
             torch.Tensor: Hessian matrix with shape (n_asu, n_atoms_per_asu,
-                                                    n_cell, n_asu, n_atoms_per_asu)
+                                                    n_kvec, n_asu, n_atoms_per_asu)
                                                     
         References:
             - Original implementation: eryx/pdb.py:GaussianNetworkModel.compute_hessian
@@ -587,10 +587,13 @@ class OnePhonon:
         if not hasattr(self, 'gamma_intra') or not hasattr(self, 'gamma_inter'):
             raise ValueError("gamma_intra and gamma_inter must be set before calling compute_gnm_hessian")
             
+        # Calculate number of k-vectors based on sampling parameters
+        n_kvec = self.hsampling[2] * self.ksampling[2] * self.lsampling[2]
+        
         # Initialize Hessian tensor with complex dtype for later operations with phase factors
-        # Use the correct shape to match NumPy implementation
+        # Use the correct shape to match NumPy implementation with k-vector dimension
         hessian = torch.zeros((self.n_asu, self.n_atoms_per_asu,
-                              self.n_cell, self.n_asu, self.n_atoms_per_asu),
+                              n_kvec, self.n_asu, self.n_atoms_per_asu),
                              dtype=torch.complex64, device=self.device)
         
         # Initialize diagonal tensor to accumulate values for diagonal elements
@@ -610,9 +613,10 @@ class OnePhonon:
                             # Get appropriate gamma value
                             gamma = self._get_gamma(i_asu, i_cell, j_asu)
                             
-                            # Set Hessian values for all neighbors
-                            for j_at in iat_neighbors:
-                                hessian[i_asu, i_at, i_cell, j_asu, j_at] = -gamma
+                            # Set Hessian values for all neighbors for all k-vectors
+                            for k_idx in range(n_kvec):
+                                for j_at in iat_neighbors:
+                                    hessian[i_asu, i_at, k_idx, j_asu, j_at] = -gamma
                             
                             # Accumulate for diagonal elements
                             hessian_diagonal[i_asu, i_at] -= gamma * len(iat_neighbors)
@@ -621,7 +625,8 @@ class OnePhonon:
         for i_asu in range(self.n_asu):
             for i_at in range(self.n_atoms_per_asu):
                 gamma_self = self._get_gamma(i_asu, self.id_cell_ref, i_asu)
-                hessian[i_asu, i_at, self.id_cell_ref, i_asu, i_at] = hessian_diagonal[i_asu, i_at] - gamma_self
+                for k_idx in range(n_kvec):
+                    hessian[i_asu, i_at, k_idx, i_asu, i_at] = hessian_diagonal[i_asu, i_at] - gamma_self
         
         return hessian
     
@@ -667,8 +672,18 @@ class OnePhonon:
         if kvec is None:
             kvec = torch.zeros(3, device=self.device)
         
+        # Extract the shape to determine if hessian has k-vector dimension
+        hessian_shape = hessian.shape
+        
         # Initialize K matrix with the reference cell contribution
-        Kmat = hessian[:, :, self.id_cell_ref, :, :].clone()
+        if len(hessian_shape) == 5 and hessian_shape[2] > 1:
+            # Hessian has k-vector dimension, extract the first k-vector slice
+            # This function expects a single k-vector hessian slice
+            k_idx = 0
+            Kmat = hessian[:, :, k_idx, :, :].clone()
+        else:
+            # Hessian is already for a single k-vector or cell
+            Kmat = hessian.clone()
         
         # Add contributions from other cells with phase factors
         for j_cell in range(self.n_cell):
@@ -688,7 +703,10 @@ class OnePhonon:
             # Add contribution with phase factor
             for i_asu in range(self.n_asu):
                 for j_asu in range(self.n_asu):
-                    Kmat[i_asu, :, j_asu, :] += hessian[i_asu, :, j_cell, j_asu, :] * eikr
+                    if len(hessian_shape) == 5 and hessian_shape[2] > 1:
+                        Kmat[i_asu, :, j_asu, :] += hessian[i_asu, :, k_idx, j_asu, :] * eikr
+                    else:
+                        Kmat[i_asu, :, j_asu, :] += hessian[i_asu, :, j_cell, j_asu, :] * eikr
         
         return Kmat
     
@@ -728,9 +746,8 @@ class OnePhonon:
         identity = torch.eye(Kmat_2d.shape[0], device=self.device, dtype=Kmat_2d.dtype)
         Kmat_2d_reg = Kmat_2d + eps * identity
         
-        # Use EigenOps for more controllable pseudo-inverse with gradient support
-        from eryx.torch_utils import EigenOps
-        Kinv = EigenOps.solve_linear_system(Kmat_2d_reg, identity)
+        # Use torch.linalg.pinv for better numerical stability with gradients
+        Kinv = torch.linalg.pinv(Kmat_2d_reg)
         
         # Reshape if requested
         if reshape:
@@ -745,26 +762,29 @@ class OnePhonon:
         
         Returns:
             torch.Tensor: Hessian matrix with shape (n_asu, n_dof_per_asu,
-                                                    n_cell, n_asu, n_dof_per_asu)
+                                                    n_kvec, n_asu, n_dof_per_asu)
                                                     
         References:
             - Original implementation: eryx/models.py:OnePhonon.compute_hessian
         """
+        # Calculate number of k-vectors based on sampling parameters
+        n_kvec = self.hsampling[2] * self.ksampling[2] * self.lsampling[2]
+        
         # Initialize Hessian tensor with complex dtype for later operations
         hessian = torch.zeros((self.n_asu, self.n_dof_per_asu,
-                              self.n_cell, self.n_asu, self.n_dof_per_asu),
+                              n_kvec, self.n_asu, self.n_dof_per_asu),
                              dtype=torch.complex64, device=self.device)
         
         # Compute the all-atoms Hessian matrix using GNM method
         hessian_allatoms = self.compute_gnm_hessian()
         
-        # Project using Amat (similar to _project_M method)
-        for i_cell in range(self.n_cell):
-            for i_asu in range(self.n_asu):
-                for j_asu in range(self.n_asu):
-                    # Create block diagonal matrix of the Hessian
+        # Project using Amat for each k-vector
+        for i_asu in range(self.n_asu):
+            for j_asu in range(self.n_asu):
+                for k_idx in range(n_kvec):
+                    # Create block diagonal matrix of the Hessian for this k-vector
                     hessian_block = torch.kron(
-                        hessian_allatoms[i_asu, :, i_cell, j_asu, :],
+                        hessian_allatoms[i_asu, :, k_idx, j_asu, :],
                         torch.eye(3, device=self.device, dtype=torch.complex64)
                     )
                     
@@ -777,8 +797,8 @@ class OnePhonon:
                         )
                     )
                     
-                    # Store in output tensor
-                    hessian[i_asu, :, i_cell, j_asu, :] = projected
+                    # Store in output tensor for this k-vector
+                    hessian[i_asu, :, k_idx, j_asu, :] = projected
         
         return hessian
     
@@ -787,18 +807,22 @@ class OnePhonon:
         """
         Compute phonon modes from the Gaussian Network Model for each k-vector.
         """
-        # Compute the Hessian matrix
+        # Compute the Hessian matrix with proper k-vector dimension
         hessian = self.compute_hessian()
         
         # Process each k-vector in the Brillouin zone
+        k_idx = 0
         for dh in range(self.hsampling[2]):
             for dk in range(self.ksampling[2]):
                 for dl in range(self.lsampling[2]):
                     # Get current k-vector
                     kvec = self.kvec[dh, dk, dl]
                     
+                    # Extract the k_idx slice from the hessian
+                    hessian_slice = hessian[:, :, k_idx, :, :]
+                    
                     # Compute dynamical matrix K for this k-vector
-                    Kmat = self.compute_gnm_K(hessian, kvec=kvec)
+                    Kmat = self.compute_gnm_K(hessian_slice, kvec=kvec)
                     Kmat_2d = Kmat.reshape(self.n_asu * self.n_dof_per_asu,
                                           self.n_asu * self.n_dof_per_asu)
                     
@@ -812,13 +836,23 @@ class OnePhonon:
                     
                     # Process eigenvalues exactly as in NumPy version
                     w = torch.sqrt(w)
-                    w = torch.where(w < 1e-6, float('nan') * torch.ones_like(w), w)
+                    
+                    # Important: Set exactly the same NaN pattern as NumPy
+                    # Replace values < 1e-6 with NaN to match NumPy exactly
+                    w = torch.where(w < 1e-6, 
+                                   torch.tensor(float('nan'), dtype=w.dtype, device=w.device),
+                                   w)
+                    
+                    # Flip ordering to match NumPy
                     w = torch.flip(w, [0])
                     v = torch.flip(v, [1])
                     
                     # Store results
                     self.Winv[dh, dk, dl] = 1.0 / (w ** 2)
                     self.V[dh, dk, dl] = torch.matmul(Linv_complex.T, v)
+                    
+                    # Increment k-vector index
+                    k_idx += 1
 #    def compute_gnm_phonons(self):
 #        """
 #        Compute the dynamical matrix for each k-vector in the first Brillouin zone,
@@ -996,18 +1030,6 @@ class OnePhonon:
     @debug
     def apply_disorder(self, rank: int = -1, outdir: Optional[str] = None, 
                      use_data_adp: bool = False) -> torch.Tensor:
-        # Print some diagnostic information
-        import logging
-        logging.basicConfig(level=logging.INFO)
-        logging.info(f"PyTorch apply_disorder - rank: {rank}, use_data_adp: {use_data_adp}")
-        if hasattr(self, 'gamma_intra') and hasattr(self, 'gamma_inter'):
-            logging.info(f"PyTorch apply_disorder - gamma_intra: {self.gamma_intra.item()}, gamma_inter: {self.gamma_inter.item()}")
-        logging.info(f"PyTorch apply_disorder - device: {self.device}, dtype: {self.q_grid.dtype}")
-        logging.info(f"PyTorch apply_disorder - res_mask shape: {self.res_mask.shape}, True count: {torch.sum(self.res_mask)}")
-        if hasattr(self, 'V'):
-            logging.info(f"PyTorch apply_disorder - V shape: {self.V.shape}, Winv shape: {self.Winv.shape}")
-            logging.info(f"PyTorch apply_disorder - V min/max real: {torch.min(torch.real(self.V))}/{torch.max(torch.real(self.V))}")
-            logging.info(f"PyTorch apply_disorder - Winv min/max real: {torch.min(torch.real(self.Winv))}/{torch.max(torch.real(self.Winv))}")
         """
         Compute diffuse intensity in the one-phonon approximation using PyTorch.
         
@@ -1035,16 +1057,30 @@ class OnePhonon:
         References:
             - Original implementation: eryx/models.py:OnePhonon.apply_disorder
         """
-        # Select appropriate ADPs based on flag with higher precision
+        # Print some diagnostic information
+        import logging
+        logging.basicConfig(level=logging.INFO)
+        logging.info(f"PyTorch apply_disorder - rank: {rank}, use_data_adp: {use_data_adp}")
+        if hasattr(self, 'gamma_intra') and hasattr(self, 'gamma_inter'):
+            logging.info(f"PyTorch apply_disorder - gamma_intra: {self.gamma_intra.item()}, gamma_inter: {self.gamma_inter.item()}")
+        logging.info(f"PyTorch apply_disorder - device: {self.device}, dtype: {self.q_grid.dtype}")
+        logging.info(f"PyTorch apply_disorder - res_mask shape: {self.res_mask.shape}, True count: {torch.sum(self.res_mask)}")
+        if hasattr(self, 'V'):
+            logging.info(f"PyTorch apply_disorder - V shape: {self.V.shape}, Winv shape: {self.Winv.shape}")
+            logging.info(f"PyTorch apply_disorder - V min/max real: {torch.min(torch.real(self.V))}/{torch.max(torch.real(self.V))}")
+            nan_count = torch.sum(torch.isnan(torch.real(self.Winv)))
+            logging.info(f"PyTorch apply_disorder - Winv NaN count: {nan_count}")
+            
+        # Select appropriate ADPs based on flag
         if use_data_adp:
             # Use consistent dtype when creating tensors
             ADP = self.model_dict['adp'][0] / (8 * torch.pi * torch.pi)
-            ADP = ADP.to(dtype=torch.float64, device=self.device)  # Use float64 for higher precision
+            ADP = ADP.to(dtype=torch.float32, device=self.device)
         else:
-            ADP = self.ADP.to(dtype=torch.float64, device=self.device)  # Use float64 for higher precision
+            ADP = self.ADP.to(dtype=torch.float32, device=self.device)
             
-        # Initialize diffuse intensity tensor with higher precision
-        Id = torch.zeros(self.q_grid.shape[0], dtype=torch.float64, device=self.device)
+        # Initialize diffuse intensity tensor
+        Id = torch.zeros(self.q_grid.shape[0], dtype=torch.float32, device=self.device)
         
         # Import structure_factors from scatter_torch
         from eryx.scatter_torch import structure_factors
@@ -1057,7 +1093,6 @@ class OnePhonon:
                     q_indices = self._at_kvec_from_miller_points((dh, dk, dl))
                     
                     # Apply resolution mask - match NumPy implementation exactly
-                    # In NumPy, the mask is applied after computing structure factors
                     valid_indices = q_indices[self.res_mask[q_indices]]
                     
                     # Skip if no valid points
@@ -1105,21 +1140,18 @@ class OnePhonon:
                         # Multiply structure factors by eigenvectors
                         FV = torch.matmul(F, self.V[dh, dk, dl])
                         
-                        # Compute |F·V|² for all modes
+                        # Important: FV will contain NaNs if V contains NaNs
+                        # Calculate |FV|² for all modes
                         FV_abs_squared = torch.abs(FV)**2
                         
-                        # Weight by eigenvalues (Winv) and sum
-                        # Extract real part of Winv to ensure type compatibility
-                        # Convert to float64 for higher precision
-                        weighted_intensity = torch.matmul(
-                            FV_abs_squared.to(dtype=torch.float64), 
-                            torch.real(self.Winv[dh, dk, dl]).to(dtype=torch.float64)
-                        )
+                        # Extract real part of Winv for this k-vector
+                        real_winv = torch.real(self.Winv[dh, dk, dl])
+                        
+                        # Use matmul for proper handling of NaN values
+                        weighted_intensity = torch.matmul(FV_abs_squared, real_winv)
                         
                         # Update diffuse intensity at valid indices
-                        # Using index_add_ for better gradient support than direct indexing
-                        # Ensure weighted_intensity has the same dtype as Id
-                        Id.index_add_(0, valid_indices, weighted_intensity.to(dtype=Id.dtype))
+                        Id.index_add_(0, valid_indices, weighted_intensity)
                     else:
                         # Use only the selected phonon mode (rank)
                         # Select the specific eigenvector
@@ -1129,33 +1161,21 @@ class OnePhonon:
                         FV = torch.matmul(F, V_rank)
                         
                         # Compute |F·V|² and weight by the eigenvalue
-                        # Extract real part of Winv to ensure type compatibility
-                        # Convert to float64 for higher precision
-                        weighted_intensity = torch.abs(FV)**2 * torch.real(self.Winv[dh, dk, dl, rank]).to(dtype=torch.float64)
+                        weighted_intensity = torch.abs(FV)**2 * torch.real(self.Winv[dh, dk, dl, rank])
                         
                         # Update diffuse intensity at valid indices
-                        # Ensure weighted_intensity has the same dtype as Id
-                        Id.index_add_(0, valid_indices, weighted_intensity.to(dtype=Id.dtype))
+                        Id.index_add_(0, valid_indices, weighted_intensity)
         
-        # Apply resolution mask and take real part
-        # Set values outside resolution mask to NaN
-        # This matches the NumPy implementation exactly
-        Id = torch.real(Id)
+        # Apply resolution mask - set values outside to NaN
         Id_masked = Id.clone()
         Id_masked[~self.res_mask] = float('nan')
         
-        # Convert back to float32 for compatibility with NumPy implementation
-        Id_masked = Id_masked.to(dtype=torch.float32)
-        
-        # Save output if directory is provided
+        # Save output if directory provided
         if outdir is not None:
             import os
             import numpy as np
             
-            # Create output directory if it doesn't exist
             os.makedirs(outdir, exist_ok=True)
-            
-            # Save as both PyTorch tensor and NumPy array
             torch.save(Id_masked, os.path.join(outdir, f"rank_{rank:05d}_torch.pt"))
             np.save(os.path.join(outdir, f"rank_{rank:05d}.npy"), 
                    Id_masked.detach().cpu().numpy())
