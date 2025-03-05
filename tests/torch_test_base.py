@@ -11,7 +11,7 @@ import torch
 import warnings
 from typing import Dict, Any, Tuple, List, Optional, Union
 
-from torch_test_utils import TensorComparison, ModelState
+from tests.torch_test_utils import TensorComparison, ModelState
 
 
 class TorchComponentTestCase(unittest.TestCase):
