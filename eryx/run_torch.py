@@ -13,6 +13,9 @@ import numpy as np
 import torch
 from typing import Optional, Tuple, Dict, Any
 
+# Set default PyTorch dtype for consistency across the application
+torch.set_default_dtype(torch.float32)
+
 # Set up logging
 logging.basicConfig(
     level=logging.DEBUG,

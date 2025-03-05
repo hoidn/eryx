@@ -85,24 +85,32 @@ class OnePhonon:
         from eryx.map_utils_torch import generate_grid, get_resolution_mask
         from eryx.pdb import AtomicModel, Crystal
         
+        # Use consistent dtype throughout
+        dtype = torch.float32
+        
         # Create atomic model using PDBToTensor adapter
         model_adapter = PDBToTensor(device=self.device)
         atomic_model = AtomicModel(pdb_path, expand_p1)
         self.model_dict = model_adapter.convert_atomic_model(atomic_model)
         
-        # Extract key attributes from model dictionary
-        self.A_inv = self.model_dict['A_inv']
-        self.cell = self.model_dict['cell']
+        # Extract key attributes from model dictionary and ensure consistent dtype
+        self.A_inv = self.model_dict['A_inv'].to(dtype)
+        self.cell = self.model_dict['cell'].to(dtype)
         
-        # Generate grid using PyTorch implementations
+        # Generate grid using PyTorch implementations with explicit dtype
         self.hkl_grid, self.map_shape = generate_grid(self.A_inv, 
                                                      self.hsampling,
                                                      self.ksampling,
                                                      self.lsampling,
                                                      return_hkl=True)
+        # Ensure consistent dtype
+        self.hkl_grid = self.hkl_grid.to(dtype)
+        
         self.res_mask, res_map = get_resolution_mask(self.cell,
                                                     self.hkl_grid,
                                                     res_limit)
+        
+        # Now both tensors have the same dtype for matrix multiplication
         self.q_grid = 2 * torch.pi * torch.matmul(self.A_inv.T, self.hkl_grid.T).T
         
         # Setup Crystal and compute dimensions

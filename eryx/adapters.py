@@ -155,7 +155,7 @@ class PDBToTensor:
         
         return result
     
-    def array_to_tensor(self, array: np.ndarray, requires_grad: bool = True) -> torch.Tensor:
+    def array_to_tensor(self, array: np.ndarray, requires_grad: bool = True, dtype=None) -> torch.Tensor:
         """
         Convert a NumPy array to a PyTorch tensor with gradient support.
         
@@ -163,6 +163,7 @@ class PDBToTensor:
             array: NumPy array to convert. Can be of any shape or dtype.
             requires_grad: Whether the tensor requires gradients for backpropagation.
                            Only applied to floating point tensors.
+            dtype: Data type for the tensor. If None, uses torch.float32.
             
         Returns:
             PyTorch tensor with the same data, on the specified device with requires_grad set.
@@ -180,11 +181,14 @@ class PDBToTensor:
         if array is None:
             return None
             
+        if dtype is None:
+            dtype = torch.float32  # Use consistent default dtype
+            
         if array.size == 0:  # Handle empty arrays
-            tensor = torch.from_numpy(array.copy()).to(self.device)
+            tensor = torch.from_numpy(array.copy()).to(dtype=dtype, device=self.device)
         else:
-            # Use clone to avoid memory sharing issues with NumPy
-            tensor = torch.from_numpy(array.copy()).to(self.device)
+            # Use tensor constructor to specify dtype explicitly
+            tensor = torch.tensor(array, dtype=dtype, device=self.device)
         
         # Only set requires_grad for floating point tensors
         if requires_grad and tensor.dtype.is_floating_point:
@@ -238,7 +242,7 @@ class GridToTensor:
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     def convert_grid(self, q_grid: np.ndarray, map_shape: Tuple[int, int, int], 
-                    requires_grad: bool = True) -> Tuple[torch.Tensor, Tuple[int, int, int]]:
+                    requires_grad: bool = True, dtype=torch.float32) -> Tuple[torch.Tensor, Tuple[int, int, int]]:
         """
         Convert a grid of q-vectors to PyTorch tensor with gradient support.
         
@@ -246,6 +250,7 @@ class GridToTensor:
             q_grid: NumPy array of shape (n_points, 3) with q-vectors
             map_shape: Tuple with 3D map shape (dim_h, dim_k, dim_l)
             requires_grad: Whether the tensor requires gradients for backpropagation
+            dtype: Data type for the tensor (default: torch.float32)
             
         Returns:
             Tuple containing:
@@ -261,14 +266,12 @@ class GridToTensor:
             
         if q_grid.size == 0:
             # Handle empty grid
-            q_grid_tensor = torch.zeros((0, 3), dtype=torch.float32, device=self.device)
+            q_grid_tensor = torch.zeros((0, 3), dtype=dtype, device=self.device)
             q_grid_tensor.requires_grad_(requires_grad)
             return q_grid_tensor, map_shape
             
-        # Convert to tensor with gradient support
-        # Ensure we use the same dtype as the input for consistency
-        input_dtype = torch.get_default_dtype() if q_grid.dtype == np.float64 else torch.float32
-        q_grid_tensor = torch.tensor(q_grid, dtype=input_dtype, device=self.device)
+        # Convert to tensor with consistent dtype
+        q_grid_tensor = torch.tensor(q_grid, dtype=dtype, device=self.device)
         
         # Only set requires_grad for floating point tensors
         if requires_grad:
