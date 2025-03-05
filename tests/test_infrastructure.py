@@ -15,12 +15,12 @@ from typing import Dict, Any, Tuple, List, Optional
 
 # Import testing utilities
 from tests.torch_test_utils import TensorComparison, ModelState
-from torch_test_base import TorchComponentTestCase
-from test_helpers.mock_data import (
+from tests.torch_test_base import TorchComponentTestCase
+from tests.test_helpers.mock_data import (
     create_mock_kvectors, create_mock_hessian, create_mock_eigendecomposition,
     create_mock_model_dict, create_mock_crystal_dict
 )
-from test_helpers.component_tests import KVectorTests, HessianTests, PhononTests, DisorderTests
+from tests.test_helpers.component_tests import KVectorTests, HessianTests, PhononTests, DisorderTests
 
 
 class InfrastructureTest(unittest.TestCase):
