@@ -233,32 +233,18 @@ class TestOnePhononDisorder(unittest.TestCase):
             
         # Load the ground truth data
         logs = self.logger.loadLog(log_file_path)
-        if not logs or len(logs) < 2:  # Need at least one input/output pair
+        if not logs or len(logs) < 1:  # Need at least one entry with result
             self.skipTest("Insufficient ground truth data in log file")
-            
-        # Check if the log format has 'args' key
-        if 'args' not in logs[0]:
-            self.skipTest("Log format doesn't contain 'args' key. Using default parameters.")
-            # Use default parameters
-            rank = -1
-            outdir = None
-            use_data_adp = False
-            
-            # Try to get expected output if 'result' key exists
-            expected_output = self.logger.serializer.deserialize(logs[0]['result']) if 'result' in logs[0] else None
-        else:
-            # Get the input data from the first log entry
-            input_args = self.logger.serializer.deserialize(logs[0]['args'])
-            expected_output = self.logger.serializer.deserialize(logs[0]['result']) if 'result' in logs[0] else None
-            
-            # Extract parameters from the input data
-            # Note: The exact structure depends on how apply_disorder was logged
-            rank = input_args[0] if len(input_args) > 0 else -1
-            outdir = input_args[1] if len(input_args) > 1 else None
-            use_data_adp = input_args[2] if len(input_args) > 2 else False
         
-        # Run the apply_disorder method with the same parameters
-        actual_output = self.model.apply_disorder(rank=rank, outdir=outdir, use_data_adp=use_data_adp)
+        # Get the expected output from the log entry
+        if 'result' not in logs[0]:
+            self.skipTest("Log entry doesn't contain 'result' key")
+            
+        expected_output = self.logger.serializer.deserialize(logs[0]['result'])
+        
+        # Run the apply_disorder method with default parameters
+        # Since apply_disorder takes no arguments in the current implementation
+        actual_output = self.model.apply_disorder()
         
         # Convert the PyTorch tensor to NumPy for comparison with ground truth
         actual_output_np = actual_output.detach().cpu().numpy()
