@@ -228,8 +228,9 @@ class OnePhonon:
             
             # For each ASU
             for i_asu in range(self.n_asu):
-                # Get coordinates for this ASU
-                xyz = self.crystal.get_asu_xyz(i_asu).clone()
+                # Get coordinates for this ASU - convert from NumPy to PyTorch
+                xyz_np = self.crystal.get_asu_xyz(i_asu)
+                xyz = torch.tensor(xyz_np, device=self.device)
                 
                 # Subtract center of mass
                 xyz -= torch.mean(xyz, dim=0)
