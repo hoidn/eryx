@@ -10,8 +10,8 @@ This document tracks the implementation progress of the PyTorch port for the dif
 | Phase 2 | Adapter Components | In Progress | 100% |
 | Phase 3 | Core Functions | Complete | 100% |
 | Phase 4 | OnePhonon Model | In Progress | 82% |
-| Phase 5 | Integration | Complete | 100% |
-| **Overall** | **All Phases** | **Complete** | **100%** |
+| Phase 5 | Integration | In Progress | 50% |
+| **Overall** | **All Phases** | **In Progress** | **85%** |
 
 ## Ground Truth Data
 
@@ -125,24 +125,26 @@ The log file for `eryx.models.compute_covariance_matrix` has been confirmed to b
 | CP7 | Phonon Calculation Complete | Complete | March 04, 2025 |
 | CP8 | Covariance Matrix Complete | Complete | March 04, 2025 |
 | CP9 | Apply Disorder Complete | Complete | March 04, 2025 |
-| CP10 | End-to-End Integration Complete | Complete | March 05, 2025 |
+| CP10 | End-to-End Integration Complete | In Progress | - |
 
 ## Current Focus
 
-CP10 (End-to-End Integration Complete) has been completed. All planned checkpoints are now complete, with the PyTorch implementation fully functional and verified against the NumPy reference implementation.
+CP10 (End-to-End Integration Complete) is in progress. Integration tests are revealing issues with the adapter implementation that need to be fixed.
 
 ### Next Steps
-1. Optimize performance (particularly on GPU)
-2. Explore gradient-based parameter optimization applications
-3. Consider parallel execution optimizations
+1. Fix adapter implementation issues
+2. Complete integration tests
+3. Verify gradient flow through entire pipeline
+4. Implement benchmarking
 
 ### Blockers and Challenges
-None currently identified - all implementation checkpoints completed
+- Adapter implementation has issues with accessing attributes from the correct objects
+- Integration tests are failing due to these issues
 
 ### Looking Ahead
-- With the PyTorch port complete, focus will shift to applications and optimizations
-- Gradient-based parameter optimization is now possible with the differentiable implementation
-- Performance benchmarking and optimization will be the next priority
+- Once integration issues are fixed, focus will shift to performance benchmarking
+- Gradient-based parameter optimization will be possible after verifying gradient flow
+- Final verification against NumPy reference implementation is needed
 
 ## Development Timeline
 
@@ -183,6 +185,6 @@ No performance metrics available yet. This section will be updated once the impl
 | 2025-03-05 | Completed OnePhonon initialization methods (__init__, _setup, _setup_phonons) |
 | 2025-03-05 | Completed adapter methods (convert_crystal, convert_gnm, convert_symmetry_ops) |
 | 2025-03-05 | Updated Phase 2 completion to 100%, Phase 4 to 82%, overall to 75% |
-| 2025-03-05 | Completed CP10 (End-to-End Integration) with full integration tests and benchmarking |
-| 2025-03-05 | Confirmed gradient flow through entire pipeline |
-| 2025-03-05 | Updated overall project completion to 100% |
+| 2025-03-05 | Started CP10 (End-to-End Integration) implementation |
+| 2025-03-05 | Identified issues with adapter implementation |
+| 2025-03-05 | Updated overall project completion to 85% |

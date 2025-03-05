@@ -94,7 +94,7 @@ class PDBToTensor:
             
         result = {
             # Convert essential tensor attributes
-            'unit_cell_axes': self.array_to_tensor(crystal.unit_cell_axes, requires_grad=True),
+            'unit_cell_axes': self.array_to_tensor(crystal.model.unit_cell_axes, requires_grad=True),
             
             # Key scalar attributes
             'n_cell': crystal.n_cell,

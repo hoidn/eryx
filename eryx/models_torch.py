@@ -117,6 +117,7 @@ class OnePhonon:
         crystal_adapter = PDBToTensor(device=self.device)
         crystal = Crystal(atomic_model)
         self.crystal_dict = crystal_adapter.convert_crystal(crystal)
+        self.crystal = crystal  # Keep reference to original Crystal object
         
         # Set key dimensions
         self.id_cell_ref = self.crystal_dict['hkl_to_id']([0,0,0])
@@ -604,7 +605,7 @@ class OnePhonon:
                 continue
                 
             # Get unit cell origin position
-            r_cell = self.get_unitcell_origin(self.id_to_hkl(j_cell))
+            r_cell = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
             
             # Compute phase factor e^(i k·r)
             phase = torch.dot(kvec, r_cell)
