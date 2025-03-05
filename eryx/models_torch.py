@@ -118,6 +118,10 @@ class OnePhonon:
         crystal = Crystal(atomic_model)
         self.crystal = crystal_adapter.convert_crystal(crystal)  # Store the adapted dictionary
         
+        # Store original crystal for backward compatibility if needed
+        if '_original' in self.crystal:
+            self._original_crystal = self.crystal['_original']
+        
         # Set key dimensions
         self.id_cell_ref = self.crystal['hkl_to_id']([0,0,0])
         self.n_cell = self.crystal['n_cell']
@@ -228,7 +232,7 @@ class OnePhonon:
             # For each ASU
             for i_asu in range(self.n_asu):
                 # Get coordinates for this ASU - convert from NumPy to PyTorch
-                xyz_np = self.crystal.get_asu_xyz(i_asu)
+                xyz_np = self.crystal['get_asu_xyz'](i_asu)
                 xyz = torch.tensor(xyz_np, device=self.device)
                 
                 # Subtract center of mass
@@ -335,7 +339,7 @@ class OnePhonon:
         """
         # Extract atomic masses from the crystal model
         # Flatten the nested structure to get a single array of masses
-        mass_array = torch.tensor([element.weight for structure in self.crystal.model.elements 
+        mass_array = torch.tensor([element.weight for structure in self.model_dict['elements'] 
                                  for element in structure], device=self.device)
         
         # Create a 3x3 identity matrix

@@ -217,6 +217,7 @@ class TestOnePhononIntegration(unittest.TestCase):
                 # Create model with basic parameters
                 model = TorchOnePhonon(**self.test_params, device=self.device)
                 
+                # Test key crystal methods return tensors
                 # Test get_unitcell_origin returns a tensor
                 unit_cell = [0, 0, 0]
                 origin = model.crystal['get_unitcell_origin'](unit_cell)
@@ -227,6 +228,15 @@ class TestOnePhononIntegration(unittest.TestCase):
                 xyz = model.crystal['get_asu_xyz'](0, unit_cell)
                 self.assertIsInstance(xyz, torch.Tensor)
                 self.assertEqual(xyz.device, self.device)
+                
+                # Test that end-to-end operations work with the dictionary pattern
+                # Apply a basic operation that uses crystal methods
+                Id = model.apply_disorder(use_data_adp=True)
+                self.assertIsInstance(Id, torch.Tensor)
+                
+                # Verify tensor has gradients enabled
+                loss = torch.sum(torch.where(torch.isnan(Id), torch.tensor(0.0, device=self.device), Id))
+                loss.backward()
         else:
             # Same as above without warning suppression
             model = TorchOnePhonon(**self.test_params, device=self.device)
@@ -241,6 +251,15 @@ class TestOnePhononIntegration(unittest.TestCase):
             xyz = model.crystal['get_asu_xyz'](0, unit_cell)
             self.assertIsInstance(xyz, torch.Tensor)
             self.assertEqual(xyz.device, self.device)
+            
+            # Test that end-to-end operations work with the dictionary pattern
+            # Apply a basic operation that uses crystal methods
+            Id = model.apply_disorder(use_data_adp=True)
+            self.assertIsInstance(Id, torch.Tensor)
+            
+            # Verify tensor has gradients enabled
+            loss = torch.sum(torch.where(torch.isnan(Id), torch.tensor(0.0, device=self.device), Id))
+            loss.backward()
 
 if __name__ == '__main__':
     unittest.main()
