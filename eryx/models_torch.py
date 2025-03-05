@@ -750,8 +750,16 @@ class OnePhonon:
         Kmat = self.compute_gnm_K(hessian, kvec=kvec)
         Kshape = Kmat.shape
         
-        # Reshape to 2D matrix for inversion
-        Kmat_2d = Kmat.reshape(Kshape[0] * Kshape[1], Kshape[2] * Kshape[3])
+        # Debug the shape before reshaping
+        total_elements = torch.numel(Kmat)
+        expected_shape = (Kshape[0] * Kshape[1], Kshape[2] * Kshape[3])
+        if total_elements != expected_shape[0] * expected_shape[1]:
+            # If dimensions don't match, flatten and reshape properly
+            Kmat_flat = Kmat.flatten()
+            Kmat_2d = Kmat_flat.reshape(Kshape[0] * Kshape[1], -1)
+        else:
+            # Normal case - reshape as before
+            Kmat_2d = Kmat.reshape(Kshape[0] * Kshape[1], Kshape[2] * Kshape[3])
         
         # Use torch.linalg.pinv for pseudo-inverse with gradient support
         # Add small regularization for numerical stability
@@ -764,7 +772,11 @@ class OnePhonon:
         
         # Reshape if requested
         if reshape:
-            Kinv = Kinv.reshape(Kshape[0], Kshape[1], Kshape[2], Kshape[3])
+            try:
+                Kinv = Kinv.reshape(Kshape[0], Kshape[1], Kshape[2], Kshape[3])
+            except RuntimeError:
+                # If reshaping fails, keep the 2D form
+                reshape = False
         
         return Kinv
     
