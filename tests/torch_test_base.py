@@ -64,8 +64,11 @@ class TorchComponentTestCase(unittest.TestCase):
             Tuple of (numpy_model, torch_model)
         """
         # Import model classes
-        from eryx.models import OnePhonon as NumpyOnePhonon
-        from eryx.models_torch import OnePhonon as TorchOnePhonon
+        import eryx.models
+        import eryx.models_torch
+        
+        NumpyOnePhonon = eryx.models.OnePhonon
+        TorchOnePhonon = eryx.models_torch.OnePhonon
         
         # Use provided params or default test parameters
         if params is None:

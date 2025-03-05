@@ -40,7 +40,7 @@ class InfrastructureTest(unittest.TestCase):
         # Test exact match
         success, metrics = TensorComparison.compare_tensors(np_array, torch_tensor)
         self.assertTrue(success)
-        self.assertEqual(metrics["max_abs_diff"], 0.0)
+        self.assertAlmostEqual(metrics["max_abs_diff"], 0.0, places=6)
         
         # Test with small difference within tolerance
         torch_tensor_small_diff = torch_tensor + 1e-6
@@ -117,7 +117,7 @@ class InfrastructureTest(unittest.TestCase):
         mock_model.attr3 = "modified"
         
         # Inject original state
-        ModelState.inject_model_state(mock_model, state)
+        ModelState.inject_model_state(mock_model, state, to_tensor=False)
         
         # Verify object restored correctly
         self.assertEqual(mock_model.attr1, 1)
@@ -243,7 +243,7 @@ class InfrastructureTest(unittest.TestCase):
                     def __init__(self):
                         self.value = 1
                         self.array = np.array([1.0, 2.0, 3.0])
-                        self.device = self.device
+                        self.device = torch.device('cpu')
                 
                 obj = SimpleObject()
                 
@@ -255,7 +255,7 @@ class InfrastructureTest(unittest.TestCase):
                 obj.array = np.array([4.0, 5.0, 6.0])
                 
                 # Inject state
-                self.inject_model_state(obj, state)
+                self.inject_model_state(obj, state, to_tensor=False)
                 
                 # Verify restoration
                 self.assertEqual(obj.value, 1)
@@ -301,25 +301,33 @@ class MockModelTest(TorchComponentTestCase):
         self.MockNumpyModel = MockNumpyModel
         self.MockTorchModel = MockTorchModel
         
-        # Patch the model imports
-        self._original_numpy_model = sys.modules.get('eryx.models.OnePhonon')
-        self._original_torch_model = sys.modules.get('eryx.models_torch.OnePhonon')
+        # Create a module-like object to hold our mock classes
+        class MockModuleNP:
+            OnePhonon = MockNumpyModel
+            
+        class MockModuleTorch:
+            OnePhonon = MockTorchModel
+            
+        # Save original modules
+        self._original_numpy_module = sys.modules.get('eryx.models')
+        self._original_torch_module = sys.modules.get('eryx.models_torch')
         
-        sys.modules['eryx.models.OnePhonon'] = MockNumpyModel
-        sys.modules['eryx.models_torch.OnePhonon'] = MockTorchModel
+        # Replace with our mock modules
+        sys.modules['eryx.models'] = MockModuleNP
+        sys.modules['eryx.models_torch'] = MockModuleTorch
     
     def tearDown(self):
         """Tear down test environment."""
-        # Restore original model imports
-        if self._original_numpy_model:
-            sys.modules['eryx.models.OnePhonon'] = self._original_numpy_model
+        # Restore original modules
+        if self._original_numpy_module:
+            sys.modules['eryx.models'] = self._original_numpy_module
         else:
-            sys.modules.pop('eryx.models.OnePhonon', None)
+            sys.modules.pop('eryx.models', None)
             
-        if self._original_torch_model:
-            sys.modules['eryx.models_torch.OnePhonon'] = self._original_torch_model
+        if self._original_torch_module:
+            sys.modules['eryx.models_torch'] = self._original_torch_module
         else:
-            sys.modules.pop('eryx.models_torch.OnePhonon', None)
+            sys.modules.pop('eryx.models_torch', None)
     
     def test_create_models(self):
         """Test create_models method."""

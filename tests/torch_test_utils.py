@@ -89,18 +89,18 @@ class TensorComparison:
             
         # Calculate metrics
         abs_diff = np.abs(np_masked - torch_masked)
-        max_abs_diff = np.max(abs_diff) if abs_diff.size > 0 else 0
-        mean_abs_diff = np.mean(abs_diff) if abs_diff.size > 0 else 0
-        
+        max_abs_diff = float(np.max(abs_diff)) if abs_diff.size > 0 else 0.0
+        mean_abs_diff = float(np.mean(abs_diff)) if abs_diff.size > 0 else 0.0
+            
         # Calculate relative difference for non-zero values
         non_zero_mask = np_masked != 0
         if np.any(non_zero_mask):
             rel_diff = abs_diff[non_zero_mask] / np.abs(np_masked[non_zero_mask])
-            max_rel_diff = np.max(rel_diff)
-            mean_rel_diff = np.mean(rel_diff)
+            max_rel_diff = float(np.max(rel_diff))
+            mean_rel_diff = float(np.mean(rel_diff))
         else:
-            max_rel_diff = 0
-            mean_rel_diff = 0
+            max_rel_diff = 0.0
+            mean_rel_diff = 0.0
             
         # Check if arrays are close
         try:
