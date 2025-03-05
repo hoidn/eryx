@@ -107,8 +107,8 @@ class TensorComparison:
             is_close = np.allclose(np_masked, torch_masked, rtol=rtol, atol=atol)
         except:
             # Handle case where comparison might fail due to type issues
-            is_close = np.allclose(np_masked.astype(np.float64), 
-                                  torch_masked.astype(np.float64), 
+            is_close = np.allclose(np_masked.astype(np.float32), 
+                                  torch_masked.astype(np.float32), 
                                   rtol=rtol, atol=atol)
         
         # Prepare detailed metrics
@@ -266,7 +266,7 @@ class ModelState:
             # Convert NumPy arrays to tensors if to_tensor=True
             if to_tensor and isinstance(value, np.ndarray):
                 # Convert to tensor and place on device
-                tensor_value = torch.tensor(value, device=device)
+                tensor_value = torch.tensor(value, device=device, dtype=torch.float32)
                 
                 # Set requires_grad=True for floating point tensors
                 if tensor_value.is_floating_point():

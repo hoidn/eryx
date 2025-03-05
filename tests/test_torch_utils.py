@@ -683,8 +683,8 @@ class TestGradientUtils(unittest.TestCase):
     def test_validate_gradients(self):
         """Test gradient validation function."""
         # Test with identical gradients
-        analytical = torch.tensor([1.0, 2.0, 3.0], device=self.device)
-        numerical = torch.tensor([1.0, 2.0, 3.0], device=self.device)
+        analytical = torch.tensor([1.0, 2.0, 3.0], device=self.device, dtype=torch.float32)
+        numerical = torch.tensor([1.0, 2.0, 3.0], device=self.device, dtype=torch.float32)
         
         valid, rel_errors, abs_errors = GradientUtils.validate_gradients(analytical, numerical)
         

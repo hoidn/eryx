@@ -34,8 +34,8 @@ class InfrastructureTest(unittest.TestCase):
     def test_tensor_comparison(self):
         """Test the tensor comparison utilities."""
         # Create test tensors with known differences
-        np_array = np.array([[1.0, 2.0], [3.0, 4.0]])
-        torch_tensor = torch.tensor([[1.0, 2.0], [3.0, 4.0]], device=self.device)
+        np_array = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+        torch_tensor = torch.tensor([[1.0, 2.0], [3.0, 4.0]], device=self.device, dtype=torch.float32)
         
         # Test exact match
         success, metrics = TensorComparison.compare_tensors(np_array, torch_tensor)
@@ -130,7 +130,7 @@ class InfrastructureTest(unittest.TestCase):
         
         # Verify attr2 is now a tensor
         self.assertIsInstance(mock_model.attr2, torch.Tensor)
-        self.assertTrue(torch.allclose(mock_model.attr2, torch.tensor([1.0, 2.0, 3.0])))
+        self.assertTrue(torch.allclose(mock_model.attr2, torch.tensor([1.0, 2.0, 3.0], dtype=torch.float32)))
     
     def test_mock_data_generators(self):
         """Test the mock data generators."""
