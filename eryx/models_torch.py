@@ -1032,7 +1032,8 @@ class OnePhonon:
                         
                         # Update diffuse intensity at valid indices
                         # Using index_add_ for better gradient support than direct indexing
-                        Id.index_add_(0, valid_indices, weighted_intensity)
+                        # Ensure weighted_intensity has the same dtype as Id
+                        Id.index_add_(0, valid_indices, weighted_intensity.to(dtype=Id.dtype))
                     else:
                         # Use only the selected phonon mode (rank)
                         # Select the specific eigenvector
@@ -1047,7 +1048,8 @@ class OnePhonon:
                         weighted_intensity = torch.abs(FV)**2 * torch.real(self.Winv[dh, dk, dl, rank]).to(dtype=torch.float64)
                         
                         # Update diffuse intensity at valid indices
-                        Id.index_add_(0, valid_indices, weighted_intensity)
+                        # Ensure weighted_intensity has the same dtype as Id
+                        Id.index_add_(0, valid_indices, weighted_intensity.to(dtype=Id.dtype))
         
         # Apply resolution mask and take real part
         # Set values outside resolution mask to NaN
