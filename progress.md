@@ -54,13 +54,13 @@ The log file for `eryx.models.compute_covariance_matrix` has been confirmed to b
 | Function | Status | Tests | Notes |
 |----------|--------|-------|-------|
 | PDBToTensor.convert_atomic_model | Complete | Not Started | Implemented with gradient support |
-| PDBToTensor.convert_crystal | Not Started | Not Started | NotImplementedError |
-| PDBToTensor.convert_gnm | Not Started | Not Started | NotImplementedError |
+| PDBToTensor.convert_crystal | Complete | Complete | Unit tests pass |
+| PDBToTensor.convert_gnm | Complete | Complete | Unit tests pass |
 | PDBToTensor.array_to_tensor | Complete | Not Started | Implemented with gradient support |
 | PDBToTensor.convert_dict_of_arrays | Complete | Not Started | Implemented with gradient support |
 | GridToTensor.convert_grid | Complete | Not Started | Implemented with gradient support |
 | GridToTensor.convert_mask | Complete | Not Started | Implemented with gradient support |
-| GridToTensor.convert_symmetry_ops | Not Started | Not Started | NotImplementedError |
+| GridToTensor.convert_symmetry_ops | Complete | Complete | Unit tests pass |
 | TensorToNumpy.tensor_to_array | Complete | Not Started | Implemented with detachment |
 | TensorToNumpy.convert_dict_of_tensors | Complete | Not Started | Implemented with detachment |
 | TensorToNumpy.convert_intensity_map | Complete | Not Started | Implemented with detachment |
