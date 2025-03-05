@@ -34,7 +34,7 @@ class TestPDBToTensor(unittest.TestCase):
         self.assertIsInstance(tensor_2d, torch.Tensor)
         self.assertEqual(tensor_2d.shape, torch.Size([2, 2]))
         self.assertTrue(tensor_2d.requires_grad)
-        self.assertTrue(torch.allclose(tensor_2d.cpu(), torch.tensor(array_2d)))
+        self.assertTrue(torch.allclose(tensor_2d.cpu(), torch.tensor(array_2d, dtype=torch.float32)))
         
         # Test with a 3D array
         array_3d = np.random.rand(2, 3, 4)
@@ -43,7 +43,7 @@ class TestPDBToTensor(unittest.TestCase):
         self.assertIsInstance(tensor_3d, torch.Tensor)
         self.assertEqual(tensor_3d.shape, torch.Size([2, 3, 4]))
         self.assertTrue(tensor_3d.requires_grad)
-        self.assertTrue(torch.allclose(tensor_3d.cpu(), torch.tensor(array_3d)))
+        self.assertTrue(torch.allclose(tensor_3d.cpu(), torch.tensor(array_3d, dtype=torch.float32)))
         
         # Test with requires_grad=False
         tensor_no_grad = self.adapter.array_to_tensor(array_2d, requires_grad=False)
@@ -139,7 +139,7 @@ class TestGridToTensor(unittest.TestCase):
         self.assertIsInstance(q_grid_tensor, torch.Tensor)
         self.assertEqual(q_grid_tensor.shape, torch.Size([100, 3]))
         self.assertTrue(q_grid_tensor.requires_grad)
-        self.assertTrue(torch.allclose(q_grid_tensor.cpu().detach(), torch.tensor(q_grid)))
+        self.assertTrue(torch.allclose(q_grid_tensor.cpu().detach(), torch.tensor(q_grid, dtype=torch.float32)))
         
         # Verify map_shape is unchanged
         self.assertEqual(returned_map_shape, map_shape)
@@ -354,7 +354,7 @@ class TestDictConversion(unittest.TestCase):
             self.assertIsInstance(tensor, torch.Tensor)
             self.assertTrue(tensor.requires_grad)
             self.assertTrue(torch.allclose(tensor.cpu().detach(), 
-                                          torch.tensor(arrays_dict[key])))
+                                          torch.tensor(arrays_dict[key], dtype=torch.float32)))
         
         # Test with requires_grad=False
         tensors_dict = self.pdb_adapter.convert_dict_of_arrays(arrays_dict, requires_grad=False)
