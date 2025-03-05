@@ -916,7 +916,7 @@ class OnePhonon:
                      use_data_adp: bool = False) -> torch.Tensor:
         # Print some diagnostic information
         import logging
-        logging.info(f"PyTorch apply_disorder - gamma_intra: {self.gamma_intra.item()}, gamma_inter: {self.gamma_inter.item()}")
+#        logging.info(f"PyTorch apply_disorder - gamma_intra: {self.gamma_intra.item()}, gamma_inter: {self.gamma_inter.item()}")
         logging.info(f"PyTorch apply_disorder - device: {self.device}, dtype: {self.q_grid.dtype}")
         if hasattr(self, 'V'):
             logging.info(f"PyTorch apply_disorder - V shape: {self.V.shape}, Winv shape: {self.Winv.shape}")
