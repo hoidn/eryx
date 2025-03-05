@@ -442,35 +442,37 @@ class OnePhonon:
     @debug
     def _build_kvec_Brillouin(self):
         """
-        Compute k-vectors in the first Brillouin zone with exactly the same
-        centering behavior as the NumPy implementation.
-        """
-        # Initialize tensor arrays for k-vectors if they don't exist yet
-        if not hasattr(self, 'kvec') or self.kvec is None:
-            self.kvec = torch.zeros((self.hsampling[2],
-                                   self.ksampling[2],
-                                   self.lsampling[2],
-                                   3), device=self.device)
-            
-        if not hasattr(self, 'kvec_norm') or self.kvec_norm is None:
-            self.kvec_norm = torch.zeros((self.hsampling[2],
-                                        self.ksampling[2],
-                                        self.lsampling[2],
-                                        1), device=self.device)
+        Compute all k-vectors and their norm in the first Brillouin zone.
         
-        # Use exactly the same formula for centering k-vectors
-        for dh in range(self.hsampling[2]):
-            h_dh = self._center_kvec(dh, self.hsampling[2])
-            for dk in range(self.ksampling[2]):
-                k_dk = self._center_kvec(dk, self.ksampling[2])
-                for dl in range(self.lsampling[2]):
-                    l_dl = self._center_kvec(dl, self.lsampling[2])
+        This implementation uses n+1 points for each dimension where n is the sampling parameter,
+        matching the NumPy behavior that includes endpoints. For example:
+        - When sampling=2, the grid will have 3×3×3=27 k-vectors
+        - When sampling=3, the grid will have 4×4×4=64 k-vectors
+        
+        This pattern ensures compatibility with the NumPy implementation and maintains
+        consistent dimensionality throughout subsequent calculations (hessian, phonons, etc.).
+        """
+        # Use n+1 points for each dimension to match NumPy's behavior
+        h_dim = self.hsampling[2] + 1  # Include endpoint
+        k_dim = self.ksampling[2] + 1
+        l_dim = self.lsampling[2] + 1
+        
+        # Initialize tensors for k-vectors and norms
+        self.kvec = torch.zeros((h_dim, k_dim, l_dim, 3), device=self.device)
+        self.kvec_norm = torch.zeros((h_dim, k_dim, l_dim, 1), device=self.device)
+        
+        # Populate k-vectors using same logic as NumPy
+        for dh in range(h_dim):
+            h_dh = self._center_kvec(dh, h_dim)
+            for dk in range(k_dim):
+                k_dk = self._center_kvec(dk, k_dim)
+                for dl in range(l_dim):
+                    l_dl = self._center_kvec(dl, l_dim)
                     
-                    # Ensure consistent placement on device
-                    kvec_tensor = torch.tensor([h_dh, k_dk, l_dl], 
-                                             device=self.device)
+                    # Create k-vector with same centering behavior
+                    kvec_tensor = torch.tensor([h_dh, k_dk, l_dl], device=self.device)
                     
-                    # Compute actual k-vector in reciprocal space
+                    # Compute k-vector in reciprocal space
                     self.kvec[dh, dk, dl] = 2 * torch.pi * torch.matmul(
                         self.A_inv.T, kvec_tensor)
                     
@@ -867,6 +869,12 @@ class OnePhonon:
                     w = torch.where(w < 1e-6, 
                                    torch.tensor(float('nan'), dtype=w.dtype, device=w.device),
                                    w)
+                    
+                    # Count NaNs for debugging
+                    nan_count = torch.isnan(w).sum().item()
+                    if nan_count > 0:
+                        import logging
+                        logging.debug(f"PyTorch compute_gnm_phonons: {nan_count} NaN values in eigenvalues")
                     
                     # Flip ordering to match NumPy
                     w = torch.flip(w, [0])

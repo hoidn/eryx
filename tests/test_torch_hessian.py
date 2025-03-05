@@ -112,6 +112,52 @@ class TestTorchHessian(TorchComponentTestCase):
                     msg=f"Projected hessian values don't match for k_idx={k_idx}"
                 )
     
+    def test_hessian_dimensionality(self):
+        """Test that hessian dimensionality matches between NumPy and PyTorch."""
+        # Create models with test parameters 
+        params = {
+            'pdb_path': 'tests/pdbs/5zck_p1.pdb',
+            'hsampling': [-2, 2, 2],  # Should produce 3×3×3=27 k-vectors
+            'ksampling': [-2, 2, 2],
+            'lsampling': [-2, 2, 2],
+            'expand_p1': True,
+            'res_limit': 0.0,
+            'gnm_cutoff': 4.0,
+            'gamma_intra': 1.0,
+            'gamma_inter': 1.0
+        }
+        np_model, torch_model = self.create_models(params)
+        
+        # Ensure k-vectors are built
+        if not hasattr(np_model, 'kvec') or np_model.kvec is None:
+            np_model._build_kvec_Brillouin()
+            
+        if not hasattr(torch_model, 'kvec') or torch_model.kvec is None:
+            torch_model._build_kvec_Brillouin()
+        
+        # Compute hessian in both models
+        np_hessian = np_model.compute_hessian()
+        torch_hessian = torch_model.compute_hessian()
+        
+        # Convert PyTorch tensor to NumPy for shape comparison
+        torch_hessian_shape = tuple(torch_hessian.shape)
+        
+        # Print diagnostic information
+        print(f"NumPy hessian shape: {np_hessian.shape}")
+        print(f"PyTorch hessian shape: {torch_hessian_shape}")
+        
+        # Calculate expected shape
+        expected_kvectors = (params['hsampling'][2] + 1) * (params['ksampling'][2] + 1) * (params['lsampling'][2] + 1)
+        print(f"Expected k-vectors: {expected_kvectors} ({params['hsampling'][2] + 1}×{params['ksampling'][2] + 1}×{params['lsampling'][2] + 1})")
+        
+        # Assert shapes match
+        self.assertEqual(np_hessian.shape, torch_hessian_shape, 
+                         f"Hessian shapes don't match: NP={np_hessian.shape}, Torch={torch_hessian_shape}")
+        
+        # Check if third dimension matches expected k-vector count 
+        self.assertEqual(torch_hessian_shape[2], expected_kvectors,
+                         f"Hessian third dimension should be {expected_kvectors} but got {torch_hessian_shape[2]}")
+    
     def test_compute_gnm_K(self):
         """Test the compute_gnm_K method implementation."""
         # Create models
