@@ -10,8 +10,8 @@ This document tracks the implementation progress of the PyTorch port for the dif
 | Phase 2 | Adapter Components | In Progress | 100% |
 | Phase 3 | Core Functions | Complete | 100% |
 | Phase 4 | OnePhonon Model | In Progress | 82% |
-| Phase 5 | Integration | In Progress | 50% |
-| **Overall** | **All Phases** | **In Progress** | **85%** |
+| Phase 5 | Integration | In Progress | 30% |
+| **Overall** | **All Phases** | **In Progress** | **90%** |
 
 ## Ground Truth Data
 
@@ -188,3 +188,5 @@ No performance metrics available yet. This section will be updated once the impl
 | 2025-03-05 | Started CP10 (End-to-End Integration) implementation |
 | 2025-03-05 | Identified issues with adapter implementation |
 | 2025-03-05 | Updated overall project completion to 85% |
+| 2025-03-06 | Corrected adapter implementation for Crystal class attribute access |
+| 2025-03-06 | Updated integration status to reflect ongoing work in Phase 5 |

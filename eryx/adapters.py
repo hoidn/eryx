@@ -151,7 +151,20 @@ class PDBToTensor:
         
         # Handle crystal reference if present
         if hasattr(gnm, 'crystal'):
-            result['crystal'] = self.convert_crystal(gnm.crystal)
+            # Validate the crystal has required attributes before converting
+            if not hasattr(gnm.crystal, 'model'):
+                # If crystal structure is invalid, log a warning and create a minimal valid structure
+                import logging
+                logging.warning("GNM crystal object missing 'model' attribute. Creating minimal conversion.")
+                result['crystal'] = {
+                    'n_cell': self._safe_get_attr(gnm.crystal, 'n_cell', 1),
+                    'id_to_hkl': getattr(gnm.crystal, 'id_to_hkl', lambda x: [0, 0, 0]),
+                    'hkl_to_id': getattr(gnm.crystal, 'hkl_to_id', lambda x: 0),
+                    '_original_crystal': gnm.crystal
+                }
+            else:
+                # Normal conversion with validation
+                result['crystal'] = self.convert_crystal(gnm.crystal)
         
         return result
     

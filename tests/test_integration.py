@@ -11,6 +11,13 @@ from eryx.models_torch import OnePhonon as TorchOnePhonon
 class TestOnePhononIntegration(unittest.TestCase):
     def setUp(self):
         """Set up test environment with temporary directory."""
+        # Suppress specific Gemmi warnings that don't affect test functionality
+        import warnings
+        warnings.filterwarnings("ignore", message="remove_ligands_and_waters.*missing entity_type.*")
+        
+        # Add test parameter for ignoring known warnings
+        self.ignore_warnings = True
+        
         # Create temporary directory for test outputs
         self.temp_dir = tempfile.mkdtemp()
         self.pdb_path = "tests/pdbs/5zck_p1.pdb"
@@ -39,15 +46,29 @@ class TestOnePhononIntegration(unittest.TestCase):
         np_file = Path(self.temp_dir) / "np_result.npy"
         torch_file = Path(self.temp_dir) / "torch_result.npy"
         
-        # Run NumPy implementation
-        np_model = NumpyOnePhonon(**self.test_params)
-        Id_np = np_model.apply_disorder(use_data_adp=True)
-        np.save(np_file, Id_np)
-        
-        # Run PyTorch implementation
-        torch_model = TorchOnePhonon(**self.test_params, device=self.device)
-        Id_torch = torch_model.apply_disorder(use_data_adp=True)
-        np.save(torch_file, Id_torch.detach().cpu().numpy())
+        if self.ignore_warnings:
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="remove_ligands_and_waters.*")
+                # Run NumPy implementation
+                np_model = NumpyOnePhonon(**self.test_params)
+                Id_np = np_model.apply_disorder(use_data_adp=True)
+                np.save(np_file, Id_np)
+                
+                # Run PyTorch implementation
+                torch_model = TorchOnePhonon(**self.test_params, device=self.device)
+                Id_torch = torch_model.apply_disorder(use_data_adp=True)
+                np.save(torch_file, Id_torch.detach().cpu().numpy())
+        else:
+            # Run NumPy implementation
+            np_model = NumpyOnePhonon(**self.test_params)
+            Id_np = np_model.apply_disorder(use_data_adp=True)
+            np.save(np_file, Id_np)
+            
+            # Run PyTorch implementation
+            torch_model = TorchOnePhonon(**self.test_params, device=self.device)
+            Id_torch = torch_model.apply_disorder(use_data_adp=True)
+            np.save(torch_file, Id_torch.detach().cpu().numpy())
         
         # Load and compare results
         np_result = np.load(np_file)
@@ -69,23 +90,45 @@ class TestOnePhononIntegration(unittest.TestCase):
     
     def test_parameter_gradients(self):
         """Test gradient flow through model parameters."""
-        # Create model with parameters that require gradients
-        gamma_intra = torch.tensor(1.0, requires_grad=True)
-        gamma_inter = torch.tensor(1.0, requires_grad=True)
-        
-        # Create OnePhonon model with these parameters
-        torch_model = TorchOnePhonon(
-            pdb_path=self.pdb_path,
-            hsampling=self.test_params['hsampling'],
-            ksampling=self.test_params['ksampling'],
-            lsampling=self.test_params['lsampling'],
-            expand_p1=self.test_params['expand_p1'],
-            res_limit=self.test_params['res_limit'],
-            gnm_cutoff=self.test_params['gnm_cutoff'],
-            gamma_intra=gamma_intra,
-            gamma_inter=gamma_inter,
-            device=self.device
-        )
+        if self.ignore_warnings:
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="remove_ligands_and_waters.*")
+                # Create model with parameters that require gradients
+                gamma_intra = torch.tensor(1.0, requires_grad=True)
+                gamma_inter = torch.tensor(1.0, requires_grad=True)
+                
+                # Create OnePhonon model with these parameters
+                torch_model = TorchOnePhonon(
+                    pdb_path=self.pdb_path,
+                    hsampling=self.test_params['hsampling'],
+                    ksampling=self.test_params['ksampling'],
+                    lsampling=self.test_params['lsampling'],
+                    expand_p1=self.test_params['expand_p1'],
+                    res_limit=self.test_params['res_limit'],
+                    gnm_cutoff=self.test_params['gnm_cutoff'],
+                    gamma_intra=gamma_intra,
+                    gamma_inter=gamma_inter,
+                    device=self.device
+                )
+        else:
+            # Create model with parameters that require gradients
+            gamma_intra = torch.tensor(1.0, requires_grad=True)
+            gamma_inter = torch.tensor(1.0, requires_grad=True)
+            
+            # Create OnePhonon model with these parameters
+            torch_model = TorchOnePhonon(
+                pdb_path=self.pdb_path,
+                hsampling=self.test_params['hsampling'],
+                ksampling=self.test_params['ksampling'],
+                lsampling=self.test_params['lsampling'],
+                expand_p1=self.test_params['expand_p1'],
+                res_limit=self.test_params['res_limit'],
+                gnm_cutoff=self.test_params['gnm_cutoff'],
+                gamma_intra=gamma_intra,
+                gamma_inter=gamma_inter,
+                device=self.device
+            )
         
         # Forward pass
         Id_torch = torch_model.apply_disorder(use_data_adp=True)
@@ -107,17 +150,48 @@ class TestOnePhononIntegration(unittest.TestCase):
     
     def test_device_compatibility(self):
         """Test model works on different devices if available."""
-        # Test on CPU
-        try:
-            model_cpu = TorchOnePhonon(**self.test_params, device=torch.device('cpu'))
-            result_cpu = model_cpu.apply_disorder(use_data_adp=True)
-            self.assertIsNotNone(result_cpu, "CPU execution failed")
-            
-            # Test on CUDA if available
-            if torch.cuda.is_available():
-                model_cuda = TorchOnePhonon(**self.test_params, device=torch.device('cuda'))
-                result_cuda = model_cuda.apply_disorder(use_data_adp=True)
-                self.assertIsNotNone(result_cuda, "CUDA execution failed")
+        if self.ignore_warnings:
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="remove_ligands_and_waters.*")
+                # Test on CPU
+                try:
+                    model_cpu = TorchOnePhonon(**self.test_params, device=torch.device('cpu'))
+                    result_cpu = model_cpu.apply_disorder(use_data_adp=True)
+                    self.assertIsNotNone(result_cpu, "CPU execution failed")
+                    
+                    # Test on CUDA if available
+                    if torch.cuda.is_available():
+                        model_cuda = TorchOnePhonon(**self.test_params, device=torch.device('cuda'))
+                        result_cuda = model_cuda.apply_disorder(use_data_adp=True)
+                        self.assertIsNotNone(result_cuda, "CUDA execution failed")
+                        
+                        # Verify results match between devices
+                        cpu_array = result_cpu.detach().cpu().numpy()
+                        cuda_array = result_cuda.detach().cpu().numpy()
+                        
+                        mask = ~np.isnan(cpu_array) & ~np.isnan(cuda_array)
+                        self.assertTrue(np.any(mask), "All values are NaN")
+                        
+                        correlation = np.corrcoef(cpu_array[mask], cuda_array[mask])[0, 1]
+                        self.assertGreater(correlation, 0.99, f"CPU/CUDA correlation too low: {correlation}")
+                except RuntimeError as e:
+                    if "CUDA" in str(e) and not torch.cuda.is_available():
+                        self.skipTest("CUDA test skipped - not available")
+                    else:
+                        raise
+        else:
+            # Test on CPU
+            try:
+                model_cpu = TorchOnePhonon(**self.test_params, device=torch.device('cpu'))
+                result_cpu = model_cpu.apply_disorder(use_data_adp=True)
+                self.assertIsNotNone(result_cpu, "CPU execution failed")
+                
+                # Test on CUDA if available
+                if torch.cuda.is_available():
+                    model_cuda = TorchOnePhonon(**self.test_params, device=torch.device('cuda'))
+                    result_cuda = model_cuda.apply_disorder(use_data_adp=True)
+                    self.assertIsNotNone(result_cuda, "CUDA execution failed")
                 
                 # Verify results match between devices
                 cpu_array = result_cpu.detach().cpu().numpy()
