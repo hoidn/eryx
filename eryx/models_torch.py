@@ -443,35 +443,33 @@ class OnePhonon:
         computing the corresponding vectors in reciprocal space, and storing
         their norms.
         
+        Note: The sampling parameter n creates a grid of size (n+1)³.
+        For example, with sampling=2, we get a 3×3×3=27 k-vector grid.
+        
         References:
             - Original implementation: eryx/models.py:OnePhonon._build_kvec_Brillouin
         """
-        # Initialize tensor arrays for k-vectors if they don't exist yet
-        if not hasattr(self, 'kvec') or self.kvec is None:
-            self.kvec = torch.zeros((self.hsampling[2],
-                                   self.ksampling[2],
-                                   self.lsampling[2],
-                                   3), device=self.device)
-            
-        if not hasattr(self, 'kvec_norm') or self.kvec_norm is None:
-            self.kvec_norm = torch.zeros((self.hsampling[2],
-                                        self.ksampling[2],
-                                        self.lsampling[2],
-                                        1), device=self.device)
+        # Use n+1 points for each dimension to match NumPy's behavior
+        h_dim = self.hsampling[2] + 1  # Include endpoint
+        k_dim = self.ksampling[2] + 1
+        l_dim = self.lsampling[2] + 1
         
-        # Use exactly the same formula for centering k-vectors
-        for dh in range(self.hsampling[2]):
-            h_dh = self._center_kvec(dh, self.hsampling[2])
-            for dk in range(self.ksampling[2]):
-                k_dk = self._center_kvec(dk, self.ksampling[2])
-                for dl in range(self.lsampling[2]):
-                    l_dl = self._center_kvec(dl, self.lsampling[2])
+        # Initialize tensors for k-vectors and norms
+        self.kvec = torch.zeros((h_dim, k_dim, l_dim, 3), device=self.device)
+        self.kvec_norm = torch.zeros((h_dim, k_dim, l_dim, 1), device=self.device)
+        
+        # Populate k-vectors using same logic as NumPy
+        for dh in range(h_dim):
+            h_dh = self._center_kvec(dh, h_dim)
+            for dk in range(k_dim):
+                k_dk = self._center_kvec(dk, k_dim)
+                for dl in range(l_dim):
+                    l_dl = self._center_kvec(dl, l_dim)
                     
-                    # Ensure consistent placement on device
-                    kvec_tensor = torch.tensor([h_dh, k_dk, l_dl], 
-                                             device=self.device)
+                    # Create k-vector with same centering behavior
+                    kvec_tensor = torch.tensor([h_dh, k_dk, l_dl], device=self.device)
                     
-                    # Compute actual k-vector in reciprocal space
+                    # Compute k-vector in reciprocal space
                     self.kvec[dh, dk, dl] = 2 * torch.pi * torch.matmul(
                         self.A_inv.T, kvec_tensor)
                     
