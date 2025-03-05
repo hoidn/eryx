@@ -158,28 +158,23 @@ class OnePhonon:
         from eryx.adapters import PDBToTensor
         from eryx.pdb import GaussianNetworkModel
         
+        # Calculate dimensions with n+1 points per dimension
+        h_dim = self.hsampling[2] + 1
+        k_dim = self.ksampling[2] + 1
+        l_dim = self.lsampling[2] + 1
+        
         # Initialize tensor arrays for phonon calculations
         # Use torch.zeros with proper device placement
-        self.kvec = torch.zeros((self.hsampling[2],
-                               self.ksampling[2],
-                               self.lsampling[2],
-                               3), device=self.device)
+        self.kvec = torch.zeros((h_dim, k_dim, l_dim, 3), device=self.device)
         
-        self.kvec_norm = torch.zeros((self.hsampling[2],
-                                    self.ksampling[2],
-                                    self.lsampling[2],
-                                    1), device=self.device)
+        self.kvec_norm = torch.zeros((h_dim, k_dim, l_dim, 1), device=self.device)
         
-        self.V = torch.zeros((self.hsampling[2],
-                            self.ksampling[2],
-                            self.lsampling[2],
+        self.V = torch.zeros((h_dim, k_dim, l_dim,
                             self.n_asu * self.n_dof_per_asu,
                             self.n_asu * self.n_dof_per_asu),
                            dtype=torch.complex64, device=self.device)
         
-        self.Winv = torch.zeros((self.hsampling[2],
-                               self.ksampling[2],
-                               self.lsampling[2],
+        self.Winv = torch.zeros((h_dim, k_dim, l_dim,
                                self.n_asu * self.n_dof_per_asu),
                               dtype=torch.complex64, device=self.device)
         
@@ -833,10 +828,15 @@ class OnePhonon:
         # Compute the Hessian matrix with proper k-vector dimension
         hessian = self.compute_hessian()
         
+        # Calculate dimensions with n+1 points per dimension
+        h_dim = self.hsampling[2] + 1
+        k_dim = self.ksampling[2] + 1
+        l_dim = self.lsampling[2] + 1
+        
         # Process each k-vector in the Brillouin zone
-        for dh in range(self.hsampling[2]):
-            for dk in range(self.ksampling[2]):
-                for dl in range(self.lsampling[2]):
+        for dh in range(h_dim):
+            for dk in range(k_dim):
+                for dl in range(l_dim):
                     # Get current k-vector
                     kvec = self.kvec[dh, dk, dl]
                     
@@ -986,10 +986,15 @@ class OnePhonon:
         # Compute the Hessian matrix
         hessian = self.compute_hessian()
         
+        # Calculate dimensions with n+1 points per dimension
+        h_dim = self.hsampling[2] + 1
+        k_dim = self.ksampling[2] + 1
+        l_dim = self.lsampling[2] + 1
+        
         # Loop through all k-vectors in the Brillouin zone
-        for dh in range(self.hsampling[2]):
-            for dk in range(self.ksampling[2]):
-                for dl in range(self.lsampling[2]):
+        for dh in range(h_dim):
+            for dk in range(k_dim):
+                for dl in range(l_dim):
                     # Extract current k-vector
                     kvec = self.kvec[dh, dk, dl]
                     
@@ -1107,10 +1112,15 @@ class OnePhonon:
         # Import structure_factors from scatter_torch
         from eryx.scatter_torch import structure_factors
         
+        # Calculate dimensions with n+1 points per dimension
+        h_dim = self.hsampling[2] + 1
+        k_dim = self.ksampling[2] + 1
+        l_dim = self.lsampling[2] + 1
+        
         # Loop through all k-vectors in the Brillouin zone
-        for dh in range(self.hsampling[2]):
-            for dk in range(self.ksampling[2]):
-                for dl in range(self.lsampling[2]):
+        for dh in range(h_dim):
+            for dk in range(k_dim):
+                for dl in range(l_dim):
                     # Get q-vector indices that are k-vector away from Miller indices
                     q_indices = self._at_kvec_from_miller_points((dh, dk, dl))
                     
