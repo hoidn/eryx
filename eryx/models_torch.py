@@ -116,14 +116,13 @@ class OnePhonon:
         # Setup Crystal and compute dimensions
         crystal_adapter = PDBToTensor(device=self.device)
         crystal = Crystal(atomic_model)
-        self.crystal_dict = crystal_adapter.convert_crystal(crystal)
-        self.crystal = crystal  # Keep reference to original Crystal object
+        self.crystal = crystal_adapter.convert_crystal(crystal)  # Store the adapted dictionary
         
         # Set key dimensions
-        self.id_cell_ref = self.crystal_dict['hkl_to_id']([0,0,0])
-        self.n_cell = self.crystal_dict['n_cell']
-        self.n_asu = self.crystal_dict['n_asu']
-        self.n_atoms_per_asu = self.crystal_dict['n_atoms_per_asu']
+        self.id_cell_ref = self.crystal['hkl_to_id']([0,0,0])
+        self.n_cell = self.crystal['n_cell']
+        self.n_asu = self.crystal['n_asu']
+        self.n_atoms_per_asu = self.crystal['n_atoms_per_asu']
         self.n_dof_per_asu_actual = self.n_atoms_per_asu * 3
         
         # Set grouping strategy
@@ -605,11 +604,12 @@ class OnePhonon:
             if j_cell == self.id_cell_ref:
                 continue
                 
-            # Get unit cell origin position
-            r_cell = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
+            # Get unit cell origin position - ensure it's a tensor
+            j_cell_hkl = self.crystal['id_to_hkl'](j_cell)
+            r_cell = self.crystal['get_unitcell_origin'](j_cell_hkl)
             
             # Compute phase factor e^(i k·r)
-            phase = torch.dot(kvec, r_cell)
+            phase = torch.sum(kvec * r_cell)  # Use element-wise multiplication and sum
             
             # Use ComplexTensorOps if needed, or direct calculation
             eikr = torch.complex(torch.cos(phase), torch.sin(phase))
@@ -833,20 +833,22 @@ class OnePhonon:
                     
                     # Add contribution for each unit cell with phase factor
                     for j_cell in range(self.n_cell):
-                        # Get unit cell origin position
-                        r_cell = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
-                        
+                        # Get unit cell origin position - ensure it's a tensor
+                        j_cell_hkl = self.crystal['id_to_hkl'](j_cell)
+                        r_cell = self.crystal['get_unitcell_origin'](j_cell_hkl)
+                    
                         # Calculate phase factor e^(i k·r)
-                        phase = torch.dot(kvec, r_cell)
+                        # Ensure both inputs are tensors with same device
+                        phase = torch.sum(kvec * r_cell)  # Use element-wise multiplication and sum instead of dot
                         real_part, imag_part = ComplexTensorOps.complex_exp(phase)
                         eikr = torch.complex(real_part, imag_part)
-                        
+                    
                         # Add contribution to covariance matrix
                         # Use addition to preserve gradient flow (not in-place += which can break gradients)
                         self.covar[:, j_cell, :] = self.covar[:, j_cell, :] + Kinv * eikr
         
         # Get reference cell ID
-        id_cell_ref = self.crystal.hkl_to_id([0, 0, 0])
+        id_cell_ref = self.crystal['hkl_to_id']([0, 0, 0])
         
         # Extract ADPs from the diagonal of the reference cell covariance
         # Use torch.diagonal for gradient compatibility

@@ -207,6 +207,40 @@ class TestOnePhononIntegration(unittest.TestCase):
                     self.skipTest("CUDA test skipped - not available")
                 else:
                     raise
+    
+    def test_crystal_adapter(self):
+        """Test that the Crystal adapter properly converts method return values to tensors."""
+        if self.ignore_warnings:
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="remove_ligands_and_waters.*")
+                # Create model with basic parameters
+                model = TorchOnePhonon(**self.test_params, device=self.device)
+                
+                # Test get_unitcell_origin returns a tensor
+                unit_cell = [0, 0, 0]
+                origin = model.crystal['get_unitcell_origin'](unit_cell)
+                self.assertIsInstance(origin, torch.Tensor)
+                self.assertEqual(origin.device, self.device)
+                
+                # Test get_asu_xyz returns a tensor
+                xyz = model.crystal['get_asu_xyz'](0, unit_cell)
+                self.assertIsInstance(xyz, torch.Tensor)
+                self.assertEqual(xyz.device, self.device)
+        else:
+            # Same as above without warning suppression
+            model = TorchOnePhonon(**self.test_params, device=self.device)
+            
+            # Test get_unitcell_origin returns a tensor
+            unit_cell = [0, 0, 0]
+            origin = model.crystal['get_unitcell_origin'](unit_cell)
+            self.assertIsInstance(origin, torch.Tensor)
+            self.assertEqual(origin.device, self.device)
+            
+            # Test get_asu_xyz returns a tensor
+            xyz = model.crystal['get_asu_xyz'](0, unit_cell)
+            self.assertIsInstance(xyz, torch.Tensor)
+            self.assertEqual(xyz.device, self.device)
 
 if __name__ == '__main__':
     unittest.main()

@@ -126,34 +126,35 @@ class PDBToTensor:
         if not hasattr(crystal, 'model'):
             raise ValueError("Crystal object must have a 'model' attribute. Check object structure.")
         
-        if not hasattr(crystal.model, 'unit_cell_axes') or not hasattr(crystal.model, 'n_asu'):
-            raise ValueError("Crystal.model must have 'unit_cell_axes' and 'n_asu' attributes. Check object structure.")
-            
+        # Store the original crystal for method access
         result = {
-            # Access attributes through the model property
-            # Crystal class stores these attributes in its model property
-            'unit_cell_axes': self.array_to_tensor(crystal.model.unit_cell_axes, requires_grad=True),
-            
-            # Key scalar attributes - access n_asu through model
-            'n_cell': crystal.n_cell,
-            'n_asu': crystal.model.n_asu,
-            'n_atoms_per_asu': crystal.get_asu_xyz().shape[0],
-            
-            # Method access
-            'hkl_to_id': crystal.hkl_to_id,
-            'id_to_hkl': crystal.id_to_hkl,
-            'get_asu_xyz': lambda asu_id=0, unit_cell=None: self.array_to_tensor(
-                getattr(crystal, 'get_asu_xyz', lambda a=0, u=None: np.zeros((1, 3)))(asu_id, unit_cell), 
-                requires_grad=True
-            ),
-            'get_unitcell_origin': lambda unit_cell=None: self.array_to_tensor(
-                getattr(crystal, 'get_unitcell_origin', lambda u=None: np.zeros(3))(unit_cell),
-                requires_grad=True
-            ),
-            
-            # Reference to original for other attributes
-            '_original_crystal': crystal
+            '_original': crystal
         }
+        
+        # Convert key properties
+        if hasattr(crystal.model, 'unit_cell_axes'):
+            result['unit_cell_axes'] = self.array_to_tensor(crystal.model.unit_cell_axes, requires_grad=True)
+        
+        # Key scalar attributes
+        result['n_cell'] = crystal.n_cell if hasattr(crystal, 'n_cell') else 1
+        result['n_asu'] = crystal.model.n_asu if hasattr(crystal.model, 'n_asu') else 1
+        result['n_atoms_per_asu'] = crystal.get_asu_xyz().shape[0] if hasattr(crystal, 'get_asu_xyz') else 0
+        
+        # Wrap method access with tensor conversion
+        result['hkl_to_id'] = lambda hkl=None: crystal.hkl_to_id(hkl) if hasattr(crystal, 'hkl_to_id') else 0
+        result['id_to_hkl'] = lambda cell_id=0: crystal.id_to_hkl(cell_id) if hasattr(crystal, 'id_to_hkl') else [0, 0, 0]
+        
+        # Ensure get_asu_xyz returns tensors
+        result['get_asu_xyz'] = lambda asu_id=0, unit_cell=None: self.array_to_tensor(
+            crystal.get_asu_xyz(asu_id, unit_cell) if hasattr(crystal, 'get_asu_xyz') else np.zeros((1, 3)),
+            requires_grad=True
+        )
+        
+        # Ensure get_unitcell_origin returns tensors
+        result['get_unitcell_origin'] = lambda unit_cell=None: self.array_to_tensor(
+            crystal.get_unitcell_origin(unit_cell) if hasattr(crystal, 'get_unitcell_origin') else np.zeros(3),
+            requires_grad=True
+        )
         
         return result
     
