@@ -17,6 +17,8 @@ from typing import List, Tuple, Dict, Optional, Union, Any
 
 # Forward references for type hints
 from eryx.pdb import AtomicModel, Crystal, GaussianNetworkModel
+from eryx.autotest.debug import debug
+
 
 class OnePhonon:
     """
@@ -30,6 +32,7 @@ class OnePhonon:
         - Original NumPy implementation in eryx/models.py:OnePhonon
     """
     
+    @debug
     def __init__(self, pdb_path: str, hsampling: Tuple[float, float, float], 
                  ksampling: Tuple[float, float, float], lsampling: Tuple[float, float, float],
                  expand_p1: bool = True, group_by: str = 'asu',
@@ -70,6 +73,7 @@ class OnePhonon:
         self._setup(pdb_path, expand_p1, res_limit, group_by)
         self._setup_phonons(pdb_path, model, gnm_cutoff, gamma_intra, gamma_inter)
     
+    @debug
     def _setup(self, pdb_path: str, expand_p1: bool, res_limit: float, group_by: str):
         """
         Set up class, computing q-vectors and building the unit cell.
@@ -137,6 +141,7 @@ class OnePhonon:
             self.n_dof_per_asu = 6
         self.n_dof_per_cell = self.n_asu * self.n_dof_per_asu
     
+    @debug
     def _setup_phonons(self, pdb_path: str, model: str, 
                      gnm_cutoff: float, gamma_intra: float, gamma_inter: float):
         """
@@ -217,6 +222,7 @@ class OnePhonon:
             # Handle alternative model types
             self.compute_rb_phonons()
     
+    @debug
     def _build_A(self):
         """
         Build the matrix A that projects small rigid-body displacements to individual atoms.
@@ -277,6 +283,7 @@ class OnePhonon:
         else:
             self.Amat = None
     
+    @debug
     def _build_M(self):
         """
         Build the mass matrix M and compute its Cholesky decomposition.
@@ -344,6 +351,7 @@ class OnePhonon:
                 # Compute inverse of L
                 self.Linv = torch.matmul(torch.diag(1.0 / torch.sqrt(S)), U.transpose(0, 1))
     
+    @debug
     def _build_M_allatoms(self) -> torch.Tensor:
         """
         Build all-atom mass matrix M_0 from element weights.
@@ -392,6 +400,7 @@ class OnePhonon:
         
         return M_allatoms
     
+    @debug
     def _project_M(self, M_allatoms: torch.Tensor) -> torch.Tensor:
         """
         Project all-atom mass matrix using the A matrix: M = A.T M_0 A
@@ -430,45 +439,71 @@ class OnePhonon:
         
         return Mmat
     
+    @debug
     def _build_kvec_Brillouin(self):
         """
-        Compute all k-vectors and their norm in the first Brillouin zone.
-        
-        This is achieved by regularly sampling [-0.5,0.5[ for h, k and l,
-        computing the corresponding vectors in reciprocal space, and storing
-        their norms.
-        
-        References:
-            - Original implementation: eryx/models.py:OnePhonon._build_kvec_Brillouin
+        Compute k-vectors in the first Brillouin zone with exactly the same
+        centering behavior as the NumPy implementation.
         """
-        # Get dimensions
-        h_dim = self.hsampling[2]
-        k_dim = self.ksampling[2]
-        l_dim = self.lsampling[2]
-        
-        # Create centered coordinates for h, k, l
-        h_vals = torch.tensor([self._center_kvec(dh, h_dim) for dh in range(h_dim)], device=self.device)
-        k_vals = torch.tensor([self._center_kvec(dk, k_dim) for dk in range(k_dim)], device=self.device)
-        l_vals = torch.tensor([self._center_kvec(dl, l_dim) for dl in range(l_dim)], device=self.device)
-        
-        # Create meshgrid
-        h_grid, k_grid, l_grid = torch.meshgrid(h_vals, k_vals, l_vals, indexing='ij')
-        
-        # Stack to create k-vectors
-        k_vecs = torch.stack([h_grid, k_grid, l_grid], dim=-1)
-        
-        # Reshape for matrix multiplication
-        k_vecs_flat = k_vecs.reshape(-1, 3)
-        
-        # Compute 2π * A_inv^T * k for all k-vectors at once
-        q_vecs_flat = 2 * torch.pi * torch.matmul(self.A_inv.T, k_vecs_flat.T).T
-        
-        # Reshape back to grid
-        self.kvec = q_vecs_flat.reshape(h_dim, k_dim, l_dim, 3)
-        
-        # Compute norms
-        self.kvec_norm = torch.norm(self.kvec, dim=-1, keepdim=True)
+        # Use exactly the same formula for centering k-vectors
+        for dh in range(self.hsampling[2]):
+            h_dh = self._center_kvec(dh, self.hsampling[2])
+            for dk in range(self.ksampling[2]):
+                k_dk = self._center_kvec(dk, self.ksampling[2])
+                for dl in range(self.lsampling[2]):
+                    l_dl = self._center_kvec(dl, self.lsampling[2])
+                    
+                    # Ensure consistent placement on device
+                    kvec_tensor = torch.tensor([h_dh, k_dk, l_dl], 
+                                             device=self.device)
+                    
+                    # Compute actual k-vector in reciprocal space
+                    self.kvec[dh, dk, dl] = 2 * torch.pi * torch.matmul(
+                        self.A_inv.T, kvec_tensor)
+                    
+                    # Compute norm
+                    self.kvec_norm[dh, dk, dl] = torch.norm(self.kvec[dh, dk, dl])
+
+#    def _build_kvec_Brillouin(self):
+#        """
+#        Compute all k-vectors and their norm in the first Brillouin zone.
+#        
+#        This is achieved by regularly sampling [-0.5,0.5[ for h, k and l,
+#        computing the corresponding vectors in reciprocal space, and storing
+#        their norms.
+#        
+#        References:
+#            - Original implementation: eryx/models.py:OnePhonon._build_kvec_Brillouin
+#        """
+#        # Get dimensions
+#        h_dim = self.hsampling[2]
+#        k_dim = self.ksampling[2]
+#        l_dim = self.lsampling[2]
+#        
+#        # Create centered coordinates for h, k, l
+#        h_vals = torch.tensor([self._center_kvec(dh, h_dim) for dh in range(h_dim)], device=self.device)
+#        k_vals = torch.tensor([self._center_kvec(dk, k_dim) for dk in range(k_dim)], device=self.device)
+#        l_vals = torch.tensor([self._center_kvec(dl, l_dim) for dl in range(l_dim)], device=self.device)
+#        
+#        # Create meshgrid
+#        h_grid, k_grid, l_grid = torch.meshgrid(h_vals, k_vals, l_vals, indexing='ij')
+#        
+#        # Stack to create k-vectors
+#        k_vecs = torch.stack([h_grid, k_grid, l_grid], dim=-1)
+#        
+#        # Reshape for matrix multiplication
+#        k_vecs_flat = k_vecs.reshape(-1, 3)
+#        
+#        # Compute 2π * A_inv^T * k for all k-vectors at once
+#        q_vecs_flat = 2 * torch.pi * torch.matmul(self.A_inv.T, k_vecs_flat.T).T
+#        
+#        # Reshape back to grid
+#        self.kvec = q_vecs_flat.reshape(h_dim, k_dim, l_dim, 3)
+#        
+#        # Compute norms
+#        self.kvec_norm = torch.norm(self.kvec, dim=-1, keepdim=True)
     
+    @debug
     def _center_kvec(self, x: int, L: int) -> float:
         """
         Center k-vector components.
@@ -490,6 +525,7 @@ class OnePhonon:
         # as it's a simple calculation not requiring tensor operations
         return int(((x - L / 2) % L) - L / 2) / L
     
+    @debug
     def _at_kvec_from_miller_points(self, hkl_kvec: tuple):
         """
         Return the indices of all q-vector that are k-vector away from any
@@ -530,6 +566,7 @@ class OnePhonon:
         
         return indices
     
+    @debug
     def compute_gnm_hessian(self) -> torch.Tensor:
         """
         For a pair of atoms the Hessian in a GNM is defined as:
@@ -587,11 +624,13 @@ class OnePhonon:
         return hessian
     
     # Helper methods for testing - these would be replaced in the full implementation
+    @debug
     def _get_atom_neighbors(self, i_asu, i_cell, j_asu, i_at):
         """Mock implementation to get atom neighbors for testing."""
         # Return empty list for now - will be replaced in tests with mock data
         return []
     
+    @debug
     def _get_gamma(self, i_asu, i_cell, j_asu):
         """Get gamma values based on whether atoms are in the same ASU or different ASUs."""
         # Use the tensor parameters to ensure gradient flow
@@ -602,6 +641,7 @@ class OnePhonon:
             # Different ASUs - use gamma_inter
             return self.gamma_inter.to(dtype=torch.complex64, device=self.device)
     
+    @debug
     def compute_gnm_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
         """
         Noting H(d) the block of the hessian matrix corresponding the the d-th reference cell
@@ -696,6 +736,7 @@ class OnePhonon:
         
         return Kinv
     
+    @debug
     def compute_hessian(self) -> torch.Tensor:
         """
         Build the projected Hessian matrix for the supercell.
@@ -739,81 +780,119 @@ class OnePhonon:
         
         return hessian
     
+    @debug
     def compute_gnm_phonons(self):
         """
-        Compute the dynamical matrix for each k-vector in the first Brillouin zone,
-        from the supercell's GNM.
-        
-        The squared inverse of the eigenvalues is stored for intensity calculation,
-        and the eigenvectors are mass-weighted to be used in the definition of the
-        phonon structure factors.
-        
-        References:
-            - Original implementation: eryx/models.py:OnePhonon.compute_gnm_phonons
+        Compute phonon modes from the Gaussian Network Model for each k-vector.
         """
-        # Import EigenOps for eigendecomposition with gradient support
-        from eryx.torch_utils import EigenOps
-        
         # Compute the Hessian matrix
         hessian = self.compute_hessian()
-        
-        # Initialize tensors for eigenvalues and eigenvectors if not already done
-        if not hasattr(self, 'V') or self.V is None:
-            self.V = torch.zeros((self.hsampling[2],
-                                 self.ksampling[2],
-                                 self.lsampling[2],
-                                 self.n_asu * self.n_dof_per_asu,
-                                 self.n_asu * self.n_dof_per_asu),
-                                dtype=torch.complex64, device=self.device)
-        
-        if not hasattr(self, 'Winv') or self.Winv is None:
-            self.Winv = torch.zeros((self.hsampling[2],
-                                    self.ksampling[2],
-                                    self.lsampling[2],
-                                    self.n_asu * self.n_dof_per_asu),
-                                   dtype=torch.complex64, device=self.device)
         
         # Process each k-vector in the Brillouin zone
         for dh in range(self.hsampling[2]):
             for dk in range(self.ksampling[2]):
                 for dl in range(self.lsampling[2]):
-                    # Extract current k-vector
+                    # Get current k-vector
                     kvec = self.kvec[dh, dk, dl]
                     
-                    # Compute dynamical matrix for this k-vector
+                    # Compute dynamical matrix K for this k-vector
                     Kmat = self.compute_gnm_K(hessian, kvec=kvec)
-                    
-                    # Reshape to 2D matrix for eigendecomposition
                     Kmat_2d = Kmat.reshape(self.n_asu * self.n_dof_per_asu,
                                           self.n_asu * self.n_dof_per_asu)
                     
-                    # Compute D = L⁻¹ K L⁻ᵀ (mass-weighted dynamical matrix)
-                    # Convert Linv to complex for compatibility
+                    # Compute mass-weighted dynamical matrix D = L⁻¹KL⁻ᵀ
                     Linv_complex = self.Linv.to(dtype=torch.complex64)
                     Dmat = torch.matmul(Linv_complex, 
                                        torch.matmul(Kmat_2d, Linv_complex.T))
                     
-                    # Perform SVD-based eigendecomposition for better gradient support
-                    v, s, _ = EigenOps.svd_decomposition(Dmat)
+                    # Use torch.linalg.svd directly (no extra regularization)
+                    v, w, _ = torch.linalg.svd(Dmat, full_matrices=False)
                     
-                    # Post-process eigenvalues and eigenvectors
-                    # Compute frequencies (sqrt of eigenvalues)
-                    w = torch.sqrt(s)
-                    
-                    # Handle small/zero eigenvalues
-                    eps = 1e-6
-                    w_safe = torch.where(w < eps, float('nan'), w)
-                    
-                    # Reverse order to match NumPy implementation
-                    w_safe = torch.flip(w_safe, [0])
+                    # Process eigenvalues exactly as in NumPy version
+                    w = torch.sqrt(w)
+                    w = torch.where(w < 1e-6, float('nan') * torch.ones_like(w), w)
+                    w = torch.flip(w, [0])
                     v = torch.flip(v, [1])
                     
-                    # Store inverse squared frequencies
-                    self.Winv[dh, dk, dl] = 1.0 / (w_safe ** 2)
-                    
-                    # Store mass-weighted eigenvectors
+                    # Store results
+                    self.Winv[dh, dk, dl] = 1.0 / (w ** 2)
                     self.V[dh, dk, dl] = torch.matmul(Linv_complex.T, v)
+#    def compute_gnm_phonons(self):
+#        """
+#        Compute the dynamical matrix for each k-vector in the first Brillouin zone,
+#        from the supercell's GNM.
+#        
+#        The squared inverse of the eigenvalues is stored for intensity calculation,
+#        and the eigenvectors are mass-weighted to be used in the definition of the
+#        phonon structure factors.
+#        
+#        References:
+#            - Original implementation: eryx/models.py:OnePhonon.compute_gnm_phonons
+#        """
+#        # Import EigenOps for eigendecomposition with gradient support
+#        from eryx.torch_utils import EigenOps
+#        
+#        # Compute the Hessian matrix
+#        hessian = self.compute_hessian()
+#        
+#        # Initialize tensors for eigenvalues and eigenvectors if not already done
+#        if not hasattr(self, 'V') or self.V is None:
+#            self.V = torch.zeros((self.hsampling[2],
+#                                 self.ksampling[2],
+#                                 self.lsampling[2],
+#                                 self.n_asu * self.n_dof_per_asu,
+#                                 self.n_asu * self.n_dof_per_asu),
+#                                dtype=torch.complex64, device=self.device)
+#        
+#        if not hasattr(self, 'Winv') or self.Winv is None:
+#            self.Winv = torch.zeros((self.hsampling[2],
+#                                    self.ksampling[2],
+#                                    self.lsampling[2],
+#                                    self.n_asu * self.n_dof_per_asu),
+#                                   dtype=torch.complex64, device=self.device)
+#        
+#        # Process each k-vector in the Brillouin zone
+#        for dh in range(self.hsampling[2]):
+#            for dk in range(self.ksampling[2]):
+#                for dl in range(self.lsampling[2]):
+#                    # Extract current k-vector
+#                    kvec = self.kvec[dh, dk, dl]
+#                    
+#                    # Compute dynamical matrix for this k-vector
+#                    Kmat = self.compute_gnm_K(hessian, kvec=kvec)
+#                    
+#                    # Reshape to 2D matrix for eigendecomposition
+#                    Kmat_2d = Kmat.reshape(self.n_asu * self.n_dof_per_asu,
+#                                          self.n_asu * self.n_dof_per_asu)
+#                    
+#                    # Compute D = L⁻¹ K L⁻ᵀ (mass-weighted dynamical matrix)
+#                    # Convert Linv to complex for compatibility
+#                    Linv_complex = self.Linv.to(dtype=torch.complex64)
+#                    Dmat = torch.matmul(Linv_complex, 
+#                                       torch.matmul(Kmat_2d, Linv_complex.T))
+#                    
+#                    # Perform SVD-based eigendecomposition for better gradient support
+#                    v, s, _ = EigenOps.svd_decomposition(Dmat)
+#                    
+#                    # Post-process eigenvalues and eigenvectors
+#                    # Compute frequencies (sqrt of eigenvalues)
+#                    w = torch.sqrt(s)
+#                    
+#                    # Handle small/zero eigenvalues
+#                    eps = 1e-6
+#                    w_safe = torch.where(w < eps, float('nan'), w)
+#                    
+#                    # Reverse order to match NumPy implementation
+#                    w_safe = torch.flip(w_safe, [0])
+#                    v = torch.flip(v, [1])
+#                    
+#                    # Store inverse squared frequencies
+#                    self.Winv[dh, dk, dl] = 1.0 / (w_safe ** 2)
+#                    
+#                    # Store mass-weighted eigenvectors
+#                    self.V[dh, dk, dl] = torch.matmul(Linv_complex.T, v)
     
+    @debug
     def compute_covariance_matrix(self):
         """
         Compute covariance matrix for all asymmetric units with PyTorch operations.
@@ -912,6 +991,7 @@ class OnePhonon:
             self.n_asu, self.n_dof_per_asu,
             self.n_cell, self.n_asu, self.n_dof_per_asu))
     
+    @debug
     def apply_disorder(self, rank: int = -1, outdir: Optional[str] = None, 
                      use_data_adp: bool = False) -> torch.Tensor:
         # Print some diagnostic information
@@ -1082,6 +1162,7 @@ class OnePhonon:
             np.save(os.path.join(outdir, f"rank_{rank:05d}.npy"), 
                    Id_masked.detach().cpu().numpy())
         
+        Id_masked = torch.where(self.res_mask, Id, torch.tensor(float('nan'), device=self.device))
         return Id_masked
 
 # Add stubs for additional classes as well:
