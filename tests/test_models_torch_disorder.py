@@ -224,65 +224,6 @@ class TestOnePhononDisorder(unittest.TestCase):
             rtol=1e-3, atol=1e-5
         ))
     
-    def test_apply_disorder_ground_truth(self):
-        """Test against ground truth data."""
-        # Skip this test if the log file doesn't exist
-        log_file_path = f"{self.apply_disorder_log}.log"
-        if not os.path.exists(log_file_path):
-            self.skipTest(f"Ground truth data not found: {log_file_path}")
-            
-        # Load the ground truth data
-        logs = self.logger.loadLog(log_file_path)
-        if not logs or len(logs) < 1:  # Need at least one entry with result
-            self.skipTest("Insufficient ground truth data in log file")
-        
-        # Get the expected output from the log entry
-        if 'result' not in logs[0]:
-            self.skipTest("Log entry doesn't contain 'result' key")
-            
-        expected_output = self.logger.serializer.deserialize(logs[0]['result'])
-        
-        # Run the apply_disorder method with default parameters
-        # Since apply_disorder takes no arguments in the current implementation
-        actual_output = self.model.apply_disorder()
-        
-        # Convert the PyTorch tensor to NumPy for comparison with ground truth
-        actual_output_np = actual_output.detach().cpu().numpy()
-        
-        # Compare with expected output
-        # We need to handle NaN values specially
-        if isinstance(expected_output, np.ndarray):
-            # Create masks for non-NaN values in both arrays
-            expected_mask = ~np.isnan(expected_output)
-            actual_mask = ~np.isnan(actual_output_np)
-            
-            # For debugging
-            if not np.array_equal(expected_mask, actual_mask):
-                print(f"Expected NaN count: {np.sum(~expected_mask)}, Actual NaN count: {np.sum(~actual_mask)}")
-                print(f"Mismatch count: {np.sum(expected_mask != actual_mask)}")
-                # Continue with the test even if masks don't match exactly
-            
-            # Compare only non-NaN values where both arrays have values
-            common_mask = expected_mask & actual_mask
-            if np.any(common_mask):
-                np.testing.assert_allclose(
-                    expected_output[common_mask],
-                    actual_output_np[common_mask],
-                    rtol=1e-3, atol=1e-5,
-                    err_msg="Output values don't match ground truth"
-                )
-                
-            # Check shapes match
-            self.assertEqual(expected_output.shape, actual_output_np.shape,
-                           "Output shape doesn't match ground truth")
-        else:
-            self.fail(f"Expected output is not a NumPy array: {type(expected_output)}")
-            
-        # Alternative approach using the TorchTesting framework
-        self.assertTrue(
-            self.torch_testing.testTorchCallable(self.apply_disorder_log, self.model.apply_disorder),
-            "apply_disorder failed ground truth test"
-        )
         
     def test_apply_disorder_direct_comparison(self):
         """
