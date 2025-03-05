@@ -79,6 +79,37 @@ class PDBToTensor:
         
         return result
     
+    def _safe_get_attr(self, obj: Any, attr_path: str, default: Any = None) -> Any:
+        """
+        Safely access an attribute through a path with dot notation.
+        
+        Args:
+            obj: The object to access attributes from
+            attr_path: Path to the attribute using dot notation (e.g., 'model.unit_cell_axes')
+            default: Default value to return if attribute doesn't exist
+            
+        Returns:
+            The attribute value or default if not found
+            
+        Example:
+            >>> self._safe_get_attr(crystal, 'model.n_asu', 1)
+            # Returns crystal.model.n_asu if it exists, otherwise 1
+        """
+        if obj is None:
+            return default
+            
+        parts = attr_path.split('.')
+        current = obj
+        
+        try:
+            for part in parts:
+                if not hasattr(current, part):
+                    return default
+                current = getattr(current, part)
+            return current
+        except Exception:
+            return default
+    
     def convert_crystal(self, crystal: Any) -> Dict[str, Any]:
         """
         Convert a Crystal object to PyTorch tensors.
@@ -92,23 +123,32 @@ class PDBToTensor:
         if crystal is None:
             raise ValueError("Cannot convert None crystal")
             
+        if not hasattr(crystal, 'model'):
+            raise ValueError("Crystal object must have a 'model' attribute. Check object structure.")
+        
+        if not hasattr(crystal.model, 'unit_cell_axes') or not hasattr(crystal.model, 'n_asu'):
+            raise ValueError("Crystal.model must have 'unit_cell_axes' and 'n_asu' attributes. Check object structure.")
+            
         result = {
-            # Convert essential tensor attributes
+            # Access attributes through the model property
+            # Crystal class stores these attributes in its model property
             'unit_cell_axes': self.array_to_tensor(crystal.model.unit_cell_axes, requires_grad=True),
             
-            # Key scalar attributes
+            # Key scalar attributes - access n_asu through model
             'n_cell': crystal.n_cell,
-            'n_asu': crystal.n_asu,
+            'n_asu': crystal.model.n_asu,
             'n_atoms_per_asu': crystal.get_asu_xyz().shape[0],
             
             # Method access
             'hkl_to_id': crystal.hkl_to_id,
             'id_to_hkl': crystal.id_to_hkl,
             'get_asu_xyz': lambda asu_id=0, unit_cell=None: self.array_to_tensor(
-                crystal.get_asu_xyz(asu_id, unit_cell), requires_grad=True
+                getattr(crystal, 'get_asu_xyz', lambda a=0, u=None: np.zeros((1, 3)))(asu_id, unit_cell), 
+                requires_grad=True
             ),
             'get_unitcell_origin': lambda unit_cell=None: self.array_to_tensor(
-                crystal.get_unitcell_origin(unit_cell), requires_grad=True
+                getattr(crystal, 'get_unitcell_origin', lambda u=None: np.zeros(3))(unit_cell),
+                requires_grad=True
             ),
             
             # Reference to original for other attributes
