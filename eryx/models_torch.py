@@ -874,7 +874,7 @@ class OnePhonon:
         # Calculate scaling factor to match experimental ADPs
         # Add small epsilon for numerical stability
         epsilon = 1e-10
-        target_adp_mean = torch.mean(self.model.adp)
+        target_adp_mean = torch.mean(self.model_dict['adp'])
         current_adp_mean = torch.mean(self.ADP) / 3
         ADP_scale = target_adp_mean / (8*torch.pi*torch.pi*current_adp_mean + epsilon)
         
@@ -918,7 +918,7 @@ class OnePhonon:
         """
         # Select appropriate ADPs based on flag
         if use_data_adp:
-            ADP = self.model.adp[0] / (8 * torch.pi * torch.pi)
+            ADP = self.model_dict['adp'][0] / (8 * torch.pi * torch.pi)
         else:
             ADP = self.ADP
             
@@ -954,10 +954,10 @@ class OnePhonon:
                     for i_asu in range(self.n_asu):
                         F[:, i_asu, :] = structure_factors(
                             self.q_grid[valid_indices],
-                            self.model.xyz[i_asu],
-                            self.model.ff_a[i_asu],
-                            self.model.ff_b[i_asu],
-                            self.model.ff_c[i_asu],
+                            self.model_dict['xyz'][i_asu],
+                            self.model_dict['ff_a'][i_asu],
+                            self.model_dict['ff_b'][i_asu],
+                            self.model_dict['ff_c'][i_asu],
                             U=ADP,
                             batch_size=self.batch_size,
                             compute_qF=True,
