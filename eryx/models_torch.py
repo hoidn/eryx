@@ -586,7 +586,9 @@ class OnePhonon:
         # Ensure gamma parameters are available
         if not hasattr(self, 'gamma_intra') or not hasattr(self, 'gamma_inter'):
             raise ValueError("gamma_intra and gamma_inter must be set before calling compute_gnm_hessian")
+            
         # Initialize Hessian tensor with complex dtype for later operations with phase factors
+        # Use the correct shape to match NumPy implementation
         hessian = torch.zeros((self.n_asu, self.n_atoms_per_asu,
                               self.n_cell, self.n_asu, self.n_atoms_per_asu),
                              dtype=torch.complex64, device=self.device)
@@ -1056,7 +1058,7 @@ class OnePhonon:
                     
                     # Apply resolution mask - match NumPy implementation exactly
                     # In NumPy, the mask is applied after computing structure factors
-                    valid_indices = q_indices
+                    valid_indices = q_indices[self.res_mask[q_indices]]
                     
                     # Skip if no valid points
                     if valid_indices.shape[0] == 0:
@@ -1109,12 +1111,10 @@ class OnePhonon:
                         # Weight by eigenvalues (Winv) and sum
                         # Extract real part of Winv to ensure type compatibility
                         # Convert to float64 for higher precision
-                        # BUGFIX: Apply scaling factor of 4500 to match NumPy implementation
-                        scaling_factor = 4500.0  # Scaling factor identified through debugging
                         weighted_intensity = torch.matmul(
                             FV_abs_squared.to(dtype=torch.float64), 
                             torch.real(self.Winv[dh, dk, dl]).to(dtype=torch.float64)
-                        ) * scaling_factor
+                        )
                         
                         # Update diffuse intensity at valid indices
                         # Using index_add_ for better gradient support than direct indexing
@@ -1131,9 +1131,7 @@ class OnePhonon:
                         # Compute |F·V|² and weight by the eigenvalue
                         # Extract real part of Winv to ensure type compatibility
                         # Convert to float64 for higher precision
-                        # BUGFIX: Apply scaling factor of 4500 to match NumPy implementation
-                        scaling_factor = 4500.0  # Scaling factor identified through debugging
-                        weighted_intensity = torch.abs(FV)**2 * torch.real(self.Winv[dh, dk, dl, rank]).to(dtype=torch.float64) * scaling_factor
+                        weighted_intensity = torch.abs(FV)**2 * torch.real(self.Winv[dh, dk, dl, rank]).to(dtype=torch.float64)
                         
                         # Update diffuse intensity at valid indices
                         # Ensure weighted_intensity has the same dtype as Id
@@ -1162,7 +1160,6 @@ class OnePhonon:
             np.save(os.path.join(outdir, f"rank_{rank:05d}.npy"), 
                    Id_masked.detach().cpu().numpy())
         
-        Id_masked = torch.where(self.res_mask, Id, torch.tensor(float('nan'), device=self.device))
         return Id_masked
 
 # Add stubs for additional classes as well:
