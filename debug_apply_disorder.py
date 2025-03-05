@@ -103,8 +103,6 @@ def log_tensor_stats(name: str, np_tensor: Optional[np.ndarray] = None,
             if torch.any(valid_mask):
                 stats["torch_min"] = torch.min(torch_tensor[valid_mask]).item()
                 stats["torch_max"] = torch.max(torch_tensor[valid_mask]).item()
-                stats["torch_mean"] = torch.mean(torch_tensor[valid_mask]).item()
-                stats["torch_std"] = torch.std(torch_tensor[valid_mask]).item()
             stats["torch_has_nan"] = torch.isnan(torch_tensor).any().item()
             stats["torch_nan_count"] = torch.sum(torch.isnan(torch_tensor)).item()
     

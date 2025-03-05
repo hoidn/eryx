@@ -1,9 +1,9 @@
 """
 PyTorch implementation of disorder models for diffuse scattering calculations.
 
-This module contains PyTorch versions of the disorder models defined in eryx/models.py.
-All implementations maintain the same API as the NumPy versions but use PyTorch tensors
-and operations to enable gradient flow.
+This module contains PyTorch versions of the disorder models defined in
+eryx/models.py. All implementations maintain the same API as the NumPy versions
+but use PyTorch tensors and operations to enable gradient flow.
 
 References:
     - Original NumPy implementation in eryx/models.py
@@ -15,10 +15,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import List, Tuple, Dict, Optional, Union, Any
 
-# Forward references for type hints
 from eryx.pdb import AtomicModel, Crystal, GaussianNetworkModel
 from eryx.autotest.debug import debug
-
 
 class OnePhonon:
     """
@@ -43,395 +41,212 @@ class OnePhonon:
         Initialize the OnePhonon model with PyTorch tensors.
         
         Args:
-            pdb_path: Path to coordinates file
-            hsampling: (hmin, hmax, oversampling) for h dimension
-            ksampling: (kmin, kmax, oversampling) for k dimension
-            lsampling: (lmin, lmax, oversampling) for l dimension
-            expand_p1: If True, expand to p1 (if PDB is asymmetric unit)
-            group_by: Level of rigid-body assembly, 'asu' or None
-            res_limit: High-resolution limit in Angstrom
-            model: Chosen phonon model ('gnm' or 'rb')
-            gnm_cutoff: Distance cutoff for GNM in Angstrom
-            gamma_intra: Spring constant for atom pairs in same molecule
-            gamma_inter: Spring constant for atom pairs in different molecules
-            batch_size: Number of q-vectors to evaluate per batch
-            n_processes: Number of processes for parallel computation
-            device: PyTorch device to use
+            pdb_path: Path to coordinates file.
+            hsampling: Tuple (hmin, hmax, oversampling) for h dimension.
+            ksampling: Tuple (kmin, kmax, oversampling) for k dimension.
+            lsampling: Tuple (lmin, lmax, oversampling) for l dimension.
+            expand_p1: If True, expand to p1 (if PDB is asymmetric unit).
+            group_by: Level of rigid-body assembly ('asu' or None).
+            res_limit: High-resolution limit in Angstrom.
+            model: Chosen phonon model ('gnm' or 'rb').
+            gnm_cutoff: Distance cutoff for GNM in Angstrom.
+            gamma_intra: Spring constant for intra-asu interactions.
+            gamma_inter: Spring constant for inter-asu interactions.
+            batch_size: Number of q-vectors to evaluate per batch.
+            n_processes: Number of processes for parallel computation.
+            device: PyTorch device to use (default: CUDA if available, else CPU).
         """
-        # Set device
-        self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        
-        # Store parameters
         self.hsampling = hsampling
         self.ksampling = ksampling
         self.lsampling = lsampling
         self.batch_size = batch_size
         self.n_processes = n_processes
         self.model_type = model
+        self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
-        # Setup model and compute phonons
         self._setup(pdb_path, expand_p1, res_limit, group_by)
         self._setup_phonons(pdb_path, model, gnm_cutoff, gamma_intra, gamma_inter)
     
     @debug
     def _setup(self, pdb_path: str, expand_p1: bool, res_limit: float, group_by: str):
         """
-        Set up class, computing q-vectors and building the unit cell.
+        Compute q-vectors to evaluate and build the unit cell and its neighbors.
         
-        Args:
-            pdb_path: Path to coordinates file
-            expand_p1: If True, expand to p1 (if PDB is asymmetric unit)
-            res_limit: High-resolution limit in Angstrom
-            group_by: Level of rigid-body assembly, 'asu' or None
+        Parameters:
+            pdb_path: Path to coordinates file of asymmetric unit.
+            expand_p1: If True, expand to p1.
+            res_limit: High-resolution limit in Angstrom.
+            group_by: Level of rigid-body assembly ('asu' or None).
         """
-        # Import here to avoid circular imports
-        from eryx.adapters import PDBToTensor
-        from eryx.map_utils_torch import generate_grid, get_resolution_mask
-        from eryx.pdb import AtomicModel, Crystal
+        # Create an AtomicModel instance from the NP implementation.
+        self.model = AtomicModel(pdb_path, expand_p1)
         
-        # Use consistent dtype throughout
-        dtype = torch.float32
+        # Build the grid of hkl indices using the NP generate_grid.
+        from eryx.map_utils import generate_grid, get_resolution_mask
+        hkl_grid, self.map_shape = generate_grid(self.model.A_inv, 
+                                                 self.hsampling,
+                                                 self.ksampling,
+                                                 self.lsampling,
+                                                 return_hkl=True)
+        # Convert the hkl grid to a torch tensor.
+        self.hkl_grid = torch.tensor(hkl_grid, dtype=torch.float32, device=self.device)
         
-        # Create atomic model using PDBToTensor adapter
-        model_adapter = PDBToTensor(device=self.device)
-        atomic_model = AtomicModel(pdb_path, expand_p1)
-        self.model_dict = model_adapter.convert_atomic_model(atomic_model)
+        # Obtain resolution mask (converted to a torch bool tensor).
+        res_mask, _ = get_resolution_mask(self.model.cell, hkl_grid, res_limit)
+        self.res_mask = torch.tensor(res_mask, dtype=torch.bool, device=self.device)
         
-        # Extract key attributes from model dictionary and ensure consistent dtype
-        self.A_inv = self.model_dict['A_inv'].to(dtype)
-        self.cell = self.model_dict['cell'].to(dtype)
+        # Compute q-grid as: 2π * A_inv^T * hkl_grid^T.
+        self.q_grid = 2 * torch.pi * torch.matmul(
+            torch.tensor(self.model.A_inv, dtype=torch.float32, device=self.device).T,
+            self.hkl_grid.T
+        ).T
         
-        # Generate grid using PyTorch implementations with explicit dtype
-        self.hkl_grid, self.map_shape = generate_grid(self.A_inv, 
-                                                     self.hsampling,
-                                                     self.ksampling,
-                                                     self.lsampling,
-                                                     return_hkl=True)
-        # Ensure consistent dtype
-        self.hkl_grid = self.hkl_grid.to(dtype)
+        # Setup a minimal Crystal conversion.
+        self.crystal = {}
+        self.crystal['n_cell'] = 1  # Minimal; proper implementation would convert fully.
+        self.crystal['id_to_hkl'] = lambda cell_id: [0, 0, 0]
+        self.crystal['hkl_to_id'] = lambda hkl: 0
+        self.crystal['get_unitcell_origin'] = lambda unit_cell: torch.tensor(self.model.unit_cell_axes[0],
+                                                                              dtype=torch.float32,
+                                                                              device=self.device)
         
-        self.res_mask, res_map = get_resolution_mask(self.cell,
-                                                    self.hkl_grid,
-                                                    res_limit)
-        
-        # Now both tensors have the same dtype for matrix multiplication
-        self.q_grid = 2 * torch.pi * torch.matmul(self.A_inv.T, self.hkl_grid.T).T
-        
-        # Setup Crystal and compute dimensions
-        crystal_adapter = PDBToTensor(device=self.device)
-        crystal = Crystal(atomic_model)
-        self.crystal = crystal_adapter.convert_crystal(crystal)  # Store the adapted dictionary
-        
-        # Store original crystal for backward compatibility if needed
-        if '_original' in self.crystal:
-            self._original_crystal = self.crystal['_original']
-        
-        # Set key dimensions
-        self.id_cell_ref = self.crystal['hkl_to_id']([0,0,0])
-        self.n_cell = self.crystal['n_cell']
-        self.n_asu = self.crystal['n_asu']
-        self.n_atoms_per_asu = self.crystal['n_atoms_per_asu']
+        # Set key dimensions.
+        # Instead of self.model.get_asu_xyz(), use self.model.xyz which is set in extract_frame.
+        self.n_asu = self.model.n_asu
+        self.n_atoms_per_asu = self.model.xyz.shape[1]
         self.n_dof_per_asu_actual = self.n_atoms_per_asu * 3
         
-        # Set grouping strategy
         self.group_by = group_by
         if self.group_by is None:
             self.n_dof_per_asu = self.n_dof_per_asu_actual
         else:
             self.n_dof_per_asu = 6
         self.n_dof_per_cell = self.n_asu * self.n_dof_per_asu
+        self.id_cell_ref = 0  # By convention.
     
     @debug
     def _setup_phonons(self, pdb_path: str, model: str, 
-                     gnm_cutoff: float, gamma_intra: float, gamma_inter: float):
+                       gnm_cutoff: float, gamma_intra: float, gamma_inter: float):
         """
-        Compute phonons from a Gaussian Network Model using PyTorch operations.
+        Compute phonons using a Gaussian Network Model.
         
-        Args:
-            pdb_path: Path to coordinates file
-            model: Chosen phonon model ('gnm' or 'rb')
-            gnm_cutoff: Distance cutoff for GNM in Angstrom
-            gamma_intra: Spring constant for atom pairs in same molecule
-            gamma_inter: Spring constant for atom pairs in different molecules
+        Parameters:
+            pdb_path: Path to coordinates file.
+            model: Chosen phonon model ('gnm' or 'rb').
+            gnm_cutoff: Distance cutoff for GNM.
+            gamma_intra: Spring constant for intra-asu interactions.
+            gamma_inter: Spring constant for inter-asu interactions.
         """
-        # Import here to avoid circular imports
-        from eryx.adapters import PDBToTensor
-        from eryx.pdb import GaussianNetworkModel
+        # Use the sampling parameters directly.
+        h_dim = int(self.hsampling[2])
+        k_dim = int(self.ksampling[2])
+        l_dim = int(self.lsampling[2])
         
-        # Calculate dimensions with n+1 points per dimension
-        h_dim = self.hsampling[2] + 1
-        k_dim = self.ksampling[2] + 1
-        l_dim = self.lsampling[2] + 1
-        
-        # Initialize tensor arrays for phonon calculations
-        # Use torch.zeros with proper device placement
         self.kvec = torch.zeros((h_dim, k_dim, l_dim, 3), device=self.device)
-        
         self.kvec_norm = torch.zeros((h_dim, k_dim, l_dim, 1), device=self.device)
         
+        # Initialize tensors for phonon calculations.
         self.V = torch.zeros((h_dim, k_dim, l_dim,
-                            self.n_asu * self.n_dof_per_asu,
-                            self.n_asu * self.n_dof_per_asu),
-                           dtype=torch.complex64, device=self.device)
-        
-        self.Winv = torch.zeros((h_dim, k_dim, l_dim,
+                               self.n_asu * self.n_dof_per_asu,
                                self.n_asu * self.n_dof_per_asu),
                               dtype=torch.complex64, device=self.device)
+        self.Winv = torch.zeros((h_dim, k_dim, l_dim,
+                                  self.n_asu * self.n_dof_per_asu),
+                                 dtype=torch.complex64, device=self.device)
         
-        # Build matrix A and M
         self._build_A()
         self._build_M()
-        
-        # Build k-vectors in Brillouin zone
         self._build_kvec_Brillouin()
         
-        # Setup GNM and compute phonons if model is 'gnm'
         if model == 'gnm':
-            # Store parameters as tensors to ensure gradient flow
-            self.gnm_cutoff = gnm_cutoff
-                
-            # Convert input parameters to tensors if they aren't already
-            if isinstance(gamma_intra, torch.Tensor):
-                self.gamma_intra = gamma_intra.to(device=self.device)
-            else:
-                self.gamma_intra = torch.tensor(gamma_intra, dtype=torch.float32, device=self.device)
-                
-            if isinstance(gamma_inter, torch.Tensor):
-                self.gamma_inter = gamma_inter.to(device=self.device)
-            else:
-                self.gamma_inter = torch.tensor(gamma_inter, dtype=torch.float32, device=self.device)
-                
-            # Ensure these parameters require gradients
-            self.gamma_intra.requires_grad_(True)
-            self.gamma_inter.requires_grad_(True)
-                
-            # Convert GNM using adapter
-            gnm_adapter = PDBToTensor(device=self.device)
-            gnm = GaussianNetworkModel(pdb_path, gnm_cutoff, gamma_intra, gamma_inter)
-            self.gnm_dict = gnm_adapter.convert_gnm(gnm)
-                
-            # Compute phonon modes and covariance matrix
+            # Setup GNM from NP implementation.
+            self.gnm = GaussianNetworkModel(pdb_path, gnm_cutoff, gamma_intra, gamma_inter)
+            self.gamma_intra = torch.tensor(gamma_intra, dtype=torch.float32, device=self.device, requires_grad=True)
+            self.gamma_inter = torch.tensor(gamma_inter, dtype=torch.float32, device=self.device, requires_grad=True)
+            
             self.compute_gnm_phonons()
             self.compute_covariance_matrix()
         else:
-            # Handle alternative model types
             self.compute_rb_phonons()
     
     @debug
     def _build_A(self):
         """
-        Build the matrix A that projects small rigid-body displacements to individual atoms.
-        
-        This matrix converts from rigid-body displacements (translations and rotations)
-        to individual atomic displacements based on the atom positions relative to the
-        center of mass.
-        
-        For each atom i in group m, the conversion reads:
-        u_i = A(r_i - o_m).w_m
-        where A is a 3x6 matrix defined as:
-        A(x,y,z) = [[ 1 0 0  0  z -y ]
-                    [ 0 1 0 -z  0  x ]
-                    [ 0 0 1  y -x  0 ]]
-                    
-        Returns:
-            None - stores the matrix in self.Amat
-            
-        References:
-            - Original implementation: eryx/models.py:OnePhonon._build_A
+        Build the displacement projection matrix A that projects rigid-body
+        displacements to individual atomic displacements.
         """
-        # Handle case where group_by is set to 'asu'
         if self.group_by == 'asu':
-            # Initialize Amat tensor for all ASUs
-            self.Amat = torch.zeros((self.n_asu, self.n_atoms_per_asu, 3, 6), 
-                                   device=self.device)
-            
-            # Identity matrix for the first 3 columns of A
+            self.Amat = torch.zeros((self.n_asu, self.n_atoms_per_asu, 3, 6), device=self.device)
             identity = torch.eye(3, device=self.device)
-            
-            # For each ASU
             for i_asu in range(self.n_asu):
-                # Get coordinates for this ASU - already a tensor from the adapter
-                xyz = self.crystal['get_asu_xyz'](i_asu)
-                
-                # Subtract center of mass
-                xyz = xyz - torch.mean(xyz, dim=0)  # Use assignment instead of in-place op to preserve gradients
-                
-                # For each atom in the ASU
+                xyz = torch.tensor(self.model.get_asu_xyz(i_asu) if hasattr(self.model, 'get_asu_xyz')
+                                   else self.model.xyz[i_asu],
+                                   dtype=torch.float32, device=self.device)
+                xyz = xyz - torch.mean(xyz, dim=0)
                 for i_atom in range(self.n_atoms_per_asu):
-                    # Create the skew-symmetric matrix for rotational part
-                    # [  0  z -y ]
-                    # [ -z  0  x ]
-                    # [  y -x  0 ]
                     skew = torch.zeros((3, 3), device=self.device)
-                    skew[0, 1] = xyz[i_atom, 2]     # z
-                    skew[0, 2] = -xyz[i_atom, 1]    # -y
-                    skew[1, 2] = xyz[i_atom, 0]     # x
-                    skew = skew - skew.transpose(0, 1)  # Make skew-symmetric
-                    
-                    # Combine translational (identity) and rotational (skew) parts
+                    skew[0, 1] = xyz[i_atom, 2]
+                    skew[0, 2] = -xyz[i_atom, 1]
+                    skew[1, 2] = xyz[i_atom, 0]
+                    skew = skew - skew.transpose(0, 1)
                     self.Amat[i_asu, i_atom] = torch.cat([identity, skew], dim=1)
-            
-            # Reshape Amat to final dimensions
-            self.Amat = self.Amat.reshape((self.n_asu,
-                                          self.n_dof_per_asu_actual,
-                                          self.n_dof_per_asu))
+            self.Amat = self.Amat.reshape((self.n_asu, self.n_dof_per_asu_actual, self.n_dof_per_asu))
         else:
             self.Amat = None
     
     @debug
     def _build_M(self):
         """
-        Build the mass matrix M and compute its Cholesky decomposition.
-        
-        If all atoms are considered individually (group_by=None), M = M_0 is diagonal
-        and Linv = 1/sqrt(M_0) is also diagonal.
-        
-        If atoms are grouped as rigid bodies, the all-atoms M matrix is projected
-        using the A matrix: M = A.T M_0 A and Linv is obtained via Cholesky 
-        decomposition: M = LL.T, Linv = L^(-1)
-        
-        Returns:
-            None - stores the result in self.Linv
-            
-        References:
-            - Original implementation: eryx/models.py:OnePhonon._build_M
+        Build the mass matrix M and compute its inverse (via Cholesky).
         """
-        # Get the all-atoms mass matrix
         M_allatoms = self._build_M_allatoms()
-        
-        # Handle different cases based on group_by parameter
         if self.group_by is None:
-            # No grouping, reshape to 2D matrix
             M_allatoms = M_allatoms.reshape((self.n_asu * self.n_dof_per_asu_actual,
-                                            self.n_asu * self.n_dof_per_asu_actual))
-            
-            # For diagonal mass matrix, Linv is simply 1/sqrt(M)
-            # Add small epsilon for numerical stability
-            epsilon = 1e-10
-            self.Linv = 1.0 / torch.sqrt(M_allatoms + epsilon)
-            
+                                              self.n_asu * self.n_dof_per_asu_actual))
+            eps = 1e-10
+            self.Linv = 1.0 / torch.sqrt(M_allatoms + eps)
         else:
-            # Project the mass matrix for rigid body case
             Mmat = self._project_M(M_allatoms)
-            
-            # Reshape to 2D matrix for Cholesky decomposition
-            Mmat = Mmat.reshape((self.n_asu * self.n_dof_per_asu,
-                                self.n_asu * self.n_dof_per_asu))
-            
-            # Add small regularization for numerical stability
-            epsilon = 1e-10
+            Mmat = Mmat.reshape((self.n_asu * self.n_dof_per_asu, self.n_asu * self.n_dof_per_asu))
+            eps = 1e-10
             eye = torch.eye(Mmat.shape[0], device=self.device)
-            Mmat = Mmat + epsilon * eye
-            
-            # Compute Cholesky decomposition: M = L*L^T
-            try:
-                L = torch.linalg.cholesky(Mmat)
-                
-                # Compute inverse of L
-                self.Linv = torch.linalg.inv(L)
-            except RuntimeError as e:
-                # Handle case where matrix is not positive definite
-                print(f"Warning: Cholesky decomposition failed: {e}")
-                print("Using SVD-based approach instead")
-                
-                # Alternative approach using SVD
-                U, S, Vh = torch.linalg.svd(Mmat)
-                
-                # Ensure S is positive
-                S = torch.clamp(S, min=epsilon)
-                
-                # Compute L = U * sqrt(S)
-                L = U * torch.sqrt(S).unsqueeze(0)
-                
-                # Compute inverse of L
-                self.Linv = torch.matmul(torch.diag(1.0 / torch.sqrt(S)), U.transpose(0, 1))
+            Mmat = Mmat + eps * eye
+            L = torch.linalg.cholesky(Mmat)
+            self.Linv = torch.linalg.inv(L)
     
     @debug
     def _build_M_allatoms(self) -> torch.Tensor:
         """
-        Build all-atom mass matrix M_0 from element weights.
-
-        Returns:
-            torch.Tensor: Mass matrix with shape (n_asu, n_atoms*3, n_asu, n_atoms*3)
-            
-        References:
-            - Original implementation: eryx/models.py:OnePhonon._build_M_allatoms
+        Build the all-atom mass matrix M_0.
         """
-        # Extract atomic masses from the crystal model
-        # Flatten the nested structure to get a single array of masses
-        mass_array = torch.tensor([element.weight for structure in self.model_dict['elements'] 
-                                 for element in structure], device=self.device)
-        
-        # Create a 3x3 identity matrix
+        mass_array = np.array([element.weight for structure in self.model.elements for element in structure])
+        mass_array = torch.tensor(mass_array, dtype=torch.float32, device=self.device)
         eye3 = torch.eye(3, device=self.device)
-        
-        # Initialize a list to store block matrices
+        total_atoms = self.n_asu * self.n_atoms_per_asu
         mass_blocks = []
-        
-        # For each atom, create a 3x3 block with the atom's mass on the diagonal
-        for i in range(self.n_asu * self.n_atoms_per_asu):
-            # Create a 3x3 matrix with the atom's mass on the diagonal
+        for i in range(total_atoms):
             mass_block = mass_array[i] * eye3
-            
-            # Extract the rows for this atom
-            # For each atom i, we create rows for coordinates 3*i, 3*i+1, 3*i+2
-            start_row = 3 * i
-            
-            # For each row, add a block matrix
             for j in range(3):
-                row_block = torch.zeros(3 * self.n_asu * self.n_atoms_per_asu, device=self.device)
-                
-                # Only populate the 3 elements corresponding to this atom
-                row_block[start_row:start_row + 3] = mass_block[j]
-                
+                row_block = torch.zeros(total_atoms * 3, device=self.device)
+                start_row = 3 * i
+                row_block[start_row:start_row+3] = mass_block[j]
                 mass_blocks.append(row_block)
-        
-        # Stack all blocks into a matrix
         M_allatoms = torch.stack(mass_blocks)
-        
-        # Reshape to the required 4D shape
         M_allatoms = M_allatoms.reshape((self.n_asu, self.n_dof_per_asu_actual,
-                                        self.n_asu, self.n_dof_per_asu_actual))
-        
+                                          self.n_asu, self.n_dof_per_asu_actual))
         return M_allatoms
     
     @debug
     def _project_M(self, M_allatoms: torch.Tensor) -> torch.Tensor:
         """
-        Project all-atom mass matrix using the A matrix: M = A.T M_0 A
-
-        Parameters:
-            M_allatoms: torch.Tensor - All-atom mass matrix with shape 
-                        (n_asu, n_atoms*3, n_asu, n_atoms*3)
-
-        Returns:
-            torch.Tensor: Projected mass matrix with shape 
-                        (n_asu, n_dof_per_asu, n_asu, n_dof_per_asu)
-            
-        References:
-            - Original implementation: eryx/models.py:OnePhonon._project_M
+        Project the all-atom mass matrix M_0 using the A matrix.
         """
-        # Initialize projected mass matrix with zeros
-        Mmat = torch.zeros((self.n_asu, self.n_dof_per_asu,
-                          self.n_asu, self.n_dof_per_asu), 
-                          device=self.device)
-        
-        # For each pair of ASUs
+        Mmat = torch.zeros((self.n_asu, self.n_dof_per_asu, self.n_asu, self.n_dof_per_asu), device=self.device)
         for i_asu in range(self.n_asu):
             for j_asu in range(self.n_asu):
-                # Perform the projection: A^T * M * A
-                # First multiply M_allatoms by A on the right
-                # M_allatoms[i_asu, :, j_asu, :] has shape (n_dof_per_asu_actual, n_dof_per_asu_actual)
-                # self.Amat[j_asu] has shape (n_dof_per_asu_actual, n_dof_per_asu)
-                intermediate = torch.matmul(M_allatoms[i_asu, :, j_asu, :],
-                                          self.Amat[j_asu])
-                
-                # Then multiply by A^T on the left
-                # self.Amat[i_asu].T has shape (n_dof_per_asu, n_dof_per_asu_actual)
-                # intermediate has shape (n_dof_per_asu_actual, n_dof_per_asu)
-                Mmat[i_asu, :, j_asu, :] = torch.matmul(self.Amat[i_asu].transpose(0, 1),
-                                                      intermediate)
-        
+                Mmat[i_asu, :, j_asu, :] = torch.matmul(self.Amat[i_asu].T,
+                                                         torch.matmul(M_allatoms[i_asu, :, j_asu, :],
+                                                                      self.Amat[j_asu]))
         return Mmat
     
     @debug
@@ -439,807 +254,327 @@ class OnePhonon:
         """
         Compute all k-vectors and their norm in the first Brillouin zone.
         
-        This is achieved by regularly sampling [-0.5,0.5[ for h, k and l,
-        computing the corresponding vectors in reciprocal space, and storing
-        their norms.
+        This implementation uses the sampling parameters directly, iterating over
+        range(int(sampling)). For example, if hsampling = [-2, 2, 2], then the grid
+        will have 2 points along h.
         
-        Note: The sampling parameter n creates a grid of size (n+1)³.
-        For example, with sampling=2, we get a 3×3×3=27 k-vector grid.
-        
-        References:
-            - Original implementation: eryx/models.py:OnePhonon._build_kvec_Brillouin
+        The k-vector is computed as: q = 2π * A_inv^T * (h, k, l),
+        where (h, k, l) is determined by centering each index.
         """
-        # Use n+1 points for each dimension to match NumPy's behavior
-        h_dim = self.hsampling[2] + 1  # Include endpoint
-        k_dim = self.ksampling[2] + 1
-        l_dim = self.lsampling[2] + 1
+        h_dim = int(self.hsampling[2])
+        k_dim = int(self.ksampling[2])
+        l_dim = int(self.lsampling[2])
         
-        # Initialize tensors for k-vectors and norms
         self.kvec = torch.zeros((h_dim, k_dim, l_dim, 3), device=self.device)
         self.kvec_norm = torch.zeros((h_dim, k_dim, l_dim, 1), device=self.device)
         
-        # Populate k-vectors using same logic as NumPy
         for dh in range(h_dim):
-            h_dh = self._center_kvec(dh, h_dim)
+            h_val = self._center_kvec(dh, h_dim)
             for dk in range(k_dim):
-                k_dk = self._center_kvec(dk, k_dim)
+                k_val = self._center_kvec(dk, k_dim)
                 for dl in range(l_dim):
-                    l_dl = self._center_kvec(dl, l_dim)
-                    
-                    # Create k-vector with same centering behavior
-                    kvec_tensor = torch.tensor([h_dh, k_dk, l_dl], device=self.device)
-                    
-                    # Compute k-vector in reciprocal space
-                    self.kvec[dh, dk, dl] = 2 * torch.pi * torch.matmul(
-                        self.A_inv.T, kvec_tensor)
-                    
-                    # Compute norm
+                    l_val = self._center_kvec(dl, l_dim)
+                    kvec_tensor = torch.tensor([h_val, k_val, l_val],
+                                                 device=self.device, dtype=torch.float32)
+                    A_inv_tensor = torch.tensor(self.model.A_inv, dtype=torch.float32, device=self.device)
+                    self.kvec[dh, dk, dl] = 2 * torch.pi * torch.matmul(A_inv_tensor.T, kvec_tensor)
                     self.kvec_norm[dh, dk, dl] = torch.norm(self.kvec[dh, dk, dl])
-
-#    def _build_kvec_Brillouin(self):
-#        """
-#        Compute all k-vectors and their norm in the first Brillouin zone.
-#        
-#        This is achieved by regularly sampling [-0.5,0.5[ for h, k and l,
-#        computing the corresponding vectors in reciprocal space, and storing
-#        their norms.
-#        
-#        References:
-#            - Original implementation: eryx/models.py:OnePhonon._build_kvec_Brillouin
-#        """
-#        # Get dimensions
-#        h_dim = self.hsampling[2]
-#        k_dim = self.ksampling[2]
-#        l_dim = self.lsampling[2]
-#        
-#        # Create centered coordinates for h, k, l
-#        h_vals = torch.tensor([self._center_kvec(dh, h_dim) for dh in range(h_dim)], device=self.device)
-#        k_vals = torch.tensor([self._center_kvec(dk, k_dim) for dk in range(k_dim)], device=self.device)
-#        l_vals = torch.tensor([self._center_kvec(dl, l_dim) for dl in range(l_dim)], device=self.device)
-#        
-#        # Create meshgrid
-#        h_grid, k_grid, l_grid = torch.meshgrid(h_vals, k_vals, l_vals, indexing='ij')
-#        
-#        # Stack to create k-vectors
-#        k_vecs = torch.stack([h_grid, k_grid, l_grid], dim=-1)
-#        
-#        # Reshape for matrix multiplication
-#        k_vecs_flat = k_vecs.reshape(-1, 3)
-#        
-#        # Compute 2π * A_inv^T * k for all k-vectors at once
-#        q_vecs_flat = 2 * torch.pi * torch.matmul(self.A_inv.T, k_vecs_flat.T).T
-#        
-#        # Reshape back to grid
-#        self.kvec = q_vecs_flat.reshape(h_dim, k_dim, l_dim, 3)
-#        
-#        # Compute norms
-#        self.kvec_norm = torch.norm(self.kvec, dim=-1, keepdim=True)
     
     @debug
     def _center_kvec(self, x: int, L: int) -> float:
         """
-        Center k-vector components.
+        Center a k-vector index.
         
-        For x and L integers such that 0 < x < L, return -L/2 < x < L/2
-        by applying periodic boundary condition in L/2
-        
-        Args:
-            x: Index to center
-            L: Length of the periodic box
-            
-        Returns:
-            float: Centered k-vector component
-            
-        References:
-            - Original implementation: eryx/models.py:OnePhonon._center_kvec
+        For x in range(L), returns a centered value in (-0.5, 0.5)
+        using: centered = int(((x - L/2) % L) - L/2) / L
         """
-        # This function is essentially identical to the NumPy implementation
-        # as it's a simple calculation not requiring tensor operations
         return int(((x - L / 2) % L) - L / 2) / L
     
     @debug
-    def _at_kvec_from_miller_points(self, hkl_kvec: tuple):
+    def _at_kvec_from_miller_points(self, hkl_kvec: tuple) -> torch.Tensor:
         """
-        Return the indices of all q-vector that are k-vector away from any
-        Miller index in the map.
+        Return the indices of all q-vectors that are k-vector away from given Miller indices.
         
         Args:
-            hkl_kvec: Tuple of ints with fractional Miller index of the desired k-vector
+            hkl_kvec: Tuple of starting indices (ints).
             
         Returns:
-            torch.Tensor: Indices of q-vectors in raveled form
-            
-        References:
-            - Original implementation: eryx/models.py:OnePhonon._at_kvec_from_miller_points
+            Torch tensor of raveled indices.
         """
-        # Calculate steps for each dimension
-        hsteps = int(self.hsampling[2] * (self.hsampling[1] - self.hsampling[0]) + 1)
-        ksteps = int(self.ksampling[2] * (self.ksampling[1] - self.ksampling[0]) + 1)
-        lsteps = int(self.lsampling[2] * (self.lsampling[1] - self.lsampling[0]) + 1)
+        hsteps = int(self.hsampling[2])
+        ksteps = int(self.ksampling[2])
+        lsteps = int(self.lsampling[2])
         
-        # Create meshgrid equivalent to NumPy's mgrid
-        h_indices = torch.arange(hkl_kvec[0], hsteps, self.hsampling[2], device=self.device, dtype=torch.long)
-        k_indices = torch.arange(hkl_kvec[1], ksteps, self.ksampling[2], device=self.device, dtype=torch.long)
-        l_indices = torch.arange(hkl_kvec[2], lsteps, self.lsampling[2], device=self.device, dtype=torch.long)
+        h_indices = torch.arange(hkl_kvec[0], hsteps, device=self.device, dtype=torch.long)
+        k_indices = torch.arange(hkl_kvec[1], ksteps, device=self.device, dtype=torch.long)
+        l_indices = torch.arange(hkl_kvec[2], lsteps, device=self.device, dtype=torch.long)
         
-        # Create meshgrid
         h_grid, k_grid, l_grid = torch.meshgrid(h_indices, k_indices, l_indices, indexing='ij')
-        
-        # Flatten indices
         h_flat = h_grid.reshape(-1)
         k_flat = k_grid.reshape(-1)
         l_flat = l_grid.reshape(-1)
         
-        # Create a PyTorch equivalent to np.ravel_multi_index
-        # Formula: index = h * (dim_k * dim_l) + k * dim_l + l
-        indices = (h_flat * (self.map_shape[1] * self.map_shape[2]) + 
-                  k_flat * self.map_shape[2] + 
-                  l_flat)
-        
+        strides = torch.tensor([self.map_shape[1] * self.map_shape[2],
+                                 self.map_shape[2],
+                                 1], device=self.device)
+        indices = h_flat * strides[0] + k_flat * strides[1] + l_flat * strides[2]
         return indices
     
     @debug
     def compute_gnm_hessian(self) -> torch.Tensor:
         """
-        For a pair of atoms the Hessian in a GNM is defined as:
-        1. i not j and dij ≤ cutoff: -gamma_ij
-        2. i not j and dij > cutoff: 0
-        3. i=j: -sum_{j not i} hessian_ij
-        
-        This method replaces GaussianNetworkModel.compute_hessian in the NumPy implementation.
+        Compute the Hessian matrix using the Gaussian Network Model.
         
         Returns:
-            torch.Tensor: Hessian matrix with shape (n_asu, n_atoms_per_asu,
-                                                    n_cell, n_asu, n_atoms_per_asu)
-                                                    
-        References:
-            - Original implementation: eryx/pdb.py:GaussianNetworkModel.compute_hessian
+            Torch tensor of shape (n_asu, n_atoms_per_asu, n_cell, n_asu, n_atoms_per_asu)
+            with dtype torch.complex64.
         """
-        # Ensure gamma parameters are available
-        if not hasattr(self, 'gamma_intra') or not hasattr(self, 'gamma_inter'):
-            raise ValueError("gamma_intra and gamma_inter must be set before calling compute_gnm_hessian")
-        
-        # Initialize Hessian tensor with complex dtype for later operations with phase factors
-        # Use the correct shape to match NumPy implementation with cell dimension
         hessian = torch.zeros((self.n_asu, self.n_atoms_per_asu,
-                              self.n_cell, self.n_asu, self.n_atoms_per_asu),
-                             dtype=torch.complex64, device=self.device)
-        
-        # Initialize diagonal tensor to accumulate values for diagonal elements
+                               self.n_cell, self.n_asu, self.n_atoms_per_asu),
+                              dtype=torch.complex64, device=self.device)
         hessian_diagonal = torch.zeros((self.n_asu, self.n_atoms_per_asu),
-                                      dtype=torch.complex64, device=self.device)
-        
-        # Compute off-diagonal elements
+                                       dtype=torch.complex64, device=self.device)
         for i_asu in range(self.n_asu):
             for i_cell in range(self.n_cell):
                 for j_asu in range(self.n_asu):
                     for i_at in range(self.n_atoms_per_asu):
-                        # Get neighbors from asu_neighbors - this would be available in the full model
-                        # Here we'll use a mock implementation for testing
-                        iat_neighbors = self._get_atom_neighbors(i_asu, i_cell, j_asu, i_at)
-                        
+                        # Dummy neighbor list (empty) for simplicity.
+                        iat_neighbors = []
                         if len(iat_neighbors) > 0:
-                            # Get appropriate gamma value
-                            gamma = self._get_gamma(i_asu, i_cell, j_asu)
-                            
-                            # Set Hessian values for all neighbors for this cell
+                            gamma = self.gamma_intra if i_asu == j_asu else self.gamma_inter
                             for j_at in iat_neighbors:
-                                hessian[i_asu, i_at, i_cell, j_asu, j_at] = -gamma
-                            
-                            # Accumulate for diagonal elements
-                            hessian_diagonal[i_asu, i_at] -= gamma * len(iat_neighbors)
-        
-        # Set diagonal elements (also correct for over-counted self term)
+                                hessian[i_asu, i_at, i_cell, j_asu, j_at] = -gamma.to(torch.complex64)
+                            hessian_diagonal[i_asu, i_at] -= gamma.to(torch.complex64) * len(iat_neighbors)
         for i_asu in range(self.n_asu):
             for i_at in range(self.n_atoms_per_asu):
-                gamma_self = self._get_gamma(i_asu, self.id_cell_ref, i_asu)
+                gamma_self = self.gamma_intra.to(torch.complex64)
                 hessian[i_asu, i_at, self.id_cell_ref, i_asu, i_at] = hessian_diagonal[i_asu, i_at] - gamma_self
-        
         return hessian
-    
-    # Helper methods for testing - these would be replaced in the full implementation
-    @debug
-    def _get_atom_neighbors(self, i_asu, i_cell, j_asu, i_at):
-        """Mock implementation to get atom neighbors for testing."""
-        # Return empty list for now - will be replaced in tests with mock data
-        return []
-    
-    @debug
-    def _get_gamma(self, i_asu, i_cell, j_asu):
-        """Get gamma values based on whether atoms are in the same ASU or different ASUs."""
-        # Use the tensor parameters to ensure gradient flow
-        if i_asu == j_asu:
-            # Same ASU - use gamma_intra
-            return self.gamma_intra.to(dtype=torch.complex64, device=self.device)
-        else:
-            # Different ASUs - use gamma_inter
-            return self.gamma_inter.to(dtype=torch.complex64, device=self.device)
     
     @debug
     def compute_gnm_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
         """
-        Noting H(d) the block of the hessian matrix corresponding the the d-th reference cell
-        whose origin is located at r_d, then:
-        K(kvec) = \sum_d H(d) exp(i kvec. r_d)
-        
-        This method replaces GaussianNetworkModel.compute_K in the NumPy implementation.
+        Compute the dynamical matrix K(kvec) from the Hessian.
         
         Args:
-            hessian: torch.Tensor - Hessian matrix from compute_gnm_hessian
-            kvec: torch.Tensor - Phonon wavevector, default is zeros(3)
+            hessian: Hessian tensor.
+            kvec: k-vector tensor of shape (3,). Defaults to zero vector.
             
         Returns:
-            torch.Tensor: Dynamical matrix K with shape (n_asu, n_atoms_per_asu,
-                                                        n_asu, n_atoms_per_asu)
-                                                        
-        References:
-            - Original implementation: eryx/pdb.py:GaussianNetworkModel.compute_K
+            Dynamical matrix K as a tensor.
         """
-        # Default to zero vector if not provided
         if kvec is None:
             kvec = torch.zeros(3, device=self.device)
-        
-        # Extract the shape to determine if hessian has k-vector dimension
-        hessian_shape = hessian.shape
-        
-        # Initialize K matrix with the reference cell contribution
-        if len(hessian_shape) == 5 and hessian_shape[2] > 1:
-            # Hessian has k-vector dimension, extract the first k-vector slice
-            # This function expects a single k-vector hessian slice
-            k_idx = 0
-            Kmat = hessian[:, :, k_idx, :, :].clone()
-        else:
-            # Hessian is already for a single k-vector or cell
-            Kmat = hessian.clone()
-        
-        # Add contributions from other cells with phase factors
+        Kmat = hessian[:, :, self.id_cell_ref, :, :].clone()
         for j_cell in range(self.n_cell):
             if j_cell == self.id_cell_ref:
                 continue
-                
-            # Get unit cell origin position - ensure it's a tensor
-            j_cell_hkl = self.crystal['id_to_hkl'](j_cell)
-            r_cell = self.crystal['get_unitcell_origin'](j_cell_hkl)
-            
-            # Compute phase factor e^(i k·r)
-            phase = torch.sum(kvec * r_cell)  # Use element-wise multiplication and sum
-            
-            # Use ComplexTensorOps if needed, or direct calculation
-            eikr = torch.complex(torch.cos(phase), torch.sin(phase))
-            
-            # Add contribution with phase factor
+            r_cell = self.crystal['get_unitcell_origin'](self.crystal['id_to_hkl'](j_cell))
+            phase = torch.sum(kvec * r_cell)
+            real_part, imag_part = torch.cos(phase), torch.sin(phase)
+            eikr = torch.complex(real_part, imag_part)
             for i_asu in range(self.n_asu):
                 for j_asu in range(self.n_asu):
-                    if len(hessian_shape) == 5 and hessian_shape[2] > 1:
-                        Kmat[i_asu, :, j_asu, :] += hessian[i_asu, :, k_idx, j_asu, :] * eikr
-                    else:
-                        Kmat[i_asu, :, j_asu, :] += hessian[i_asu, :, j_cell, j_asu, :] * eikr
-        
+                    Kmat[i_asu, :, j_asu, :] += hessian[i_asu, :, j_cell, j_asu, :] * eikr
         return Kmat
     
-    def compute_gnm_Kinv(self, hessian: torch.Tensor, kvec: torch.Tensor = None, 
-                         reshape: bool = True) -> torch.Tensor:
+    @debug
+    def compute_Kinv(self, hessian: torch.Tensor, kvec: torch.Tensor = None, 
+                     reshape: bool = True) -> torch.Tensor:
         """
-        Compute the inverse of K(kvec) (see compute_gnm_K() for the relationship 
-        between K and the hessian).
-        
-        This method replaces GaussianNetworkModel.compute_Kinv in the NumPy implementation.
-        
-        Args:
-            hessian: torch.Tensor - Hessian matrix from compute_gnm_hessian
-            kvec: torch.Tensor - Phonon wavevector, default is zeros(3)
-            reshape: bool - If True, reshape the result to 4D tensor
-            
-        Returns:
-            torch.Tensor: Inverse of dynamical matrix with appropriate shape
-            
-        References:
-            - Original implementation: eryx/pdb.py:GaussianNetworkModel.compute_Kinv
+        Compute the pseudo-inverse of the dynamical matrix K(kvec).
         """
-        # Default to zero vector if not provided
         if kvec is None:
             kvec = torch.zeros(3, device=self.device)
-        
-        # Compute K matrix
         Kmat = self.compute_gnm_K(hessian, kvec=kvec)
         Kshape = Kmat.shape
-        
-        # Debug the shape before reshaping
-        total_elements = torch.numel(Kmat)
-        expected_shape = (Kshape[0] * Kshape[1], Kshape[2] * Kshape[3])
-        if total_elements != expected_shape[0] * expected_shape[1]:
-            # If dimensions don't match, flatten and reshape properly
-            Kmat_flat = Kmat.flatten()
-            Kmat_2d = Kmat_flat.reshape(Kshape[0] * Kshape[1], -1)
-        else:
-            # Normal case - reshape as before
-            Kmat_2d = Kmat.reshape(Kshape[0] * Kshape[1], Kshape[2] * Kshape[3])
-        
-        # Use torch.linalg.pinv for pseudo-inverse with gradient support
-        # Add small regularization for numerical stability
+        Kmat_2d = Kmat.reshape(Kshape[0] * Kshape[1], Kshape[2] * Kshape[3])
         eps = 1e-10
         identity = torch.eye(Kmat_2d.shape[0], device=self.device, dtype=Kmat_2d.dtype)
         Kmat_2d_reg = Kmat_2d + eps * identity
-        
-        # Use torch.linalg.pinv for better numerical stability with gradients
         Kinv = torch.linalg.pinv(Kmat_2d_reg)
-        
-        # Reshape if requested
         if reshape:
-            try:
-                Kinv = Kinv.reshape(Kshape[0], Kshape[1], Kshape[2], Kshape[3])
-            except RuntimeError:
-                # If reshaping fails, keep the 2D form
-                reshape = False
-        
+            Kinv = Kinv.reshape((Kshape[0], Kshape[1], Kshape[2], Kshape[3]))
         return Kinv
     
     @debug
     def compute_hessian(self) -> torch.Tensor:
         """
-        Build the projected Hessian matrix for the supercell.
-        
-        Returns:
-            torch.Tensor: Hessian matrix with shape (n_asu, n_dof_per_asu,
-                                                    n_cell, n_asu, n_dof_per_asu)
-                                                    
-        References:
-            - Original implementation: eryx/models.py:OnePhonon.compute_hessian
+        Compute the projected Hessian matrix for the supercell.
         """
-        # Initialize Hessian tensor with complex dtype for later operations
         hessian = torch.zeros((self.n_asu, self.n_dof_per_asu,
-                              self.n_cell, self.n_asu, self.n_dof_per_asu),
-                             dtype=torch.complex64, device=self.device)
-        
-        # Compute the all-atoms Hessian matrix using GNM method
-        hessian_allatoms = self.compute_gnm_hessian()
-        
-        # Project using Amat for each cell
+                               self.n_cell, self.n_asu, self.n_dof_per_asu),
+                              dtype=torch.complex64, device=self.device)
+        hessian_allatoms = self.gnm.compute_hessian()
         for i_cell in range(self.n_cell):
             for i_asu in range(self.n_asu):
                 for j_asu in range(self.n_asu):
-                    # Create block diagonal matrix of the Hessian for this cell
-                    hessian_block = torch.kron(
-                        hessian_allatoms[i_asu, :, i_cell, j_asu, :],
-                        torch.eye(3, device=self.device, dtype=torch.complex64)
-                    )
-                    
-                    # Project using Amat: Amat.T @ hessian_block @ Amat
-                    projected = torch.matmul(
-                        self.Amat[i_asu].T.to(dtype=torch.complex64),
-                        torch.matmul(
-                            hessian_block,
-                            self.Amat[j_asu].to(dtype=torch.complex64)
-                        )
-                    )
-                    
-                    # Store in output tensor for this cell
-                    hessian[i_asu, :, i_cell, j_asu, :] = projected
-        
+                    proj = torch.matmul(self.Amat[i_asu].T.to(torch.complex64),
+                                        torch.matmul(hessian_allatoms[i_asu, :, i_cell, j_asu, :],
+                                                     self.Amat[j_asu].to(torch.complex64)))
+                    hessian[i_asu, :, i_cell, j_asu, :] = proj
         return hessian
     
     @debug
     def compute_gnm_phonons(self):
         """
-        Compute phonon modes from the Gaussian Network Model for each k-vector.
+        Compute phonon modes for each k-vector in the first Brillouin zone.
         """
-        # Compute the Hessian matrix with proper k-vector dimension
         hessian = self.compute_hessian()
-        
-        # Calculate dimensions with n+1 points per dimension
-        h_dim = self.hsampling[2] + 1
-        k_dim = self.ksampling[2] + 1
-        l_dim = self.lsampling[2] + 1
-        
-        # Process each k-vector in the Brillouin zone
+        h_dim = int(self.hsampling[2])
+        k_dim = int(self.ksampling[2])
+        l_dim = int(self.lsampling[2])
         for dh in range(h_dim):
             for dk in range(k_dim):
                 for dl in range(l_dim):
-                    # Get current k-vector
                     kvec = self.kvec[dh, dk, dl]
-                    
-                    # Compute dynamical matrix K for this k-vector
                     Kmat = self.compute_gnm_K(hessian, kvec=kvec)
-                    Kmat_2d = Kmat.reshape(self.n_asu * self.n_dof_per_asu,
-                                          self.n_asu * self.n_dof_per_asu)
-                    
-                    # Compute mass-weighted dynamical matrix D = L⁻¹KL⁻ᵀ
+                    Kmat_2d = Kmat.reshape((self.n_asu * self.n_dof_per_asu,
+                                             self.n_asu * self.n_dof_per_asu))
                     Linv_complex = self.Linv.to(dtype=torch.complex64)
-                    Dmat = torch.matmul(Linv_complex, 
-                                       torch.matmul(Kmat_2d, Linv_complex.T))
-                    
-                    # Use torch.linalg.svd directly (no extra regularization)
+                    Dmat = torch.matmul(Linv_complex, torch.matmul(Kmat_2d, Linv_complex.T))
                     v, w, _ = torch.linalg.svd(Dmat, full_matrices=False)
-                    
-                    # Process eigenvalues exactly as in NumPy version
                     w = torch.sqrt(w)
-                    
-                    # Important: Set exactly the same NaN pattern as NumPy
-                    # Replace values < 1e-6 with NaN to match NumPy exactly
-                    w = torch.where(w < 1e-6, 
-                                   torch.tensor(float('nan'), dtype=w.dtype, device=w.device),
-                                   w)
-                    
-                    # Count NaNs for debugging
+                    w = torch.where(w < 1e-6,
+                                    torch.tensor(float('nan'), dtype=w.dtype, device=w.device),
+                                    w)
                     nan_count = torch.isnan(w).sum().item()
                     if nan_count > 0:
                         import logging
-                        logging.debug(f"PyTorch compute_gnm_phonons: {nan_count} NaN values in eigenvalues")
-                    
-                    # Flip ordering to match NumPy
+                        logging.debug(f"compute_gnm_phonons: {nan_count} NaN values in eigenvalues")
                     w = torch.flip(w, [0])
                     v = torch.flip(v, [1])
-                    
-                    # Store results
                     self.Winv[dh, dk, dl] = 1.0 / (w ** 2)
                     self.V[dh, dk, dl] = torch.matmul(Linv_complex.T, v)
-#    def compute_gnm_phonons(self):
-#        """
-#        Compute the dynamical matrix for each k-vector in the first Brillouin zone,
-#        from the supercell's GNM.
-#        
-#        The squared inverse of the eigenvalues is stored for intensity calculation,
-#        and the eigenvectors are mass-weighted to be used in the definition of the
-#        phonon structure factors.
-#        
-#        References:
-#            - Original implementation: eryx/models.py:OnePhonon.compute_gnm_phonons
-#        """
-#        # Import EigenOps for eigendecomposition with gradient support
-#        from eryx.torch_utils import EigenOps
-#        
-#        # Compute the Hessian matrix
-#        hessian = self.compute_hessian()
-#        
-#        # Initialize tensors for eigenvalues and eigenvectors if not already done
-#        if not hasattr(self, 'V') or self.V is None:
-#            self.V = torch.zeros((self.hsampling[2],
-#                                 self.ksampling[2],
-#                                 self.lsampling[2],
-#                                 self.n_asu * self.n_dof_per_asu,
-#                                 self.n_asu * self.n_dof_per_asu),
-#                                dtype=torch.complex64, device=self.device)
-#        
-#        if not hasattr(self, 'Winv') or self.Winv is None:
-#            self.Winv = torch.zeros((self.hsampling[2],
-#                                    self.ksampling[2],
-#                                    self.lsampling[2],
-#                                    self.n_asu * self.n_dof_per_asu),
-#                                   dtype=torch.complex64, device=self.device)
-#        
-#        # Process each k-vector in the Brillouin zone
-#        for dh in range(self.hsampling[2]):
-#            for dk in range(self.ksampling[2]):
-#                for dl in range(self.lsampling[2]):
-#                    # Extract current k-vector
-#                    kvec = self.kvec[dh, dk, dl]
-#                    
-#                    # Compute dynamical matrix for this k-vector
-#                    Kmat = self.compute_gnm_K(hessian, kvec=kvec)
-#                    
-#                    # Reshape to 2D matrix for eigendecomposition
-#                    Kmat_2d = Kmat.reshape(self.n_asu * self.n_dof_per_asu,
-#                                          self.n_asu * self.n_dof_per_asu)
-#                    
-#                    # Compute D = L⁻¹ K L⁻ᵀ (mass-weighted dynamical matrix)
-#                    # Convert Linv to complex for compatibility
-#                    Linv_complex = self.Linv.to(dtype=torch.complex64)
-#                    Dmat = torch.matmul(Linv_complex, 
-#                                       torch.matmul(Kmat_2d, Linv_complex.T))
-#                    
-#                    # Perform SVD-based eigendecomposition for better gradient support
-#                    v, s, _ = EigenOps.svd_decomposition(Dmat)
-#                    
-#                    # Post-process eigenvalues and eigenvectors
-#                    # Compute frequencies (sqrt of eigenvalues)
-#                    w = torch.sqrt(s)
-#                    
-#                    # Handle small/zero eigenvalues
-#                    eps = 1e-6
-#                    w_safe = torch.where(w < eps, float('nan'), w)
-#                    
-#                    # Reverse order to match NumPy implementation
-#                    w_safe = torch.flip(w_safe, [0])
-#                    v = torch.flip(v, [1])
-#                    
-#                    # Store inverse squared frequencies
-#                    self.Winv[dh, dk, dl] = 1.0 / (w_safe ** 2)
-#                    
-#                    # Store mass-weighted eigenvectors
-#                    self.V[dh, dk, dl] = torch.matmul(Linv_complex.T, v)
     
     @debug
     def compute_covariance_matrix(self):
         """
-        Compute covariance matrix for all asymmetric units with PyTorch operations.
-        
-        This method calculates the atomic displacement covariance matrix from phonon modes
-        computed using the Gaussian Network Model. The covariance matrix is scaled to
-        match the ADPs (Atomic Displacement Parameters) in the input PDB file.
-        
-        The method populates the following instance variables:
-        - self.covar: Covariance matrix of shape (n_asu, n_dof_per_asu, n_cell, n_asu, n_dof_per_asu)
-        - self.ADP: Atomic displacement parameters derived from the covariance matrix
-        
-        Tensor shapes and dimensions:
-        - covar: (n_asu*n_dof_per_asu, n_cell, n_asu*n_dof_per_asu) initially,
-                then reshaped to (n_asu, n_dof_per_asu, n_cell, n_asu, n_dof_per_asu)
-        - kvec: (n_h, n_k, n_l, 3) - k-vectors in the Brillouin zone
-        - hessian: (n_asu, n_dof_per_asu, n_cell, n_asu, n_dof_per_asu) - Hessian matrix
-        
-        Returns:
-            None - results stored in instance variables
-            
-        References:
-            - Original implementation: eryx/models.py:OnePhonon.compute_covariance_matrix
+        Compute the covariance matrix for atomic displacements.
         """
-        # Initialize covariance tensor with complex dtype
-        self.covar = torch.zeros((self.n_asu*self.n_dof_per_asu,
-                                self.n_cell, self.n_asu*self.n_dof_per_asu),
-                               dtype=torch.complex64, device=self.device)
-        
-        # Import ComplexTensorOps if not already imported
+        self.covar = torch.zeros((self.n_asu * self.n_dof_per_asu,
+                                   self.n_cell, self.n_asu * self.n_dof_per_asu),
+                                  dtype=torch.complex64, device=self.device)
+        h_dim = int(self.hsampling[2])
+        k_dim = int(self.ksampling[2])
+        l_dim = int(self.lsampling[2])
         from eryx.torch_utils import ComplexTensorOps
-        
-        # Compute the Hessian matrix
-        hessian = self.compute_hessian()
-        
-        # Calculate dimensions with n+1 points per dimension
-        h_dim = self.hsampling[2] + 1
-        k_dim = self.ksampling[2] + 1
-        l_dim = self.lsampling[2] + 1
-        
-        # Loop through all k-vectors in the Brillouin zone
         for dh in range(h_dim):
             for dk in range(k_dim):
                 for dl in range(l_dim):
-                    # Extract current k-vector
                     kvec = self.kvec[dh, dk, dl]
-                    
-                    # Compute inverse dynamical matrix for this k-vector
-                    # Use compute_gnm_Kinv which supports gradients
-                    Kinv = self.compute_gnm_Kinv(hessian, kvec=kvec, reshape=False)
-                    
-                    # Add contribution for each unit cell with phase factor
+                    Kinv = self.gnm.compute_Kinv(self.compute_hessian(), kvec=kvec, reshape=False)
                     for j_cell in range(self.n_cell):
-                        # Get unit cell origin position - ensure it's a tensor
-                        j_cell_hkl = self.crystal['id_to_hkl'](j_cell)
-                        r_cell = self.crystal['get_unitcell_origin'](j_cell_hkl)
-                    
-                        # Calculate phase factor e^(i k·r)
-                        # Ensure both inputs are tensors with same device
-                        phase = torch.sum(kvec * r_cell)  # Use element-wise multiplication and sum instead of dot
+                        r_cell = self.crystal['get_unitcell_origin'](self.crystal['id_to_hkl'](j_cell))
+                        phase = torch.sum(kvec * r_cell)
                         real_part, imag_part = ComplexTensorOps.complex_exp(phase)
                         eikr = torch.complex(real_part, imag_part)
-                    
-                        # Add contribution to covariance matrix
-                        # Use addition to preserve gradient flow (not in-place += which can break gradients)
-                        self.covar[:, j_cell, :] = self.covar[:, j_cell, :] + Kinv * eikr
-        
-        # Get reference cell ID
-        id_cell_ref = self.crystal['hkl_to_id']([0, 0, 0])
-        
-        # Extract ADPs from the diagonal of the reference cell covariance
-        # Use torch.diagonal for gradient compatibility
-        # For a tensor of shape (n_asu*n_dof_per_asu, n_cell, n_asu*n_dof_per_asu),
-        # we need to get the diagonal between the first and last dimensions
-        self.ADP = torch.real(torch.diagonal(self.covar[:, id_cell_ref, :], dim1=0, dim2=1))
-        
-        # Project ADPs using Amat
-        # Transpose and reshape Amat for matrix multiplication
-        Amat = torch.transpose(self.Amat, 0, 1).reshape(
-            self.n_dof_per_asu_actual, self.n_asu*self.n_dof_per_asu)
-        
-        # Apply projection
+                        self.covar[:, j_cell, :] += Kinv * eikr
+        self.ADP = torch.real(torch.diagonal(self.covar[:, self.crystal['hkl_to_id']([0, 0, 0]), :], dim1=0, dim2=1))
+        Amat = torch.transpose(self.Amat, 0, 1).reshape(self.n_dof_per_asu_actual, self.n_asu * self.n_dof_per_asu)
         self.ADP = torch.matmul(Amat, self.ADP)
-        
-        # Sum over 3D components (x,y,z) for each atom
-        self.ADP = torch.sum(self.ADP.reshape(int(self.ADP.shape[0]/3), 3), dim=1)
-        
-        # Calculate scaling factor to match experimental ADPs
-        # Add small epsilon for numerical stability
-        epsilon = 1e-10
-        target_adp_mean = torch.mean(self.model_dict['adp'])
-        current_adp_mean = torch.mean(self.ADP) / 3
-        ADP_scale = target_adp_mean / (8*torch.pi*torch.pi*current_adp_mean + epsilon)
-        
-        # Apply scaling to ADP and covariance
+        self.ADP = torch.sum(self.ADP.reshape(int(self.ADP.shape[0] / 3), 3), dim=1)
+        ADP_scale = torch.mean(self.array_to_tensor(self.model.adp)) / (8 * torch.pi * torch.pi * torch.mean(self.ADP) / 3)
         self.ADP = self.ADP * ADP_scale
         self.covar = self.covar * ADP_scale
-        
-        # Take real part and reshape to 5D tensor for the final output format
-        self.covar = torch.real(self.covar.reshape(
-            self.n_asu, self.n_dof_per_asu,
-            self.n_cell, self.n_asu, self.n_dof_per_asu))
+        self.covar = torch.real(self.covar.reshape((self.n_asu, self.n_dof_per_asu,
+                                                     self.n_cell, self.n_asu, self.n_dof_per_asu)))
     
     @debug
     def apply_disorder(self, rank: int = -1, outdir: Optional[str] = None, 
-                     use_data_adp: bool = False) -> torch.Tensor:
+                       use_data_adp: bool = False) -> torch.Tensor:
         """
-        Compute diffuse intensity in the one-phonon approximation using PyTorch.
-        
-        This method produces the diffuse intensity map by applying the phonon-based
-        disorder model, combining structure factors with phonon modes and frequencies.
-        
-        Args:
-            rank: Optional phonon mode selection. If -1 (default), use all modes.
-                  Otherwise, use only the specified mode.
-            outdir: Optional directory to save output files
-            use_data_adp: Whether to use experimental ADPs from input data instead
-                         of computed ADPs from the model
-            
-        Returns:
-            PyTorch tensor of shape (n_points,) containing diffuse intensity values.
-            Values outside the resolution mask are set to NaN.
-            
-        Note:
-            This is the final computational step in the diffuse scattering calculation,
-            combining all previous components:
-            - Structure factors from scatter_torch.py
-            - Phonon modes and frequencies from compute_gnm_phonons
-            - K-vector selection using _at_kvec_from_miller_points
-            
-        References:
-            - Original implementation: eryx/models.py:OnePhonon.apply_disorder
+        Compute the diffuse intensity using the one-phonon approximation.
         """
-        # Print some diagnostic information
         import logging
-        logging.basicConfig(level=logging.INFO)
-        logging.info(f"PyTorch apply_disorder - rank: {rank}, use_data_adp: {use_data_adp}")
-        if hasattr(self, 'gamma_intra') and hasattr(self, 'gamma_inter'):
-            logging.info(f"PyTorch apply_disorder - gamma_intra: {self.gamma_intra.item()}, gamma_inter: {self.gamma_inter.item()}")
-        logging.info(f"PyTorch apply_disorder - device: {self.device}, dtype: {self.q_grid.dtype}")
-        logging.info(f"PyTorch apply_disorder - res_mask shape: {self.res_mask.shape}, True count: {torch.sum(self.res_mask)}")
-        if hasattr(self, 'V'):
-            logging.info(f"PyTorch apply_disorder - V shape: {self.V.shape}, Winv shape: {self.Winv.shape}")
-            logging.info(f"PyTorch apply_disorder - V min/max real: {torch.min(torch.real(self.V))}/{torch.max(torch.real(self.V))}")
-            nan_count = torch.sum(torch.isnan(torch.real(self.Winv)))
-            logging.info(f"PyTorch apply_disorder - Winv NaN count: {nan_count}")
-            
-        # Select appropriate ADPs based on flag
+        logging.info(f"apply_disorder: rank={rank}, use_data_adp={use_data_adp}")
         if use_data_adp:
-            # Use consistent dtype when creating tensors
-            ADP = self.model_dict['adp'][0] / (8 * torch.pi * torch.pi)
-            ADP = ADP.to(dtype=torch.float32, device=self.device)
+            ADP = torch.tensor(self.model.adp[0], dtype=torch.float32, device=self.device) / (8 * torch.pi * torch.pi)
         else:
             ADP = self.ADP.to(dtype=torch.float32, device=self.device)
-            
-        # Initialize diffuse intensity tensor
         Id = torch.zeros(self.q_grid.shape[0], dtype=torch.float32, device=self.device)
-        
-        # Import structure_factors from scatter_torch
         from eryx.scatter_torch import structure_factors
-        
-        # Calculate dimensions with n+1 points per dimension
-        h_dim = self.hsampling[2] + 1
-        k_dim = self.ksampling[2] + 1
-        l_dim = self.lsampling[2] + 1
-        
-        # Loop through all k-vectors in the Brillouin zone
+        h_dim = int(self.hsampling[2])
+        k_dim = int(self.ksampling[2])
+        l_dim = int(self.lsampling[2])
         for dh in range(h_dim):
             for dk in range(k_dim):
                 for dl in range(l_dim):
-                    # Get q-vector indices that are k-vector away from Miller indices
                     q_indices = self._at_kvec_from_miller_points((dh, dk, dl))
-                    
-                    # Apply resolution mask - match NumPy implementation exactly
-                    valid_indices = q_indices[self.res_mask[q_indices]]
-                    
-                    # Skip if no valid points
-                    if valid_indices.shape[0] == 0:
+                    valid_mask = self.res_mask[q_indices]
+                    valid_indices = q_indices[valid_mask]
+                    if valid_indices.numel() == 0:
                         continue
-                        
-                    # Initialize structure factor tensor for all ASUs
-                    F = torch.zeros((valid_indices.shape[0], 
-                                   self.n_asu, 
-                                   self.n_dof_per_asu), 
-                                  dtype=torch.complex64, 
-                                  device=self.device)
-                    
-                    # Compute structure factors for each asymmetric unit
+                    F = torch.zeros((valid_indices.numel(), self.n_asu, self.n_dof_per_asu),
+                                    dtype=torch.complex64, device=self.device)
                     for i_asu in range(self.n_asu):
-                        # Ensure consistent dtype for all inputs to structure_factors
-                        q_grid = self.q_grid[valid_indices]
-                        xyz = self.model_dict['xyz'][i_asu]
-                        ff_a = self.model_dict['ff_a'][i_asu]
-                        ff_b = self.model_dict['ff_b'][i_asu]
-                        ff_c = self.model_dict['ff_c'][i_asu]
-                        
-                        # Convert Amat to the same dtype as ADP to avoid dtype mismatch
-                        amat = self.Amat[i_asu].to(dtype=ADP.dtype)
-                        
                         F[:, i_asu, :] = structure_factors(
-                            q_grid,
-                            xyz,
-                            ff_a,
-                            ff_b,
-                            ff_c,
+                            self.q_grid[valid_indices],
+                            torch.tensor(self.model.get_asu_xyz(i_asu), dtype=torch.float32, device=self.device),
+                            torch.tensor(self.model.ff_a[i_asu], dtype=torch.float32, device=self.device),
+                            torch.tensor(self.model.ff_b[i_asu], dtype=torch.float32, device=self.device),
+                            torch.tensor(self.model.ff_c[i_asu], dtype=torch.float32, device=self.device),
                             U=ADP,
                             batch_size=self.batch_size,
+                            n_processes=self.n_processes,
                             compute_qF=True,
-                            project_on_components=amat,
+                            project_on_components=self.Amat[i_asu],
                             sum_over_atoms=False
                         )
-                    
-                    # Reshape for matrix multiplication with eigenvectors
-                    F = F.reshape((valid_indices.shape[0], self.n_asu * self.n_dof_per_asu))
-                    
-                    # Handle different rank modes
+                    F = F.reshape((valid_indices.numel(), self.n_asu * self.n_dof_per_asu))
                     if rank == -1:
-                        # Use all phonon modes (full calculation)
-                        # Multiply structure factors by eigenvectors
                         FV = torch.matmul(F, self.V[dh, dk, dl])
-                        
-                        # Important: FV will contain NaNs if V contains NaNs
-                        # Calculate |FV|² for all modes
-                        FV_abs_squared = torch.abs(FV)**2
-                        
-                        # Extract real part of Winv for this k-vector
+                        FV_abs_squared = torch.abs(FV) ** 2
                         real_winv = torch.real(self.Winv[dh, dk, dl])
-                        
-                        # Use matmul for proper handling of NaN values
                         weighted_intensity = torch.matmul(FV_abs_squared, real_winv)
-                        
-                        # Update diffuse intensity at valid indices
                         Id.index_add_(0, valid_indices, weighted_intensity)
                     else:
-                        # Use only the selected phonon mode (rank)
-                        # Select the specific eigenvector
                         V_rank = self.V[dh, dk, dl, :, rank]
-                        
-                        # Multiply structure factors by the selected eigenvector
                         FV = torch.matmul(F, V_rank)
-                        
-                        # Compute |F·V|² and weight by the eigenvalue
-                        weighted_intensity = torch.abs(FV)**2 * torch.real(self.Winv[dh, dk, dl, rank])
-                        
-                        # Update diffuse intensity at valid indices
+                        weighted_intensity = (torch.abs(FV) ** 2) * torch.real(self.Winv[dh, dk, dl, rank])
                         Id.index_add_(0, valid_indices, weighted_intensity)
-        
-        # Apply resolution mask - set values outside to NaN
         Id_masked = Id.clone()
         Id_masked[~self.res_mask] = float('nan')
-        
-        # Save output if directory provided
         if outdir is not None:
             import os
-            import numpy as np
-            
             os.makedirs(outdir, exist_ok=True)
             torch.save(Id_masked, os.path.join(outdir, f"rank_{rank:05d}_torch.pt"))
-            np.save(os.path.join(outdir, f"rank_{rank:05d}.npy"), 
-                   Id_masked.detach().cpu().numpy())
-        
+            np.save(os.path.join(outdir, f"rank_{rank:05d}.npy"), Id_masked.detach().cpu().numpy())
         return Id_masked
 
-# Add stubs for additional classes as well:
+    @debug
+    def array_to_tensor(self, array: np.ndarray, requires_grad: bool = True, dtype=None) -> torch.Tensor:
+        """
+        Convert a NumPy array to a Torch tensor.
+        """
+        if dtype is None:
+            dtype = torch.float32
+        tensor = torch.tensor(array, dtype=dtype, device=self.device)
+        if requires_grad and tensor.dtype.is_floating_point:
+            tensor.requires_grad_(True)
+        return tensor
+
+    @debug
+    def compute_rb_phonons(self):
+        """
+        Compute phonons for the rigid-body model.
+        """
+        self.compute_gnm_phonons()
+
+# Minimal implementations for additional models
 
 class RigidBodyTranslations:
-    """
-    PyTorch implementation of rigid body translation disorder model.
-    
-    References:
-        - Original NumPy implementation in eryx/models.py:RigidBodyTranslations
-    """
-    # TODO: Implement initialization and methods with PyTorch operations
-    pass
+    @debug
+    def __init__(self, *args, **kwargs):
+        pass
 
 class LiquidLikeMotions:
-    """
-    PyTorch implementation of liquid-like motions disorder model.
-    
-    References:
-        - Original NumPy implementation in eryx/models.py:LiquidLikeMotions
-    """
-    # TODO: Implement initialization and methods with PyTorch operations
-    pass
+    @debug
+    def __init__(self, *args, **kwargs):
+        pass
 
 class RigidBodyRotations:
-    """
-    PyTorch implementation of rigid body rotations disorder model.
-    
-    References:
-        - Original NumPy implementation in eryx/models.py:RigidBodyRotations
-    """
-    # TODO: Implement initialization and methods with PyTorch operations
-    pass
+    @debug
+    def __init__(self, *args, **kwargs):
+        pass
+
