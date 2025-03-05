@@ -444,35 +444,39 @@ class OnePhonon:
         """
         Compute all k-vectors and their norm in the first Brillouin zone.
         
-        This implementation uses n+1 points for each dimension where n is the sampling parameter,
-        matching the NumPy behavior that includes endpoints. For example:
-        - When sampling=2, the grid will have 3×3×3=27 k-vectors
-        - When sampling=3, the grid will have 4×4×4=64 k-vectors
+        This is achieved by regularly sampling [-0.5,0.5[ for h, k and l,
+        computing the corresponding vectors in reciprocal space, and storing
+        their norms.
         
-        This pattern ensures compatibility with the NumPy implementation and maintains
-        consistent dimensionality throughout subsequent calculations (hessian, phonons, etc.).
+        References:
+            - Original implementation: eryx/models.py:OnePhonon._build_kvec_Brillouin
         """
-        # Use n+1 points for each dimension to match NumPy's behavior
-        h_dim = self.hsampling[2] + 1  # Include endpoint
-        k_dim = self.ksampling[2] + 1
-        l_dim = self.lsampling[2] + 1
+        # Initialize tensor arrays for k-vectors if they don't exist yet
+        if not hasattr(self, 'kvec') or self.kvec is None:
+            self.kvec = torch.zeros((self.hsampling[2],
+                                   self.ksampling[2],
+                                   self.lsampling[2],
+                                   3), device=self.device)
+            
+        if not hasattr(self, 'kvec_norm') or self.kvec_norm is None:
+            self.kvec_norm = torch.zeros((self.hsampling[2],
+                                        self.ksampling[2],
+                                        self.lsampling[2],
+                                        1), device=self.device)
         
-        # Initialize tensors for k-vectors and norms
-        self.kvec = torch.zeros((h_dim, k_dim, l_dim, 3), device=self.device)
-        self.kvec_norm = torch.zeros((h_dim, k_dim, l_dim, 1), device=self.device)
-        
-        # Populate k-vectors using same logic as NumPy
-        for dh in range(h_dim):
-            h_dh = self._center_kvec(dh, h_dim)
-            for dk in range(k_dim):
-                k_dk = self._center_kvec(dk, k_dim)
-                for dl in range(l_dim):
-                    l_dl = self._center_kvec(dl, l_dim)
+        # Use exactly the same formula for centering k-vectors
+        for dh in range(self.hsampling[2]):
+            h_dh = self._center_kvec(dh, self.hsampling[2])
+            for dk in range(self.ksampling[2]):
+                k_dk = self._center_kvec(dk, self.ksampling[2])
+                for dl in range(self.lsampling[2]):
+                    l_dl = self._center_kvec(dl, self.lsampling[2])
                     
-                    # Create k-vector with same centering behavior
-                    kvec_tensor = torch.tensor([h_dh, k_dk, l_dl], device=self.device)
+                    # Ensure consistent placement on device
+                    kvec_tensor = torch.tensor([h_dh, k_dk, l_dl], 
+                                             device=self.device)
                     
-                    # Compute k-vector in reciprocal space
+                    # Compute actual k-vector in reciprocal space
                     self.kvec[dh, dk, dl] = 2 * torch.pi * torch.matmul(
                         self.A_inv.T, kvec_tensor)
                     
@@ -593,7 +597,7 @@ class OnePhonon:
         
         Returns:
             torch.Tensor: Hessian matrix with shape (n_asu, n_atoms_per_asu,
-                                                    n_kvec, n_asu, n_atoms_per_asu)
+                                                    n_cell, n_asu, n_atoms_per_asu)
                                                     
         References:
             - Original implementation: eryx/pdb.py:GaussianNetworkModel.compute_hessian
@@ -601,14 +605,11 @@ class OnePhonon:
         # Ensure gamma parameters are available
         if not hasattr(self, 'gamma_intra') or not hasattr(self, 'gamma_inter'):
             raise ValueError("gamma_intra and gamma_inter must be set before calling compute_gnm_hessian")
-            
-        # Calculate number of k-vectors based on sampling parameters
-        n_kvec = self.hsampling[2] * self.ksampling[2] * self.lsampling[2]
         
         # Initialize Hessian tensor with complex dtype for later operations with phase factors
-        # Use the correct shape to match NumPy implementation with k-vector dimension
+        # Use the correct shape to match NumPy implementation with cell dimension
         hessian = torch.zeros((self.n_asu, self.n_atoms_per_asu,
-                              n_kvec, self.n_asu, self.n_atoms_per_asu),
+                              self.n_cell, self.n_asu, self.n_atoms_per_asu),
                              dtype=torch.complex64, device=self.device)
         
         # Initialize diagonal tensor to accumulate values for diagonal elements
@@ -628,10 +629,9 @@ class OnePhonon:
                             # Get appropriate gamma value
                             gamma = self._get_gamma(i_asu, i_cell, j_asu)
                             
-                            # Set Hessian values for all neighbors for all k-vectors
-                            for k_idx in range(n_kvec):
-                                for j_at in iat_neighbors:
-                                    hessian[i_asu, i_at, k_idx, j_asu, j_at] = -gamma
+                            # Set Hessian values for all neighbors for this cell
+                            for j_at in iat_neighbors:
+                                hessian[i_asu, i_at, i_cell, j_asu, j_at] = -gamma
                             
                             # Accumulate for diagonal elements
                             hessian_diagonal[i_asu, i_at] -= gamma * len(iat_neighbors)
@@ -640,8 +640,7 @@ class OnePhonon:
         for i_asu in range(self.n_asu):
             for i_at in range(self.n_atoms_per_asu):
                 gamma_self = self._get_gamma(i_asu, self.id_cell_ref, i_asu)
-                for k_idx in range(n_kvec):
-                    hessian[i_asu, i_at, k_idx, i_asu, i_at] = hessian_diagonal[i_asu, i_at] - gamma_self
+                hessian[i_asu, i_at, self.id_cell_ref, i_asu, i_at] = hessian_diagonal[i_asu, i_at] - gamma_self
         
         return hessian
     
@@ -789,29 +788,26 @@ class OnePhonon:
         
         Returns:
             torch.Tensor: Hessian matrix with shape (n_asu, n_dof_per_asu,
-                                                    n_kvec, n_asu, n_dof_per_asu)
+                                                    n_cell, n_asu, n_dof_per_asu)
                                                     
         References:
             - Original implementation: eryx/models.py:OnePhonon.compute_hessian
         """
-        # Calculate number of k-vectors based on sampling parameters
-        n_kvec = self.hsampling[2] * self.ksampling[2] * self.lsampling[2]
-        
         # Initialize Hessian tensor with complex dtype for later operations
         hessian = torch.zeros((self.n_asu, self.n_dof_per_asu,
-                              n_kvec, self.n_asu, self.n_dof_per_asu),
+                              self.n_cell, self.n_asu, self.n_dof_per_asu),
                              dtype=torch.complex64, device=self.device)
         
         # Compute the all-atoms Hessian matrix using GNM method
         hessian_allatoms = self.compute_gnm_hessian()
         
-        # Project using Amat for each k-vector
-        for i_asu in range(self.n_asu):
-            for j_asu in range(self.n_asu):
-                for k_idx in range(n_kvec):
-                    # Create block diagonal matrix of the Hessian for this k-vector
+        # Project using Amat for each cell
+        for i_cell in range(self.n_cell):
+            for i_asu in range(self.n_asu):
+                for j_asu in range(self.n_asu):
+                    # Create block diagonal matrix of the Hessian for this cell
                     hessian_block = torch.kron(
-                        hessian_allatoms[i_asu, :, k_idx, j_asu, :],
+                        hessian_allatoms[i_asu, :, i_cell, j_asu, :],
                         torch.eye(3, device=self.device, dtype=torch.complex64)
                     )
                     
@@ -824,8 +820,8 @@ class OnePhonon:
                         )
                     )
                     
-                    # Store in output tensor for this k-vector
-                    hessian[i_asu, :, k_idx, j_asu, :] = projected
+                    # Store in output tensor for this cell
+                    hessian[i_asu, :, i_cell, j_asu, :] = projected
         
         return hessian
     
@@ -838,18 +834,14 @@ class OnePhonon:
         hessian = self.compute_hessian()
         
         # Process each k-vector in the Brillouin zone
-        k_idx = 0
         for dh in range(self.hsampling[2]):
             for dk in range(self.ksampling[2]):
                 for dl in range(self.lsampling[2]):
                     # Get current k-vector
                     kvec = self.kvec[dh, dk, dl]
                     
-                    # Extract the k_idx slice from the hessian
-                    hessian_slice = hessian[:, :, k_idx, :, :]
-                    
                     # Compute dynamical matrix K for this k-vector
-                    Kmat = self.compute_gnm_K(hessian_slice, kvec=kvec)
+                    Kmat = self.compute_gnm_K(hessian, kvec=kvec)
                     Kmat_2d = Kmat.reshape(self.n_asu * self.n_dof_per_asu,
                                           self.n_asu * self.n_dof_per_asu)
                     
@@ -883,9 +875,6 @@ class OnePhonon:
                     # Store results
                     self.Winv[dh, dk, dl] = 1.0 / (w ** 2)
                     self.V[dh, dk, dl] = torch.matmul(Linv_complex.T, v)
-                    
-                    # Increment k-vector index
-                    k_idx += 1
 #    def compute_gnm_phonons(self):
 #        """
 #        Compute the dynamical matrix for each k-vector in the first Brillouin zone,
