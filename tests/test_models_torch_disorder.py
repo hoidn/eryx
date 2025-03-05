@@ -283,6 +283,80 @@ class TestOnePhononDisorder(unittest.TestCase):
             self.torch_testing.testTorchCallable(self.apply_disorder_log, self.model.apply_disorder),
             "apply_disorder failed ground truth test"
         )
+        
+    def test_apply_disorder_direct_comparison(self):
+        """
+        Direct comparison test for apply_disorder between NumPy and PyTorch implementations.
+        
+        This test instantiates both implementations with identical parameters,
+        runs apply_disorder on both, and compares the outputs to verify the PyTorch
+        implementation produces numerically equivalent results to the NumPy version.
+        """
+        # Skip if test PDB file doesn't exist
+        pdb_path = 'tests/pdbs/5zck_p1.pdb'
+        if not os.path.exists(pdb_path):
+            self.skipTest(f"Test PDB file not found: {pdb_path}")
+            
+        # Common parameters for both implementations
+        params = {
+            'pdb_path': pdb_path,
+            'hsampling': [-2, 2, 2],  # Smaller grid for faster testing
+            'ksampling': [-2, 2, 2],
+            'lsampling': [-2, 2, 2],
+            'expand_p1': True,
+            'res_limit': 0.0,
+            'gnm_cutoff': 4.0,
+            'gamma_intra': 1.0,
+            'gamma_inter': 1.0
+        }
+        
+        # Import both implementations
+        from eryx.models import OnePhonon as NumpyOnePhonon
+        from eryx.models_torch import OnePhonon as TorchOnePhonon
+        
+        # Create NumPy model
+        np_model = NumpyOnePhonon(**params)
+        
+        # Create PyTorch model on CPU for deterministic results
+        torch_model = TorchOnePhonon(**params, device=torch.device('cpu'))
+        
+        # Call apply_disorder on both with the same arguments
+        Id_np = np_model.apply_disorder(use_data_adp=True)
+        Id_torch = torch_model.apply_disorder(use_data_adp=True)
+        
+        # Convert PyTorch output for comparison
+        Id_torch_np = Id_torch.detach().cpu().numpy()
+        
+        # Get non-NaN mask (values should be NaN in the same locations)
+        mask = ~np.isnan(Id_np) & ~np.isnan(Id_torch_np)
+        self.assertTrue(np.any(mask), "All values are NaN")
+        
+        # Calculate comparison metrics
+        mse = np.mean((Id_np[mask] - Id_torch_np[mask])**2)
+        correlation = np.corrcoef(Id_np[mask], Id_torch_np[mask])[0, 1]
+        max_diff = np.max(np.abs(Id_np[mask] - Id_torch_np[mask]))
+        
+        # Log detailed comparison info for debugging
+        print(f"MSE: {mse}")
+        print(f"Correlation: {correlation}")
+        print(f"Max difference: {max_diff}")
+        print(f"NumPy min/max: {np.min(Id_np[mask])}/{np.max(Id_np[mask])}")
+        print(f"PyTorch min/max: {np.min(Id_torch_np[mask])}/{np.max(Id_torch_np[mask])}")
+        
+        # Use relative error for more meaningful comparison
+        max_magnitude = max(np.max(np.abs(Id_np[mask])), np.max(np.abs(Id_torch_np[mask])))
+        relative_max_diff = max_diff / max_magnitude if max_magnitude > 0 else max_diff
+        
+        # Assert results are close enough
+        self.assertGreater(correlation, 0.99, f"Correlation too low: {correlation}")
+        self.assertLess(relative_max_diff, 1e-2, f"Relative max difference too high: {relative_max_diff}")
+        np.testing.assert_allclose(
+            Id_np[mask], 
+            Id_torch_np[mask], 
+            rtol=1e-4, 
+            atol=1e-6, 
+            err_msg="NumPy and PyTorch results don't match within tolerances"
+        )
 
 if __name__ == '__main__':
     unittest.main()
