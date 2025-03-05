@@ -371,30 +371,35 @@ class PhononTests:
         # Check NaN patterns match
         np_nans = np.isnan(np_eigenvals)
         torch_nans = np.isnan(torch_eigenvals_np)
-        nan_pattern_match = np.array_equal(np_nans, torch_nans)
+        nan_patterns_match = np.array_equal(np_nans, torch_nans)
         
         # Compare non-NaN values with tolerance
         if np.any(~np_nans):
-            non_nan_match = np.allclose(
+            non_nan_values_match = np.allclose(
                 np_eigenvals[~np_nans], 
                 torch_eigenvals_np[~np_nans], 
                 rtol=rtol, 
                 atol=atol
             )
+            
+            # Calculate max absolute difference for non-NaN values
+            max_abs_diff = np.max(np.abs(np_eigenvals[~np_nans] - torch_eigenvals_np[~np_nans]))
         else:
-            non_nan_match = True
+            non_nan_values_match = True
+            max_abs_diff = 0.0
         
         # Return detailed results
         return {
-            "success": nan_pattern_match and non_nan_match,
-            "nan_pattern_match": nan_pattern_match,
-            "non_nan_match": non_nan_match,
+            "success": nan_patterns_match and non_nan_values_match,
+            "nan_patterns_match": nan_patterns_match,
+            "non_nan_values_match": non_nan_values_match,
             "np_nan_count": np.sum(np_nans),
             "torch_nan_count": np.sum(torch_nans),
             "np_min": np.nanmin(np_eigenvals) if np.any(~np_nans) else None,
             "np_max": np.nanmax(np_eigenvals) if np.any(~np_nans) else None,
             "torch_min": np.nanmin(torch_eigenvals_np) if np.any(~torch_nans) else None,
-            "torch_max": np.nanmax(torch_eigenvals_np) if np.any(~torch_nans) else None
+            "torch_max": np.nanmax(torch_eigenvals_np) if np.any(~torch_nans) else None,
+            "max_abs_diff": max_abs_diff
         }
     
     @staticmethod
