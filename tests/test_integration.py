@@ -202,11 +202,11 @@ class TestOnePhononIntegration(unittest.TestCase):
                 
                 correlation = np.corrcoef(cpu_array[mask], cuda_array[mask])[0, 1]
                 self.assertGreater(correlation, 0.99, f"CPU/CUDA correlation too low: {correlation}")
-        except RuntimeError as e:
-            if "CUDA" in str(e) and not torch.cuda.is_available():
-                self.skipTest("CUDA test skipped - not available")
-            else:
-                raise
+            except RuntimeError as e:
+                if "CUDA" in str(e) and not torch.cuda.is_available():
+                    self.skipTest("CUDA test skipped - not available")
+                else:
+                    raise
 
 if __name__ == '__main__':
     unittest.main()
