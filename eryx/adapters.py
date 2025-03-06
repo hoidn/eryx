@@ -297,7 +297,11 @@ class PDBToTensor:
         result = {}
         for key, value in state_dict.items():
             if isinstance(value, np.ndarray):
-                result[key] = self.array_to_tensor(value, requires_grad=requires_grad)
+                # Handle boolean arrays specially to preserve dtype
+                if value.dtype == np.bool_:
+                    result[key] = torch.tensor(value, dtype=torch.bool, device=self.device)
+                else:
+                    result[key] = self.array_to_tensor(value, requires_grad=requires_grad)
             elif isinstance(value, dict):
                 result[key] = self.convert_state_dict(value, requires_grad=requires_grad)
             elif isinstance(value, list) and all(isinstance(x, np.ndarray) for x in value if isinstance(x, np.ndarray)):
@@ -551,7 +555,14 @@ class TensorToNumpy:
         result = {}
         for key, value in state_dict.items():
             if isinstance(value, torch.Tensor):
-                result[key] = self.tensor_to_array(value)
+                # Handle complex tensors specially
+                if torch.is_complex(value):
+                    if value.numel() == 1:  # Single complex value
+                        result[key] = complex(value.real.item(), value.imag.item())
+                    else:
+                        result[key] = self.tensor_to_array(value)
+                else:
+                    result[key] = self.tensor_to_array(value)
             elif isinstance(value, dict):
                 result[key] = self.convert_state_to_numpy(value)
             elif isinstance(value, list):
@@ -794,7 +805,11 @@ class ModelAdapters:
                 attr = getattr(model, attr_name)
                 if isinstance(attr, torch.Tensor) and not torch.is_complex(attr):
                     # Convert real tensor to complex by adding zero imaginary part
+                    # Ensure we preserve requires_grad
+                    requires_grad = attr.requires_grad
                     complex_attr = torch.complex(attr, torch.zeros_like(attr))
+                    if requires_grad:
+                        complex_attr.requires_grad_(True)
                     setattr(model, attr_name, complex_attr)
         
         return model
