@@ -135,22 +135,17 @@ class TorchTesting(Testing):
             print(f"Error in state-based testing: {e}")
             return False
     
-    def initializeFromState(self, torch_class: Type, state_data: Dict[str, Any], 
-                          device: Optional[torch.device] = None) -> Any:
+    def initializeFromState(self, torch_class: Type, state_data: Dict[str, Any]) -> Any:
         """
         Initialize a PyTorch object from state data.
         
         Args:
             torch_class: PyTorch class to initialize
             state_data: State data dictionary
-            device: PyTorch device to place tensors on
             
         Returns:
             Initialized PyTorch object
         """
-        if device is None:
-            device = self.default_device
-        
         # Create empty instance
         obj = torch_class.__new__(torch_class)
         
@@ -167,6 +162,13 @@ class TorchTesting(Testing):
                     print(f"Warning: Could not deserialize {key}: {e}")
                     continue
             
+            # If the value is already a tensor, keep it as is
+            if isinstance(value, torch.Tensor):
+                if value.dtype.is_floating_point and is_torch_class:
+                    value.requires_grad_(True)
+                setattr(obj, key, value)
+                continue
+                
             # Check if the deserialized value is a dict representing a numpy array
             if isinstance(value, dict) and value.get('_array_type') == 'numpy.ndarray':
                 if is_torch_class:
@@ -175,7 +177,7 @@ class TorchTesting(Testing):
                         import io
                         buffer = io.BytesIO(value['_array_data'])
                         array = np.load(buffer)
-                        tensor = torch.tensor(array, device=device)
+                        tensor = torch.tensor(array)
                         if tensor.dtype.is_floating_point:
                             tensor.requires_grad_(True)
                         setattr(obj, key, tensor)
@@ -193,7 +195,7 @@ class TorchTesting(Testing):
             elif isinstance(value, np.ndarray):
                 if is_torch_class:
                     # Convert NumPy arrays to PyTorch tensors for PyTorch classes
-                    tensor = torch.tensor(value, device=device)
+                    tensor = torch.tensor(value)
                     if tensor.dtype.is_floating_point:
                         tensor.requires_grad_(True)
                     setattr(obj, key, tensor)
@@ -207,7 +209,7 @@ class TorchTesting(Testing):
                     processed_dict = {}
                     for k, v in value.items():
                         if isinstance(v, np.ndarray) and is_torch_class:
-                            tensor = torch.tensor(v, device=device)
+                            tensor = torch.tensor(v)
                             if tensor.dtype.is_floating_point:
                                 tensor.requires_grad_(True)
                             processed_dict[k] = tensor
