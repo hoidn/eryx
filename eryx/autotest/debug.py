@@ -40,7 +40,8 @@ import time
 import os
 import pickle
 import json
-from typing import Callable, Any, List, Union, Optional
+import inspect
+from typing import Callable, Any, List, Union, Optional, Dict, Set
 import re
 from .configuration import Configuration
 from .serializer import Serializer
@@ -79,6 +80,24 @@ class Debug:
                 log_file_path = self.function_mapping.get_log_file_path(func)
                 os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
 
+                # Check if this is a method call (first arg is self)
+                is_method = args and hasattr(args[0], '__dict__') and not isinstance(args[0], type)
+                obj = args[0] if is_method else None
+                
+                # Capture object state before method execution if this is a method
+                if is_method:
+                    class_name = obj.__class__.__name__
+                    before_state_log_path = os.path.join(
+                        os.path.dirname(log_file_path),
+                        f"{module_path}.{class_name}._state_before_{function_name}.log"
+                    )
+                    try:
+                        # Capture pre-execution state
+                        before_state = self.logger.captureState(obj)
+                        self.logger.saveStateLog(before_state_log_path, before_state)
+                    except Exception as e:
+                        print(f"Error capturing before state: {e}")
+
                 try:
                     serialized_args = self.serializer.serialize(args)
                     serialized_kwargs = self.serializer.serialize(kwargs)
@@ -96,6 +115,21 @@ class Debug:
                 start_time = time.time()
 
                 result = func(*args, **kwargs)
+                
+                # Capture object state after method execution if this is a method
+                if is_method:
+                    class_name = obj.__class__.__name__
+                    after_state_log_path = os.path.join(
+                        os.path.dirname(log_file_path),
+                        f"{module_path}.{class_name}._state_after_{function_name}.log"
+                    )
+                    try:
+                        # Capture post-execution state
+                        after_state = self.logger.captureState(obj)
+                        self.logger.saveStateLog(after_state_log_path, after_state)
+                    except Exception as e:
+                        print(f"Error capturing after state: {e}")
+                
                 try:
                     serialized_result = self.serializer.serialize(result)
                     self.logger.logReturn(serialized_result, time.time() - start_time, log_file_path)

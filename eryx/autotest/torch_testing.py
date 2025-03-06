@@ -8,7 +8,8 @@ PyTorch-NumPy conversion for testing.
 
 import numpy as np
 import torch
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+import inspect
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, Type, Set
 from .testing import Testing
 from .logger import Logger
 from .functionmapping import FunctionMapping
@@ -35,6 +36,7 @@ class TorchTesting(Testing):
         super().__init__(logger, function_mapping)
         self.rtol = rtol
         self.atol = atol
+        self.default_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     def testTorchCallable(self, log_path_prefix: str, torch_func: Callable) -> bool:
         """
@@ -74,6 +76,279 @@ class TorchTesting(Testing):
                     print(f"Error testing PyTorch function: {e}")
                     return False
         return True
+    
+    def testTorchCallableWithState(self, log_path_prefix: str, torch_class: Type, 
+                                 method_name: str, *args, **kwargs) -> bool:
+        """
+        Test a PyTorch method using state-based testing.
+        
+        Args:
+            log_path_prefix: Path prefix for state log files
+            torch_class: PyTorch class to test
+            method_name: Name of the method to test
+            *args: Additional arguments to pass to the method
+            **kwargs: Additional keyword arguments to pass to the method
+            
+        Returns:
+            True if test passes, False otherwise
+        """
+        # Find before/after state log files
+        before_log = f"{log_path_prefix}._state_before_{method_name}.log"
+        after_log = f"{log_path_prefix}._state_after_{method_name}.log"
+        
+        try:
+            # Load before state
+            before_state = self.logger.loadStateLog(before_log)
+            if not before_state:
+                print(f"Before state log not found or empty: {before_log}")
+                return False
+            
+            # Load expected after state
+            expected_after_state = self.logger.loadStateLog(after_log)
+            if not expected_after_state:
+                print(f"After state log not found or empty: {after_log}")
+                return False
+            
+            # Initialize object from before state
+            obj = self.initializeFromState(torch_class, before_state)
+            
+            # Get the method to call
+            method = getattr(obj, method_name)
+            
+            # Call the method
+            method(*args, **kwargs)
+            
+            # Compare resulting state with expected after state
+            result = self.compareStates(expected_after_state, obj.__dict__)
+            
+            if not result:
+                print(f"State mismatch after calling {method_name}")
+                return False
+                
+            return True
+        except Exception as e:
+            print(f"Error in state-based testing: {e}")
+            return False
+    
+    def initializeFromState(self, torch_class: Type, state_data: Dict[str, Any], 
+                          device: Optional[torch.device] = None) -> Any:
+        """
+        Initialize a PyTorch object from state data.
+        
+        Args:
+            torch_class: PyTorch class to initialize
+            state_data: State data dictionary
+            device: PyTorch device to place tensors on
+            
+        Returns:
+            Initialized PyTorch object
+        """
+        if device is None:
+            device = self.default_device
+        
+        # Create empty instance
+        obj = torch_class.__new__(torch_class)
+        
+        # Initialize each attribute
+        for key, value in state_data.items():
+            if isinstance(value, np.ndarray):
+                # Convert NumPy arrays to PyTorch tensors
+                tensor = torch.tensor(value, device=device)
+                if tensor.dtype.is_floating_point:
+                    tensor.requires_grad_(True)
+                setattr(obj, key, tensor)
+            elif isinstance(value, dict):
+                # Handle nested dictionaries
+                if any(isinstance(v, np.ndarray) for v in value.values()):
+                    # Convert NumPy arrays in dict to tensors
+                    tensor_dict = {}
+                    for k, v in value.items():
+                        if isinstance(v, np.ndarray):
+                            tensor = torch.tensor(v, device=device)
+                            if tensor.dtype.is_floating_point:
+                                tensor.requires_grad_(True)
+                            tensor_dict[k] = tensor
+                        else:
+                            tensor_dict[k] = v
+                    setattr(obj, key, tensor_dict)
+                else:
+                    setattr(obj, key, value)
+            else:
+                setattr(obj, key, value)
+        
+        # If the class has an __init__ method, check if we need to call it
+        if hasattr(torch_class, '__init__') and callable(getattr(torch_class, '__init__')):
+            # Check if __init__ has required parameters beyond self
+            init_params = inspect.signature(torch_class.__init__).parameters
+            if len(init_params) > 1:
+                # Check if any required parameters are missing from state_data
+                required_params = [p for p in list(init_params.keys())[1:] 
+                                 if init_params[p].default == inspect.Parameter.empty]
+                if not all(p in state_data for p in required_params):
+                    # Call a minimal initialization if needed
+                    try:
+                        obj.__init__()
+                    except Exception as e:
+                        print(f"Warning: Could not call __init__: {e}")
+        
+        return obj
+    
+    def compareStates(self, expected_state: Dict[str, Any], actual_state: Dict[str, Any], 
+                    attr_tolerances: Optional[Dict[str, Dict[str, float]]] = None) -> bool:
+        """
+        Compare expected and actual states with appropriate tolerances.
+        
+        Args:
+            expected_state: Expected state dictionary
+            actual_state: Actual state dictionary
+            attr_tolerances: Dictionary mapping attribute names to tolerance dictionaries
+                             with 'rtol' and 'atol' keys
+            
+        Returns:
+            True if states match within tolerances, False otherwise
+        """
+        # Set default tolerances
+        default_tolerance = {'rtol': self.rtol, 'atol': self.atol}
+        attr_tolerances = attr_tolerances or {}
+        
+        # Check for missing attributes
+        missing_attrs = set(expected_state.keys()) - set(actual_state.keys())
+        if missing_attrs:
+            print(f"Missing attributes in actual state: {missing_attrs}")
+            return False
+        
+        # Compare each attribute
+        for key in expected_state:
+            expected = expected_state[key]
+            actual = actual_state[key]
+            
+            # Get tolerance for this attribute
+            tolerance = attr_tolerances.get(key, default_tolerance)
+            rtol = tolerance.get('rtol', self.rtol)
+            atol = tolerance.get('atol', self.atol)
+            
+            # Convert PyTorch tensors to NumPy for comparison
+            if hasattr(actual, 'detach') and callable(getattr(actual, 'detach')):
+                actual = actual.detach().cpu().numpy()
+            
+            # Compare based on type
+            if isinstance(expected, np.ndarray) and isinstance(actual, np.ndarray):
+                # Compare shapes
+                if expected.shape != actual.shape:
+                    print(f"Shape mismatch for {key}: {expected.shape} vs {actual.shape}")
+                    return False
+                
+                # Handle NaN values
+                nan_mask_expected = np.isnan(expected)
+                nan_mask_actual = np.isnan(actual)
+                if not np.array_equal(nan_mask_expected, nan_mask_actual):
+                    print(f"NaN pattern mismatch for {key}")
+                    return False
+                
+                # Compare non-NaN values
+                non_nan_mask = ~nan_mask_expected
+                if np.any(non_nan_mask):
+                    if not np.allclose(expected[non_nan_mask], actual[non_nan_mask], 
+                                     rtol=rtol, atol=atol):
+                        print(f"Value mismatch for {key}")
+                        return False
+            
+            elif isinstance(expected, dict) and isinstance(actual, dict):
+                # Compare dictionaries recursively
+                if set(expected.keys()) != set(actual.keys()):
+                    print(f"Key mismatch for dict {key}: {set(expected.keys())} vs {set(actual.keys())}")
+                    return False
+                
+                # Create nested tolerances for dict attributes
+                nested_tolerances = {}
+                for k in expected.keys():
+                    nested_key = f"{key}.{k}"
+                    if nested_key in attr_tolerances:
+                        nested_tolerances[k] = attr_tolerances[nested_key]
+                
+                if not self.compareStates(expected, actual, nested_tolerances):
+                    print(f"Dict value mismatch for {key}")
+                    return False
+            
+            elif isinstance(expected, list) and isinstance(actual, list):
+                # Compare lists
+                if len(expected) != len(actual):
+                    print(f"Length mismatch for list {key}: {len(expected)} vs {len(actual)}")
+                    return False
+                
+                # Convert lists to numpy arrays if they contain numeric values
+                try:
+                    if all(isinstance(x, (int, float)) for x in expected) and \
+                       all(isinstance(x, (int, float)) for x in actual):
+                        if not np.allclose(np.array(expected), np.array(actual), 
+                                         rtol=rtol, atol=atol):
+                            print(f"Value mismatch for list {key}")
+                            return False
+                    else:
+                        # Compare elements individually
+                        for i, (e, a) in enumerate(zip(expected, actual)):
+                            if isinstance(e, np.ndarray) and isinstance(a, np.ndarray):
+                                if not np.allclose(e, a, rtol=rtol, atol=atol):
+                                    print(f"Value mismatch for {key}[{i}]")
+                                    return False
+                            elif e != a:
+                                print(f"Value mismatch for {key}[{i}]")
+                                return False
+                except Exception as e:
+                    print(f"Error comparing lists for {key}: {e}")
+                    return False
+            
+            elif type(expected) != type(actual):
+                print(f"Type mismatch for {key}: {type(expected)} vs {type(actual)}")
+                return False
+            
+            elif expected != actual:
+                # Direct comparison for other types
+                print(f"Value mismatch for {key}: {expected} vs {actual}")
+                return False
+        
+        return True
+    
+    def check_state_gradients(self, obj: Any, attr_names: Optional[List[str]] = None) -> Dict[str, bool]:
+        """
+        Check gradient flow through object state attributes.
+        
+        Args:
+            obj: Object to check gradients for
+            attr_names: List of attribute names to check, or None to check all tensor attributes
+            
+        Returns:
+            Dictionary mapping attribute names to gradient status
+        """
+        result = {}
+        
+        # If no specific attributes provided, check all tensor attributes
+        if attr_names is None:
+            attr_names = [attr for attr in dir(obj) 
+                        if not attr.startswith('_') and 
+                        hasattr(getattr(obj, attr), 'requires_grad')]
+        
+        for attr_name in attr_names:
+            if hasattr(obj, attr_name):
+                attr = getattr(obj, attr_name)
+                
+                # Check if attribute is a tensor with requires_grad
+                if hasattr(attr, 'requires_grad'):
+                    result[attr_name] = attr.requires_grad
+                
+                # Check if attribute is a dictionary of tensors
+                elif isinstance(attr, dict):
+                    for k, v in attr.items():
+                        if hasattr(v, 'requires_grad'):
+                            result[f"{attr_name}.{k}"] = v.requires_grad
+                
+                # Check if attribute is a list of tensors
+                elif isinstance(attr, list):
+                    for i, v in enumerate(attr):
+                        if hasattr(v, 'requires_grad'):
+                            result[f"{attr_name}[{i}]"] = v.requires_grad
+        
+        return result
     
     def _numpy_to_torch(self, obj: Any) -> Any:
         """

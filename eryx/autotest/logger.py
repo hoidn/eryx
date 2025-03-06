@@ -4,7 +4,7 @@ import json
 import os
 import sys
 import pickle
-from typing import Any, Union, List
+from typing import Any, Union, List, Dict, Optional, Set
 import re
 
 class Logger:
@@ -52,6 +52,133 @@ class Logger:
         except Exception as e:
             print(f"Error loading log: {e}", file=sys.stderr)
         return logs
+
+    def captureState(self, obj: Any, include_private: bool = False, 
+                    max_depth: int = 10, exclude_attrs: Optional[Set[str]] = None) -> Dict[str, Any]:
+        """
+        Capture complete object state for testing.
+        
+        Args:
+            obj: Object whose state should be captured
+            include_private: Whether to include private attributes (starting with _)
+            max_depth: Maximum recursion depth for nested objects
+            exclude_attrs: Set of attribute names to exclude from capture
+            
+        Returns:
+            Dictionary with serialized state
+        """
+        if max_depth <= 0:
+            return {}
+        
+        exclude_attrs = exclude_attrs or set()
+        state = {}
+        
+        for attr_name in dir(obj):
+            # Skip methods and excluded attributes
+            if attr_name in exclude_attrs:
+                continue
+            if not include_private and attr_name.startswith('_'):
+                continue
+            
+            try:
+                attr = getattr(obj, attr_name)
+                
+                # Skip methods and built-in attributes
+                if callable(attr) or attr_name in ('__dict__', '__class__'):
+                    continue
+                
+                # Serialize the attribute
+                state[attr_name] = self.serializer.serialize(attr)
+            except Exception as e:
+                print(f"Error capturing attribute {attr_name}: {e}", file=sys.stderr)
+                state[attr_name] = self.serializer.serialize(f"<Error capturing: {str(e)}>")
+        
+        return state
+    
+    def saveStateLog(self, log_file_path: str, state_data: Dict[str, Any]) -> None:
+        """
+        Save object state to a log file.
+        
+        Args:
+            log_file_path: Path to save the state log
+            state_data: Dictionary with serialized state data
+        """
+        try:
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+            
+            # Serialize state data to JSON with hex encoding for binary data
+            serialized_state = {}
+            for key, value in state_data.items():
+                serialized_state[key] = value.hex() if isinstance(value, bytes) else value
+            
+            with open(log_file_path, 'w') as log_file:
+                json.dump(serialized_state, log_file, indent=2)
+        except Exception as e:
+            print(f"Error saving state log: {e}", file=sys.stderr)
+    
+    def loadStateLog(self, log_file_path: str) -> Dict[str, Any]:
+        """
+        Load object state from a log file.
+        
+        Args:
+            log_file_path: Path to the state log file
+            
+        Returns:
+            Dictionary with deserialized state data
+        """
+        try:
+            with open(log_file_path, 'r') as log_file:
+                serialized_state = json.load(log_file)
+            
+            # Deserialize state data
+            state_data = {}
+            for key, value in serialized_state.items():
+                if isinstance(value, str) and len(value) > 0:
+                    try:
+                        # Try to convert from hex to bytes
+                        binary_data = bytes.fromhex(value)
+                        state_data[key] = self.serializer.deserialize(binary_data)
+                    except ValueError:
+                        # If not hex, keep as string
+                        state_data[key] = value
+                else:
+                    state_data[key] = value
+            
+            return state_data
+        except FileNotFoundError:
+            print(f"State log file not found: {log_file_path}", file=sys.stderr)
+            return {}
+        except Exception as e:
+            print(f"Error loading state log: {e}", file=sys.stderr)
+            return {}
+    
+    def searchStateLogDirectory(self, log_path_prefix: str) -> List[str]:
+        """
+        Search for state log files matching a prefix.
+        
+        Args:
+            log_path_prefix: Prefix for log file paths
+            
+        Returns:
+            List of matching log file paths
+        """
+        state_log_files = []
+        try:
+            # Extract directory from prefix
+            log_dir = os.path.dirname(log_path_prefix) if os.path.dirname(log_path_prefix) else '.'
+            
+            for root, _, files in os.walk(log_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    # Check if file matches the state log pattern and prefix
+                    if file_path.startswith(log_path_prefix) and file_path.endswith('.log'):
+                        if '_state_before_' in file_path or '_state_after_' in file_path:
+                            state_log_files.append(file_path)
+        except Exception as e:
+            print(f"Error searching state log directory: {e}", file=sys.stderr)
+        
+        return state_log_files
 
     def searchLogDirectory(self, log_directory: str) -> List[str]:
         valid_log_files = []
