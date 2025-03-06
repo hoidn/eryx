@@ -2,8 +2,33 @@
 Adapter components to bridge NumPy and PyTorch implementations.
 
 This module contains adapter classes to convert between NumPy arrays and PyTorch tensors,
-as well as domain-specific adapters for the diffuse scattering calculations.
-All adapters preserve the computational graph for gradient backpropagation.
+as well as domain-specific adapters for diffuse scattering calculations.
+
+Key features:
+- Array/tensor conversion preserving gradients
+- State dictionary conversion for state-based testing
+- Model initialization from state dictionaries
+- Complex object conversion with nested structures
+- Compatibility with Logger state format
+
+Example usage:
+    # Convert NumPy array to tensor
+    adapter = PDBToTensor()
+    tensor = adapter.array_to_tensor(array, requires_grad=True)
+    
+    # Convert complete state dictionary from Logger
+    numpy_state = logger.loadStateLog("logs/eryx.models.OnePhonon._state_before__build_A.log")
+    tensor_state = adapter.convert_state_dict(numpy_state)
+    
+    # Initialize model from state
+    model_adapters = ModelAdapters()
+    model = model_adapters.initialize_from_state(OnePhonon, state_dict)
+    
+    # Initialize OnePhonon model with special handling
+    model = model_adapters.initialize_one_phonon_from_state(OnePhonon, state_dict)
+    
+    # Convert model state back to NumPy for comparison
+    numpy_state = model_adapters.convert_state_for_comparison(model)
 """
 
 import numpy as np
@@ -249,6 +274,76 @@ class PDBToTensor:
             tensor.requires_grad_(True)
             
         return tensor
+        
+    def convert_state_dict(self, state_dict, requires_grad=True):
+        """
+        Convert a state dictionary from NumPy arrays to PyTorch tensors.
+        
+        Args:
+            state_dict: Dictionary with attribute name -> value mappings from Logger.loadStateLog()
+            requires_grad: Whether tensors should require gradients
+            
+        Returns:
+            Dictionary with same keys but values converted to tensors
+            
+        Raises:
+            ValueError: If state_dict is None or not a dictionary
+        """
+        if state_dict is None:
+            raise ValueError("Cannot convert None state dictionary")
+        if not isinstance(state_dict, dict):
+            raise ValueError(f"Expected dictionary, got {type(state_dict)}")
+            
+        result = {}
+        for key, value in state_dict.items():
+            if isinstance(value, np.ndarray):
+                result[key] = self.array_to_tensor(value, requires_grad=requires_grad)
+            elif isinstance(value, dict):
+                result[key] = self.convert_state_dict(value, requires_grad=requires_grad)
+            elif isinstance(value, list) and all(isinstance(x, np.ndarray) for x in value if isinstance(x, np.ndarray)):
+                result[key] = [
+                    self.array_to_tensor(x, requires_grad=requires_grad) if isinstance(x, np.ndarray) else x
+                    for x in value
+                ]
+            elif isinstance(value, complex):
+                # Handle complex scalar values
+                real = torch.tensor(value.real, device=self.device, dtype=torch.float32)
+                imag = torch.tensor(value.imag, device=self.device, dtype=torch.float32)
+                result[key] = torch.complex(real, imag)
+            else:
+                # Pass through other values unchanged
+                result[key] = value
+        return result
+        
+    def convert_serialized_object(self, data, requires_grad=True):
+        """
+        Handle conversion of objects that might have been serialized by Logger.
+        
+        Args:
+            data: Data that might be binary-serialized or a regular value
+            requires_grad: Whether tensors should require gradients
+            
+        Returns:
+            Converted data with PyTorch tensors
+        """
+        # If the data is a numpy array, convert it directly
+        if isinstance(data, np.ndarray):
+            return self.array_to_tensor(data, requires_grad=requires_grad)
+        
+        # If it's a dictionary, recursively convert its values
+        if isinstance(data, dict):
+            return self.convert_state_dict(data, requires_grad=requires_grad)
+        
+        # If it's a list, convert array elements
+        if isinstance(data, list):
+            return [
+                self.array_to_tensor(x, requires_grad=requires_grad) 
+                if isinstance(x, np.ndarray) else self.convert_serialized_object(x, requires_grad)
+                for x in data
+            ]
+        
+        # Handle other types
+        return data
     
     def convert_dict_of_arrays(self, dict_arrays: Dict[Any, np.ndarray], 
                               requires_grad: bool = True) -> Dict[Any, torch.Tensor]:
@@ -434,6 +529,90 @@ class TensorToNumpy:
             tensor = tensor.cpu()
         
         return tensor.numpy()
+        
+    def convert_state_to_numpy(self, state_dict):
+        """
+        Convert a state dictionary from PyTorch tensors to NumPy arrays.
+        
+        Args:
+            state_dict: Dictionary with attribute name -> tensor mappings
+            
+        Returns:
+            Dictionary with same keys but values converted to NumPy arrays
+            
+        Raises:
+            ValueError: If state_dict is None or not a dictionary
+        """
+        if state_dict is None:
+            raise ValueError("Cannot convert None state dictionary")
+        if not isinstance(state_dict, dict):
+            raise ValueError(f"Expected dictionary, got {type(state_dict)}")
+            
+        result = {}
+        for key, value in state_dict.items():
+            if isinstance(value, torch.Tensor):
+                result[key] = self.tensor_to_array(value)
+            elif isinstance(value, dict):
+                result[key] = self.convert_state_to_numpy(value)
+            elif isinstance(value, list):
+                # Convert lists with possible tensor elements
+                result[key] = [
+                    self.tensor_to_array(x) if isinstance(x, torch.Tensor) else x
+                    for x in value
+                ]
+            else:
+                # Pass through other values unchanged
+                result[key] = value
+        return result
+        
+    def extract_object_state(self, obj, include_private=False):
+        """
+        Extract an object's state as a dictionary and convert to NumPy arrays.
+        
+        Args:
+            obj: PyTorch object to extract state from
+            include_private: Whether to include private attributes (starting with '_')
+            
+        Returns:
+            Dictionary with attribute names mapped to NumPy array values
+            
+        Raises:
+            ValueError: If obj is None
+        """
+        if obj is None:
+            raise ValueError("Cannot extract state from None object")
+            
+        state = {}
+        for attr_name in dir(obj):
+            # Skip private attributes unless explicitly requested
+            if attr_name.startswith('_') and not include_private:
+                continue
+                
+            # Skip callable attributes (methods)
+            try:
+                attr = getattr(obj, attr_name)
+                if callable(attr):
+                    continue
+                    
+                # Convert attribute based on type
+                if isinstance(attr, torch.Tensor):
+                    state[attr_name] = self.tensor_to_array(attr)
+                elif isinstance(attr, dict):
+                    state[attr_name] = self.convert_state_to_numpy(attr)
+                elif isinstance(attr, list):
+                    # Convert lists containing tensors
+                    state[attr_name] = [
+                        self.tensor_to_array(x) if isinstance(x, torch.Tensor) else x
+                        for x in attr
+                    ]
+                else:
+                    # Store other attributes directly
+                    state[attr_name] = attr
+            except (AttributeError, RuntimeError):
+                # Skip attributes that can't be accessed
+                continue
+                
+        return state
     
     def convert_dict_of_tensors(self, dict_tensors: Dict[Any, torch.Tensor]) -> Dict[Any, np.ndarray]:
         """
@@ -516,6 +695,109 @@ class ModelAdapters:
         self.pdb_to_tensor = PDBToTensor(device)
         self.grid_to_tensor = GridToTensor(device)
         self.tensor_to_numpy = TensorToNumpy()
+        
+    def initialize_from_state(self, torch_class, state_data, device=None):
+        """
+        Initialize a PyTorch model from state data loaded from Logger.
+        
+        Args:
+            torch_class: PyTorch model class to instantiate
+            state_data: Dictionary with state data from Logger.loadStateLog()
+            device: Device to place tensors on
+            
+        Returns:
+            Initialized instance of torch_class
+            
+        Raises:
+            ValueError: If torch_class or state_data is None
+        """
+        if torch_class is None:
+            raise ValueError("torch_class cannot be None")
+        if state_data is None:
+            raise ValueError("state_data cannot be None")
+            
+        if device is None:
+            device = self.device
+            
+        # Create empty instance
+        model = torch_class.__new__(torch_class)
+        
+        # Convert state arrays to tensors
+        tensor_state = self.pdb_to_tensor.convert_state_dict(state_data)
+        
+        # Set attributes
+        for key, value in tensor_state.items():
+            setattr(model, key, value)
+            
+        return model
+        
+    def convert_state_for_comparison(self, torch_model):
+        """
+        Extract and convert model state for comparison with ground truth.
+        
+        Args:
+            torch_model: PyTorch model instance
+            
+        Returns:
+            Dictionary with state converted to NumPy for comparison
+            
+        Raises:
+            ValueError: If torch_model is None
+        """
+        if torch_model is None:
+            raise ValueError("torch_model cannot be None")
+            
+        state = {}
+        for key, value in torch_model.__dict__.items():
+            if key.startswith('_'):
+                continue
+            if callable(value):
+                continue
+            
+            if isinstance(value, torch.Tensor):
+                state[key] = self.tensor_to_numpy.tensor_to_array(value)
+            elif isinstance(value, dict):
+                state[key] = self.tensor_to_numpy.convert_state_to_numpy(value)
+            elif isinstance(value, list):
+                state[key] = [
+                    self.tensor_to_numpy.tensor_to_array(x) if isinstance(x, torch.Tensor) else x
+                    for x in value
+                ]
+            else:
+                state[key] = value
+            
+        return state
+        
+    def initialize_one_phonon_from_state(self, torch_class, state_data, device=None):
+        """
+        Initialize a PyTorch OnePhonon model from state data with special handling.
+        
+        Args:
+            torch_class: PyTorch OnePhonon class
+            state_data: Dictionary with state data from Logger.loadStateLog()
+            device: Device to place tensors on
+            
+        Returns:
+            Initialized OnePhonon instance
+            
+        Raises:
+            ValueError: If torch_class or state_data is None
+        """
+        # Basic initialization
+        model = self.initialize_from_state(torch_class, state_data, device)
+        
+        # Handle complex tensors in OnePhonon model
+        # V and Winv need to be complex tensors for phonon calculations
+        complex_attrs = ['V', 'Winv']
+        for attr_name in complex_attrs:
+            if hasattr(model, attr_name):
+                attr = getattr(model, attr_name)
+                if isinstance(attr, torch.Tensor) and not torch.is_complex(attr):
+                    # Convert real tensor to complex by adding zero imaginary part
+                    complex_attr = torch.complex(attr, torch.zeros_like(attr))
+                    setattr(model, attr_name, complex_attr)
+        
+        return model
     
     def adapt_one_phonon_inputs(self, np_model: Any) -> Dict[str, Any]:
         """
