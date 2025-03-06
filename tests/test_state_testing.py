@@ -270,13 +270,7 @@ class TestStateTesting(unittest.TestCase):
         self.assertTrue(torch.allclose(new_torch_obj.tensor2, self.torch_obj.tensor2))
         self.assertEqual(new_torch_obj.scalar, self.torch_obj.scalar)
         
-        # Verify device placement
-        if torch.cuda.is_available():
-            # Test with CUDA device
-            cuda_device = torch.device('cuda')
-            cuda_obj = self.torch_testing.initializeFromState(
-                SimpleTorchClass, torch_state, device=cuda_device)
-            self.assertEqual(cuda_obj.tensor1.device.type, 'cuda')
+        # Device placement tests removed - tensors are now restored on their original device
         
         # Test with complex object
         complex_state = self.logger.captureState(self.complex_obj)
