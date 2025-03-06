@@ -154,6 +154,9 @@ class TorchTesting(Testing):
         # Create empty instance
         obj = torch_class.__new__(torch_class)
         
+        # Check if this is a PyTorch class (to determine whether to convert arrays to tensors)
+        is_torch_class = torch_class.__name__.startswith('Torch') or hasattr(torch_class, 'forward')
+        
         # Initialize each attribute
         for key, value in state_data.items():
             # First deserialize if the value is bytes
@@ -163,27 +166,54 @@ class TorchTesting(Testing):
                 except Exception as e:
                     print(f"Warning: Could not deserialize {key}: {e}")
                     continue
-                    
-            if isinstance(value, np.ndarray):
-                # Convert NumPy arrays to PyTorch tensors
-                tensor = torch.tensor(value, device=device)
-                if tensor.dtype.is_floating_point:
-                    tensor.requires_grad_(True)
-                setattr(obj, key, tensor)
+            
+            # Check if the deserialized value is a dict representing a numpy array
+            if isinstance(value, dict) and value.get('_array_type') == 'numpy.ndarray':
+                if is_torch_class:
+                    # For PyTorch classes, convert to tensor
+                    if '_array_data' in value:
+                        import io
+                        buffer = io.BytesIO(value['_array_data'])
+                        array = np.load(buffer)
+                        tensor = torch.tensor(array, device=device)
+                        if tensor.dtype.is_floating_point:
+                            tensor.requires_grad_(True)
+                        setattr(obj, key, tensor)
+                    else:
+                        print(f"Warning: Missing array data for {key}")
+                else:
+                    # For non-PyTorch classes, keep as numpy array
+                    if '_array_data' in value:
+                        import io
+                        buffer = io.BytesIO(value['_array_data'])
+                        array = np.load(buffer)
+                        setattr(obj, key, array)
+                    else:
+                        print(f"Warning: Missing array data for {key}")
+            elif isinstance(value, np.ndarray):
+                if is_torch_class:
+                    # Convert NumPy arrays to PyTorch tensors for PyTorch classes
+                    tensor = torch.tensor(value, device=device)
+                    if tensor.dtype.is_floating_point:
+                        tensor.requires_grad_(True)
+                    setattr(obj, key, tensor)
+                else:
+                    # Keep as NumPy arrays for non-PyTorch classes
+                    setattr(obj, key, value)
             elif isinstance(value, dict):
                 # Handle nested dictionaries
                 if any(isinstance(v, np.ndarray) for v in value.values()):
-                    # Convert NumPy arrays in dict to tensors
-                    tensor_dict = {}
+                    # Convert NumPy arrays in dict to tensors if PyTorch class
+                    processed_dict = {}
                     for k, v in value.items():
-                        if isinstance(v, np.ndarray):
+                        if isinstance(v, np.ndarray) and is_torch_class:
                             tensor = torch.tensor(v, device=device)
                             if tensor.dtype.is_floating_point:
                                 tensor.requires_grad_(True)
-                            tensor_dict[k] = tensor
+                            processed_dict[k] = tensor
                         else:
-                            tensor_dict[k] = v
-                    setattr(obj, key, tensor_dict)
+                            processed_dict[k] = v
+                    setattr(obj, key, processed_dict)
                 else:
                     setattr(obj, key, value)
             else:
