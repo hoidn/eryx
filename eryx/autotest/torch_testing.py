@@ -118,8 +118,13 @@ class TorchTesting(Testing):
             # Call the method
             method(*args, **kwargs)
             
+            # Capture current state
+            current_state = {}
+            for key, value in obj.__dict__.items():
+                current_state[key] = value
+            
             # Compare resulting state with expected after state
-            result = self.compareStates(expected_after_state, obj.__dict__)
+            result = self.compareStates(expected_after_state, current_state)
             
             if not result:
                 print(f"State mismatch after calling {method_name}")
@@ -151,6 +156,14 @@ class TorchTesting(Testing):
         
         # Initialize each attribute
         for key, value in state_data.items():
+            # First deserialize if the value is bytes
+            if isinstance(value, bytes):
+                try:
+                    value = self.logger.serializer.deserialize(value)
+                except Exception as e:
+                    print(f"Warning: Could not deserialize {key}: {e}")
+                    continue
+                    
             if isinstance(value, np.ndarray):
                 # Convert NumPy arrays to PyTorch tensors
                 tensor = torch.tensor(value, device=device)
@@ -222,6 +235,21 @@ class TorchTesting(Testing):
             expected = expected_state[key]
             actual = actual_state[key]
             
+            # Deserialize if values are bytes
+            if isinstance(expected, bytes):
+                try:
+                    expected = self.logger.serializer.deserialize(expected)
+                except Exception as e:
+                    print(f"Warning: Could not deserialize expected {key}: {e}")
+                    return False
+                    
+            if isinstance(actual, bytes):
+                try:
+                    actual = self.logger.serializer.deserialize(actual)
+                except Exception as e:
+                    print(f"Warning: Could not deserialize actual {key}: {e}")
+                    return False
+            
             # Get tolerance for this attribute
             tolerance = attr_tolerances.get(key, default_tolerance)
             rtol = tolerance.get('rtol', self.rtol)
@@ -230,6 +258,9 @@ class TorchTesting(Testing):
             # Convert PyTorch tensors to NumPy for comparison
             if hasattr(actual, 'detach') and callable(getattr(actual, 'detach')):
                 actual = actual.detach().cpu().numpy()
+                
+            if hasattr(expected, 'detach') and callable(getattr(expected, 'detach')):
+                expected = expected.detach().cpu().numpy()
             
             # Compare based on type
             if isinstance(expected, np.ndarray) and isinstance(actual, np.ndarray):
