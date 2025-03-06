@@ -558,7 +558,7 @@ class TensorToNumpy:
                 # Handle complex tensors specially
                 if torch.is_complex(value):
                     if value.numel() == 1:  # Single complex value
-                        result[key] = complex(value.real.item(), value.imag.item())
+                        result[key] = np.complex128(complex(value.real.item(), value.imag.item()))
                     else:
                         result[key] = self.tensor_to_array(value)
                 else:
