@@ -1,3 +1,5 @@
+
+
 # TODO: Implementation Plan for State-Based Testing
 
 ## Introduction
@@ -219,68 +221,50 @@ This document is organized into phases with concrete tasks and should be read al
 ## Phase 3: Ground Truth Generation (1 week)
 > Reference: See "Ground Truth Testing Strategy" section in phased_plan.md
 
-### 3.1 Extend run_debug.py for State Capture
-> Location: eryx/autotest/debug.py and eryx/run_debug.py
-> Prerequisites: Phase 1 complete
+### 3.1 Create StateCapture Class
+> Location: eryx/autotest/state_capture.py
 
-- [ ] Modify @debug decorator to capture before/after state
-  ```python
-  def debug(func):
-      """
-      Decorator that logs function inputs/outputs and object state for testing.
-      """
-      @functools.wraps(func)
-      def wrapper(*args, **kwargs):
-          # Get logger and serializer
-          logger = Logger()
-          
-          # Capture class instance state for methods
-          if args and hasattr(args[0], '__dict__'):
-              obj = args[0]
-              class_name = obj.__class__.__name__
-              method_name = func.__name__
-              
-              # Capture pre-execution state
-              before_state = logger.captureState(obj)
-              logger.saveStateLog(f"{class_name}._state_before_{method_name}", before_state)
-          
-          # Original function call and logging
-          result = func(*args, **kwargs)
-          
-          # Capture post-execution state
-          if args and hasattr(args[0], '__dict__'):
-              after_state = logger.captureState(obj)
-              logger.saveStateLog(f"{class_name}._state_after_{method_name}", after_state)
-          
-          return result
-      return wrapper
-  ```
-- [ ] Add configuration parameters for state capture depth
-- [ ] Update serialization for complex nested structures
-- [ ] Add timing measurements for state capture overhead
+- [x] Implement StateCapture class with configurable state capture
+- [x] Add attribute filtering with exclude_attrs option
+- [x] Add max_depth parameter to limit recursion
+- [x] Handle complex objects like tensors and arrays
+- [x] Add proper error handling that logs but doesn't crash
 
-### 3.2 Generate State-Based Ground Truth Data
-> Location: logs/eryx.*.log files
-> Prerequisites: Task 3.1 complete
-> Reference: See "Component-to-Test Mapping" table in phased_plan.md
+### 3.2 Update Debug Decorator
+> Location: eryx/autotest/debug.py
 
-- [ ] Generate state logs for OnePhonon methods:
-  - [ ] Matrix construction methods (_build_A, _build_M, etc.)
-  - [ ] K-vector methods (_build_kvec_Brillouin)
-  - [ ] Phonon calculation methods (compute_gnm_phonons, compute_hessian)
-  - [ ] Covariance matrix method (compute_covariance_matrix)
-  - [ ] Disorder application method (apply_disorder)
-- [ ] Generate state logs for GaussianNetworkModel methods
-- [ ] Validate state log completeness
+- [x] Update debug decorator to use StateCapture for method state capture
+- [x] Add configuration options (max_depth, exclude_attrs)
+- [x] Implement consistent log naming convention
+- [x] Add error handling that preserves execution flow
+- [x] Ensure decorator works with both functions and methods
 
-### 3.3 Implement State Log Verification
-> Location: scripts/verify_state_logs.py
-> Prerequisites: Task 3.2 complete
+### 3.3 Create Log Generation Script
+> Location: scripts/generate_state_logs.py
 
-- [ ] Add verification script for state log validity
-- [ ] Check state logs for expected attributes
-- [ ] Validate state completeness for restoration
-- [ ] Measure state log sizes and optimize if needed
+- [x] Create a simple script to generate state logs for specific components
+- [x] Add command-line options for component selection
+- [x] Enable debug mode for test execution
+- [x] Integrate with existing run_debug.py functionality
+- [x] Add basic output reporting on logs generated
+
+### 3.4 Create Simple Verification Script
+> Location: scripts/verify_logs.py
+
+- [x] Implement script to verify log existence and completeness
+- [x] Add log pair matching for before/after states
+- [x] Check for required attributes in logs
+- [x] Provide summary statistics on verification results
+- [x] Support saving detailed results to file
+
+### 3.5 Create State-Based Testing Documentation
+> Location: docs/state_based_testing.md
+
+- [x] Document the state-based testing approach
+- [x] Include examples of decorator usage with configuration
+- [x] Describe the state-based testing pattern
+- [x] Add best practices for state capture and testing
+- [x] Document log naming conventions and verification tools
 
 ## Phase 4: Test Implementation (2 weeks)
 > Reference: See "Component-to-Test Mapping" table in phased_plan.md
@@ -289,138 +273,85 @@ This document is organized into phases with concrete tasks and should be read al
 > Location: tests/test_models_torch.py
 > Prerequisites: Phases 1-3 complete
 
-- [ ] Create state-based tests for _build_A
-  ```python
-  def test_build_A_state_based(self):
-      """Test _build_A with state-based approach."""
-      # Load before state
-      before_state = self.logger.loadStateLog("logs/eryx.models.OnePhonon._state_before__build_A.log")
-      
-      # Initialize PyTorch object with state
-      model_torch = self.torch_testing.initializeFromState(
-          OnePhonon, before_state, device=torch.device('cpu'))
-      
-      # Call method under test
-      model_torch._build_A()
-      
-      # Load expected after state
-      expected_after_state = self.logger.loadStateLog(
-          "logs/eryx.models.OnePhonon._state_after__build_A.log")
-      
-      # Compare states
-      self.assertTrue(
-          self.torch_testing.compareStates(expected_after_state, model_torch.__dict__),
-          "_build_A failed state comparison")
-          
-      # Verify gradient flow
-      self.assertTrue(
-          model_torch.Amat.requires_grad,
-          "Gradient not enabled for Amat tensor")
-  ```
-- [ ] Create state-based tests for _build_M
-- [ ] Create state-based tests for _build_M_allatoms
-- [ ] Create state-based tests for _project_M
-- [ ] Verify gradient flow through matrix operations
+- [ ] Update test_build_A to use state-based testing pattern:
+  - Use Logger.loadStateLog to load "logs/eryx.models.OnePhonon._state_before__build_A.log"
+  - Use TorchTesting.initializeFromState to create model from state
+  - Call model._build_A()
+  - Compare resulting state with after state
+  - Verify gradient flow through Amat tensor
+- [ ] Update tests for _build_M, _build_M_allatoms, and _project_M similarly
+- [ ] Verify log completeness using verify_logs.py
 
 ### 4.2 Update CP6 Tests (K-vector Methods)
 > Location: tests/test_models_torch_kvector.py
 > Prerequisites: Task 4.1 complete
 
-- [ ] Create state-based test for _build_kvec_Brillouin
-- [ ] Keep function-based tests for _center_kvec
-- [ ] Keep function-based tests for _at_kvec_from_miller_points
-- [ ] Verify combined test approach works correctly
+- [ ] Update test for _build_kvec_Brillouin to use state-based pattern
+- [ ] Keep function-based tests for _center_kvec and _at_kvec_from_miller_points
+- [ ] Verify log completeness for necessary components
+- [ ] Test gradient flow through k-vector tensors
 
 ### 4.3 Update CP7 Tests (Phonon Calculation)
 > Location: tests/test_models_torch_phonon.py
 > Prerequisites: Task 4.2 complete
 
-- [ ] Create state-based test for compute_gnm_phonons
-- [ ] Create state-based test for compute_hessian
-- [ ] Create state-based tests for GNM methods
-- [ ] Verify gradient flow through eigendecomposition
+- [ ] Update state-based tests for compute_gnm_phonons
+- [ ] Update state-based tests for compute_hessian
+- [ ] Update state-based tests for GNM methods
+- [ ] Verify tensor shapes, dtypes, and gradient flow
+- [ ] Use verify_logs.py to check log completeness for these components
 
 ### 4.4 Update CP8 Tests (Covariance Matrix)
 > Location: tests/test_models_torch_covariance.py
 > Prerequisites: Task 4.3 complete
 
-- [ ] Create state-based test for compute_covariance_matrix
+- [ ] Update state-based test for compute_covariance_matrix
 - [ ] Verify gradient flow through covariance calculations
-- [ ] Test scaling to match experimental ADPs
+- [ ] Test for expected state changes from before to after
+- [ ] Check for required tensor properties (shape, dtype, etc.)
 
 ### 4.5 Update CP9 Tests (Apply Disorder)
 > Location: tests/test_models_torch_disorder.py
 > Prerequisites: Task 4.4 complete
 
-- [ ] Create state-based test for apply_disorder
+- [ ] Update state-based test for apply_disorder
 - [ ] Verify end-to-end gradient flow
 - [ ] Test with different parameter configurations
+- [ ] Validate output tensor properties match expectations
 
-## Phase 5: Integration Updates (1 week)
+## Phase 5: Integration and Documentation (1 week)
 > Reference: See "Key Data Flows" section in architecture.md
 
 ### 5.1 Update CP10 Tests (End-to-End Integration)
 > Location: tests/test_integration.py
 > Prerequisites: Phase 4 complete
 
-- [ ] Update integration tests to use adapter pattern explicitly
-  ```python
-  def test_end_to_end_integration(self):
-      """Test end-to-end integration with adapter pattern."""
-      # Initialize adapters
-      pdb_adapter = PDBToTensor(device=self.device)
-      grid_adapter = GridToTensor(device=self.device)
-      results_adapter = TensorToNumpy()
-      
-      # Load NumPy model
-      np_model = NumpyOnePhonon(**self.test_params)
-      
-      # Apply disorder with NumPy model
-      Id_np = np_model.apply_disorder(use_data_adp=True)
-      
-      # Create PyTorch model with adapters
-      # Note: Using adapter to convert model data
-      model_data = pdb_adapter.convert_atomic_model(np_model.model)
-      grid_data, map_shape = grid_adapter.convert_grid(np_model.q_grid, np_model.map_shape)
-      
-      # Initialize PyTorch model with converted data
-      torch_model = TorchOnePhonon(
-          pdb_path=self.test_params['pdb_path'],
-          hsampling=self.test_params['hsampling'],
-          ksampling=self.test_params['ksampling'],
-          lsampling=self.test_params['lsampling'],
-          device=self.device
-      )
-      
-      # Apply disorder with PyTorch model
-      Id_torch = torch_model.apply_disorder(use_data_adp=True)
-      
-      # Convert PyTorch output back to NumPy for comparison
-      Id_torch_np = results_adapter.tensor_to_array(Id_torch)
-      
-      # Compare outputs
-      self.assertTrue(np.allclose(Id_np, Id_torch_np, rtol=1e-4, atol=1e-7))
-  ```
-- [ ] Add gradient flow verification through the entire pipeline
-- [ ] Add device handling verification
-- [ ] Update performance benchmarks
+- [ ] Update integration tests to follow state-based testing pattern:
+  - Load initial state from logs 
+  - Initialize model with that state
+  - Run end-to-end pipeline
+  - Compare with expected state
+- [ ] Use verify_logs.py to validate all logs
+- [ ] Test gradient flow through the entire model
+- [ ] Verify complete end-to-end pipeline works with state-based approach
 
-### 5.2 Update Documentation for New Approach
-> Location: Multiple documentation files
-> Prerequisites: Task 5.1 complete
+### 5.2 Update Project Documentation
+> Prerequisites: Tasks 5.1 complete
 
-- [ ] Update architecture.md with adapter patterns
-- [ ] Update phased_plan.md with testing approach changes
-- [ ] Update progress.md to reflect new testing status
-- [ ] Create guide for adding new state-based tests
+- [ ] Complete docs/state_based_testing.md if not already finished
+- [ ] Update architecture.md to reference state-based testing approach
+- [ ] Update phased_plan.md to reflect implemented testing approach
+- [ ] Update progress.md to reflect current implementation status
+- [ ] Create guide for adding new state-based tests for future components
 
-### 5.3 Final Review and Verification
+### 5.3 Final Verification
 > Prerequisites: Tasks 5.1-5.2 complete
 
-- [ ] Verify all tests pass with new approach
+- [ ] Run verify_logs.py on all generated logs
+- [ ] Verify all tests pass with state-based approach
 - [ ] Check documentation consistency
-- [ ] Verify gradient flow at all levels
-- [ ] Benchmark performance with adapter overhead
+- [ ] Validate gradient flow throughout the entire system
+- [ ] Create final report on implementation status
 
 ## Completion Criteria
 
@@ -428,10 +359,10 @@ This implementation plan is complete when:
 
 1. All state-based testing infrastructure is implemented and tested
 2. Ground truth state logs are generated for all stateful methods
-3. Test implementations are updated to use state-based approach where appropriate
-4. Documentation is updated to clearly explain the adapter-based architecture
-5. All tests pass and gradient flow is verified throughout the system
-6. Performance is benchmarked with adapter overhead considerations
+3. Test implementations are updated to use state-based approach
+4. Documentation is updated to explain the state-based testing approach
+5. All tests pass and gradient flow is verified
+6. Log verification confirms completeness of state capture
 
 ## Timeline
 
@@ -439,6 +370,6 @@ This implementation plan is complete when:
 - **Phase 2**: Adapter Enhancement - 1 week
 - **Phase 3**: Ground Truth Generation - 1 week
 - **Phase 4**: Test Implementation - 2 weeks
-- **Phase 5**: Integration Updates - 1 week
+- **Phase 5**: Integration and Documentation - 1 week
 
 **Total: 6 weeks**
