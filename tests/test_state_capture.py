@@ -109,17 +109,17 @@ class TestStateCapture(unittest.TestCase):
     
     def test_max_depth_limitation(self):
         """Test max depth limitation."""
-        # Create a class for nested objects
-        class NestedLevel1:
-            def __init__(self):
-                self.level2 = NestedLevel2()
-                
-        class NestedLevel2:
-            def __init__(self):
-                self.value = 42
-        
-        # Create nested object
-        nested_obj = type('NestedObject', (), {'level1': NestedLevel1()})
+        # Create a simple nested dictionary structure instead of classes
+        # (to avoid pickling issues with local classes)
+        nested_obj = {
+            'level1': {
+                'level2': {
+                    'level3': {
+                        'value': 42
+                    }
+                }
+            }
+        }
         
         # Test with max_depth=1
         capturer = StateCapture(max_depth=1)

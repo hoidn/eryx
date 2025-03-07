@@ -36,8 +36,18 @@ def run_component(component_name: str, exclude_attrs: Optional[List[str]] = None
         
         if component_name == "onePhonon":
             # Import and run OnePhonon test
-            from eryx.run_debug import run_np
-            run_np()
+            # The run_debug.py file is at the root level, not in eryx package
+            import sys
+            import os
+            
+            # Add the root directory to the path if needed
+            root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            if root_dir not in sys.path:
+                sys.path.insert(0, root_dir)
+                
+            # Now import from the root level
+            import run_debug
+            run_debug.run_np()
             return True
         elif component_name == "mapUtils":
             # Import and run map_utils tests
