@@ -14,13 +14,13 @@ class TestMatrixConstruction(TestBase):
         self.class_name = "OnePhonon"
         
     def test_build_A_state_based(self):
-        # Load before state
-        before_state = self._load_state(self.module_name, self.class_name, "_build_A")
+        # Load NumPy before state (ground truth)
+        before_state = self._load_state("eryx.models", self.class_name, "_build_A")
         
         # Initialize model from state
         model = self._init_from_state(OnePhonon, before_state)
         
-        # Call method
+        # Call method on PyTorch implementation
         model._build_A()
         
         # Verify Amat tensor properties
@@ -29,41 +29,42 @@ class TestMatrixConstruction(TestBase):
         self._verify_tensor(model.Amat, expected_shape=expected_shape,
                           requires_grad=True, check_gradient=True)
         
-        # Load expected after state - use PyTorch logs directly
-        after_state = self._load_state("eryx.models_torch", self.class_name, "_build_A", before=False)
+        # Load expected NumPy after state (ground truth)
+        after_state = self._load_state("eryx.models", self.class_name, "_build_A", before=False)
         
-        # Compare only the Amat attribute with appropriate tolerances
-        # Instead of comparing entire state dictionaries
+        # Compare PyTorch result with NumPy ground truth
         if 'Amat' in after_state and hasattr(model, 'Amat'):
             from eryx.adapters import TensorToNumpy
             converter = TensorToNumpy()
             model_amat_np = converter.tensor_to_array(model.Amat)
             
-            # Handle both tensor and numpy array in after_state
-            if isinstance(after_state['Amat'], np.ndarray):
-                expected_amat = after_state['Amat']
-            else:
-                # If it's already a tensor in the log, convert to numpy
-                expected_amat = converter.tensor_to_array(after_state['Amat'])
+            # Get NumPy ground truth
+            expected_amat = after_state['Amat']
             
-            # Compare with numpy's allclose with much more relaxed tolerances for Amat
+            # Compare with numpy's allclose with relaxed tolerances
             # The numerical differences can be larger due to different implementations
             is_close = np.allclose(model_amat_np, expected_amat, 
-                                  rtol=1e-2, atol=1e-2)  # Even more relaxed tolerances
-            self.assertTrue(is_close, "Amat mismatch after _build_A execution")
+                                  rtol=1e-2, atol=1e-2)  # Relaxed tolerances
+            
+            # Print comparison info for debugging
+            if not is_close:
+                print(f"Amat shapes: PyTorch {model_amat_np.shape}, NumPy {expected_amat.shape}")
+                print(f"Max difference: {np.max(np.abs(model_amat_np - expected_amat))}")
+                
+            self.assertTrue(is_close, "PyTorch Amat doesn't match NumPy ground truth")
         else:
             # If we can't compare directly, just check that Amat exists and has the right shape
             self.assertTrue(hasattr(model, 'Amat'), "Amat not created")
             self.assertEqual(model.Amat.shape, expected_shape, "Amat has wrong shape")
         
     def test_build_M_state_based(self):
-        # Load before state
-        before_state = self._load_state(self.module_name, self.class_name, "_build_M")
+        # Load NumPy before state (ground truth)
+        before_state = self._load_state("eryx.models", self.class_name, "_build_M")
         
         # Initialize model from state
         model = self._init_from_state(OnePhonon, before_state)
         
-        # Call method
+        # Call method on PyTorch implementation
         model._build_M()
         
         # Verify Linv tensor properties
@@ -72,39 +73,41 @@ class TestMatrixConstruction(TestBase):
         self._verify_tensor(model.Linv, expected_shape=expected_shape,
                           requires_grad=True, check_gradient=False)  # Don't check gradient for Linv
         
-        # Load expected after state - use PyTorch logs directly
-        after_state = self._load_state("eryx.models_torch", self.class_name, "_build_M", before=False)
+        # Load expected NumPy after state (ground truth)
+        after_state = self._load_state("eryx.models", self.class_name, "_build_M", before=False)
         
-        # Compare only the Linv attribute with appropriate tolerances
+        # Compare PyTorch result with NumPy ground truth
         if 'Linv' in after_state and hasattr(model, 'Linv'):
             from eryx.adapters import TensorToNumpy
             converter = TensorToNumpy()
             model_linv_np = converter.tensor_to_array(model.Linv)
             
-            # Handle both tensor and numpy array in after_state
-            if isinstance(after_state['Linv'], np.ndarray):
-                expected_linv = after_state['Linv']
-            else:
-                # If it's already a tensor in the log, convert to numpy
-                expected_linv = converter.tensor_to_array(after_state['Linv'])
+            # Get NumPy ground truth
+            expected_linv = after_state['Linv']
             
             # Compare with numpy's allclose with relaxed tolerances
             is_close = np.allclose(model_linv_np, expected_linv, 
-                                  rtol=1e-2, atol=1e-2)  # More relaxed tolerances
-            self.assertTrue(is_close, "Linv mismatch after _build_M execution")
+                                  rtol=1e-2, atol=1e-2)  # Relaxed tolerances
+            
+            # Print comparison info for debugging
+            if not is_close:
+                print(f"Linv shapes: PyTorch {model_linv_np.shape}, NumPy {expected_linv.shape}")
+                print(f"Max difference: {np.max(np.abs(model_linv_np - expected_linv))}")
+                
+            self.assertTrue(is_close, "PyTorch Linv doesn't match NumPy ground truth")
         else:
             # If we can't compare directly, just check that Linv exists and has the right shape
             self.assertTrue(hasattr(model, 'Linv'), "Linv not created")
             self.assertEqual(model.Linv.shape, expected_shape, "Linv has wrong shape")
         
     def test_build_M_allatoms_state_based(self):
-        # Load before state
-        before_state = self._load_state(self.module_name, self.class_name, "_build_M_allatoms")
+        # Load NumPy before state (ground truth)
+        before_state = self._load_state("eryx.models", self.class_name, "_build_M_allatoms")
         
         # Initialize model from state
         model = self._init_from_state(OnePhonon, before_state)
         
-        # Call method
+        # Call method on PyTorch implementation
         result = model._build_M_allatoms()
         
         # Verify basic properties of result
@@ -113,18 +116,38 @@ class TestMatrixConstruction(TestBase):
         self._verify_tensor(result, expected_shape=expected_shape, requires_grad=True)
         self.assertTrue(torch.all(result >= 0), "Mass matrix should be non-negative")
         
-        # Load expected after state - use PyTorch logs directly
-        after_state = self._load_state("eryx.models_torch", self.class_name, "_build_M_allatoms", before=False)
+        # Load expected NumPy after state (ground truth)
+        after_state = self._load_state("eryx.models", self.class_name, "_build_M_allatoms", before=False)
         
-        # For this test, we don't need to compare states since the method doesn't modify state
-        # Just verify the result has the right properties
-        self.assertIsNotNone(result, "Result should not be None")
-        self.assertEqual(result.shape, expected_shape, "Result has wrong shape")
-        self.assertTrue(torch.all(result >= 0), "Mass matrix should be non-negative")
+        # Compare PyTorch result with NumPy ground truth
+        # Extract the result from the NumPy log if available
+        if 'return' in after_state:
+            from eryx.adapters import TensorToNumpy
+            converter = TensorToNumpy()
+            result_np = converter.tensor_to_array(result)
+            
+            # Get NumPy ground truth
+            expected_result = after_state['return']
+            
+            # Compare with numpy's allclose with relaxed tolerances
+            is_close = np.allclose(result_np, expected_result, 
+                                  rtol=1e-2, atol=1e-2)  # Relaxed tolerances
+            
+            # Print comparison info for debugging
+            if not is_close:
+                print(f"M_allatoms shapes: PyTorch {result_np.shape}, NumPy {expected_result.shape}")
+                print(f"Max difference: {np.max(np.abs(result_np - expected_result))}")
+                
+            self.assertTrue(is_close, "PyTorch M_allatoms doesn't match NumPy ground truth")
+        else:
+            # If we can't compare directly, just check that result has the right properties
+            self.assertIsNotNone(result, "Result should not be None")
+            self.assertEqual(result.shape, expected_shape, "Result has wrong shape")
+            self.assertTrue(torch.all(result >= 0), "Mass matrix should be non-negative")
         
     def test_project_M_state_based(self):
-        # Load before state
-        before_state = self._load_state(self.module_name, self.class_name, "_project_M")
+        # Load NumPy before state (ground truth)
+        before_state = self._load_state("eryx.models", self.class_name, "_project_M")
         
         # Initialize model from state
         model = self._init_from_state(OnePhonon, before_state)
@@ -149,13 +172,33 @@ class TestMatrixConstruction(TestBase):
                          model.n_asu, model.n_dof_per_asu)
         self._verify_tensor(result, expected_shape=expected_shape, requires_grad=True)
         
-        # Load expected after state - use PyTorch logs directly
-        after_state = self._load_state("eryx.models_torch", self.class_name, "_project_M", before=False)
+        # Load expected NumPy after state (ground truth)
+        after_state = self._load_state("eryx.models", self.class_name, "_project_M", before=False)
         
-        # For this test, we don't need to compare states since the method doesn't modify state
-        # Just verify the result has the right properties
-        self.assertIsNotNone(result, "Result should not be None")
-        self.assertEqual(result.shape, expected_shape, "Result has wrong shape")
+        # Compare PyTorch result with NumPy ground truth
+        # Extract the result from the NumPy log if available
+        if 'return' in after_state:
+            from eryx.adapters import TensorToNumpy
+            converter = TensorToNumpy()
+            result_np = converter.tensor_to_array(result)
+            
+            # Get NumPy ground truth
+            expected_result = after_state['return']
+            
+            # Compare with numpy's allclose with relaxed tolerances
+            is_close = np.allclose(result_np, expected_result, 
+                                  rtol=1e-2, atol=1e-2)  # Relaxed tolerances
+            
+            # Print comparison info for debugging
+            if not is_close:
+                print(f"Projected M shapes: PyTorch {result_np.shape}, NumPy {expected_result.shape}")
+                print(f"Max difference: {np.max(np.abs(result_np - expected_result))}")
+                
+            self.assertTrue(is_close, "PyTorch projected M doesn't match NumPy ground truth")
+        else:
+            # If we can't compare directly, just check that result has the right properties
+            self.assertIsNotNone(result, "Result should not be None")
+            self.assertEqual(result.shape, expected_shape, "Result has wrong shape")
         
     def test_log_completeness(self):
         """Verify matrix construction logs exist and contain required attributes."""

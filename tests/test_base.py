@@ -33,14 +33,18 @@ class TestBase(unittest.TestCase):
         state_type = "_state_before_" if before else "_state_after_"
         
         # Try both naming patterns with both module names (models and models_torch)
+        # Prioritize NumPy logs over PyTorch logs for ground truth comparison
         log_paths = [
-            f"logs/{module_name}.{class_name}.{state_type}{method_name}.log",  # Original pattern
-            f"logs/{module_name}.{method_name}.{class_name}.{state_type}{method_name}.log",  # Actual pattern
-            f"logs/eryx.models_torch.{method_name}.{class_name}.{state_type}{method_name}.log",  # PyTorch logs
-            f"logs/eryx.models_torch.{class_name}.{state_type}{method_name}.log"  # PyTorch logs alt pattern
+            # NumPy logs (prioritize these for ground truth)
+            f"logs/eryx.models.{method_name}.{class_name}.{state_type}{method_name}.log",  # NumPy actual pattern
+            f"logs/eryx.models.{class_name}.{state_type}{method_name}.log",  # NumPy original pattern
+            
+            # PyTorch logs (fallback)
+            f"logs/eryx.models_torch.{method_name}.{class_name}.{state_type}{method_name}.log",  # PyTorch actual pattern
+            f"logs/eryx.models_torch.{class_name}.{state_type}{method_name}.log"  # PyTorch original pattern
         ]
         
-        # Try to load from either path
+        # Try to load from each path
         state = None
         for log_path in log_paths:
             try:
