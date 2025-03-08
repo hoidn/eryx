@@ -387,10 +387,10 @@ class OnePhonon:
                 if not isinstance(self.Amat, torch.Tensor):
                     self.Amat = adapter.array_to_tensor(self.Amat)
                 
-                # Ensure all operands are on the same device
-                M_block = M_block.to(self.device)
-                Amat_i = self.Amat[i_asu].to(self.device)
-                Amat_j = self.Amat[j_asu].to(self.device)
+                # Ensure all operands are on the same device and dtype
+                M_block = M_block.to(device=self.device, dtype=torch.float32)
+                Amat_i = self.Amat[i_asu].to(device=self.device, dtype=torch.float32)
+                Amat_j = self.Amat[j_asu].to(device=self.device, dtype=torch.float32)
                 
                 Mmat[i_asu, :, j_asu, :] = torch.matmul(Amat_i.T,
                                                         torch.matmul(M_block,

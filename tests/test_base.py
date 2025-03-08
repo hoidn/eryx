@@ -67,10 +67,12 @@ class TestBase(unittest.TestCase):
                 if isinstance(attr, torch.Tensor):
                     setattr(model, attr_name, attr.to(self.device))
                 elif isinstance(attr, np.ndarray):
-                    # Convert numpy arrays to tensors
-                    tensor = torch.tensor(attr, device=self.device)
-                    if tensor.dtype.is_floating_point:
+                    # Convert numpy arrays to tensors with consistent dtype
+                    if np.issubdtype(attr.dtype, np.floating):
+                        tensor = torch.tensor(attr, device=self.device, dtype=torch.float32)
                         tensor.requires_grad_(True)
+                    else:
+                        tensor = torch.tensor(attr, device=self.device)
                     setattr(model, attr_name, tensor)
             except Exception as e:
                 pass
