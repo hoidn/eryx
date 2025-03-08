@@ -17,7 +17,7 @@ from typing import List, Tuple, Dict, Optional, Union, Any
 
 from eryx.pdb import AtomicModel, Crystal, GaussianNetworkModel
 from eryx.autotest.debug import debug
-from eryx.adapters import PDBToTensor
+from eryx.adapters import PDBToTensor, TensorToNumpy
 
 class OnePhonon:
     """
@@ -184,13 +184,20 @@ class OnePhonon:
                 asu_components = []
                 # Safely get coordinates with error handling
                 try:
-                    if hasattr(self.model, 'get_asu_xyz'):
-                        xyz_np = self.model.get_asu_xyz(i_asu)
+                    # Use crystal to get ASU coordinates
+                    if hasattr(self, 'crystal') and hasattr(self.crystal, 'get_asu_xyz'):
+                        xyz_np = self.crystal['get_asu_xyz'](i_asu)
+                    elif hasattr(self, 'model_data') and 'xyz' in self.model_data:
+                        xyz_np = self.model_data['xyz'][i_asu]
                     else:
-                        xyz_np = self.model.xyz[i_asu]
+                        # Fallback to zeros if no coordinates available
+                        xyz_np = np.zeros((self.n_atoms_per_asu, 3))
                         
                     # Convert to tensor and ensure proper shape
-                    xyz = torch.tensor(xyz_np, dtype=torch.float32, device=self.device)
+                    if isinstance(xyz_np, torch.Tensor):
+                        xyz = xyz_np
+                    else:
+                        xyz = torch.tensor(xyz_np, dtype=torch.float32, device=self.device)
                     
                     # Ensure xyz has the right shape (n_atoms_per_asu, 3)
                     if xyz.ndim == 1 and xyz.shape[0] == 3:
@@ -312,6 +319,20 @@ class OnePhonon:
                 except Exception as e:
                     print(f"Warning: Could not extract weights from elements: {e}")
                 
+            # Alternative: try to get weights from the original model if available
+            elif hasattr(self, 'crystal') and hasattr(self.crystal, '_original') and hasattr(self.crystal['_original'].model, 'elements'):
+                try:
+                    elements = self.crystal['_original'].model.elements
+                    if elements:
+                        weights = [element.weight for structure in elements for element in structure]
+                        if weights:
+                            mass_array = torch.tensor(weights, 
+                                                    dtype=torch.float32, 
+                                                    device=self.device, 
+                                                    requires_grad=True)
+                except Exception as e:
+                    print(f"Warning: Could not extract weights from crystal elements: {e}")
+                
             # Ensure mass_array has enough elements
             if mass_array.shape[0] < self.n_asu * self.n_atoms_per_asu:
                 # Pad with ones if needed
@@ -349,12 +370,22 @@ class OnePhonon:
         """
         Project the all-atom mass matrix M_0 using the A matrix.
         """
+        # Use the PDBToTensor adapter to ensure we have tensors
+        from eryx.adapters import PDBToTensor
+        adapter = PDBToTensor(device=self.device)
+        
         Mmat = torch.zeros((self.n_asu, self.n_dof_per_asu, self.n_asu, self.n_dof_per_asu), device=self.device)
         for i_asu in range(self.n_asu):
             for j_asu in range(self.n_asu):
+                # Ensure M_allatoms is a tensor
+                if isinstance(M_allatoms, np.ndarray):
+                    M_block = adapter.array_to_tensor(M_allatoms[i_asu, :, j_asu, :])
+                else:
+                    M_block = M_allatoms[i_asu, :, j_asu, :]
+                
                 Mmat[i_asu, :, j_asu, :] = torch.matmul(self.Amat[i_asu].T,
-                                                         torch.matmul(M_allatoms[i_asu, :, j_asu, :],
-                                                                      self.Amat[j_asu]))
+                                                        torch.matmul(M_block,
+                                                                    self.Amat[j_asu]))
         return Mmat
     
     @debug
