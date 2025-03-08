@@ -61,31 +61,35 @@ class TestBase(unittest.TestCase):
         return state
         
     def _init_from_state(self, torch_class: Type, state: Dict) -> Any:
-        # Initialize object from state dictionary
-        model = self.torch_testing.initializeFromState(torch_class, state)
+        # Create empty instance without calling __init__
+        model = torch_class.__new__(torch_class)
         
         # Always set device attribute for OnePhonon models
         model.device = self.device
             
-        # Move tensors to the correct device and convert numpy arrays to tensors
-        for attr_name in dir(model):
+        # Set all attributes from state dictionary
+        for attr_name, attr_value in state.items():
             if attr_name.startswith('_'):
                 continue
                 
             try:
-                attr = getattr(model, attr_name)
-                if isinstance(attr, torch.Tensor):
-                    setattr(model, attr_name, attr.to(self.device))
-                elif isinstance(attr, np.ndarray):
+                if isinstance(attr_value, np.ndarray):
                     # Convert numpy arrays to tensors with consistent dtype
-                    if np.issubdtype(attr.dtype, np.floating):
-                        tensor = torch.tensor(attr, device=self.device, dtype=torch.float32)
+                    if np.issubdtype(attr_value.dtype, np.floating):
+                        tensor = torch.tensor(attr_value, device=self.device, dtype=torch.float32)
+                        tensor.requires_grad_(True)
+                    elif np.issubdtype(attr_value.dtype, np.complexfloating):
+                        # Handle complex arrays
+                        tensor = torch.tensor(attr_value, device=self.device, dtype=torch.complex64)
                         tensor.requires_grad_(True)
                     else:
-                        tensor = torch.tensor(attr, device=self.device)
+                        tensor = torch.tensor(attr_value, device=self.device)
                     setattr(model, attr_name, tensor)
+                else:
+                    # Set non-array attributes directly
+                    setattr(model, attr_name, attr_value)
             except Exception as e:
-                pass
+                print(f"Warning: Could not set attribute {attr_name}: {e}")
                 
         return model
         

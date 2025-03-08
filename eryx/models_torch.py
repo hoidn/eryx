@@ -176,97 +176,57 @@ class OnePhonon:
         displacements to individual atomic displacements.
         """
         if self.group_by == 'asu':
-            # Create lists to store tensors for each ASU and atom
-            amat_components = []
+            # Initialize Amat with zeros
+            self.Amat = torch.zeros((self.n_asu, self.n_dof_per_asu_actual, self.n_dof_per_asu), 
+                                   device=self.device, dtype=torch.float32)
+            
+            # Create identity and temporary matrices
             identity = torch.eye(3, device=self.device)
+            Atmp = torch.zeros((3, 3), device=self.device)
+            Adiag = torch.eye(3, device=self.device)
             
             for i_asu in range(self.n_asu):
-                asu_components = []
-                # Safely get coordinates with error handling
+                # Get coordinates for this ASU
                 try:
-                    # Use crystal to get ASU coordinates
                     if hasattr(self, 'crystal') and hasattr(self.crystal, 'get_asu_xyz'):
                         xyz_np = self.crystal['get_asu_xyz'](i_asu)
-                    elif hasattr(self, 'model_data') and 'xyz' in self.model_data:
-                        xyz_np = self.model_data['xyz'][i_asu]
+                    elif hasattr(self, 'model') and hasattr(self.model, 'xyz'):
+                        xyz_np = self.model.xyz[i_asu]
                     else:
-                        # Fallback to zeros if no coordinates available
-                        xyz_np = np.zeros((self.n_atoms_per_asu, 3))
+                        xyz_np = torch.zeros((self.n_atoms_per_asu, 3), device=self.device)
                         
-                    # Convert to tensor and ensure proper shape
-                    if isinstance(xyz_np, torch.Tensor):
-                        xyz = xyz_np
-                    else:
+                    # Convert to tensor if needed
+                    if isinstance(xyz_np, np.ndarray):
                         xyz = torch.tensor(xyz_np, dtype=torch.float32, device=self.device)
-                    
-                    # Ensure xyz has the right shape (n_atoms_per_asu, 3)
-                    if xyz.ndim == 1 and xyz.shape[0] == 3:
-                        # Single atom case - reshape to (1, 3)
-                        xyz = xyz.unsqueeze(0)
-                    elif xyz.ndim > 2:
-                        # Too many dimensions - flatten to (n_atoms, 3)
-                        xyz = xyz.reshape(-1, 3)
+                    else:
+                        xyz = xyz_np
                         
                     # Center coordinates
                     xyz = xyz - torch.mean(xyz, dim=0)
                     
-                    # Handle case where n_atoms_per_asu doesn't match xyz shape
-                    actual_atoms = min(self.n_atoms_per_asu, xyz.shape[0])
-                    
-                    for i_atom in range(actual_atoms):
-                        # Create skew matrix without in-place operations
-                        skew_elements = torch.zeros((3, 3), device=self.device)
-                        if xyz.shape[1] > 2:
-                            z_val = xyz[i_atom, 2]
-                            skew_elements = torch.tensor([
-                                [0, z_val, 0],
-                                [0, 0, 0],
-                                [0, 0, 0]
-                            ], device=self.device)
+                    # Process each atom
+                    for i_atom in range(self.n_atoms_per_asu):
+                        # Set identity part (translations)
+                        self.Amat[i_asu, i_atom*3:(i_atom+1)*3, 0:3] = Adiag
                         
-                        if xyz.shape[1] > 1:
-                            y_val = -xyz[i_atom, 1]
-                            skew_elements = skew_elements + torch.tensor([
-                                [0, 0, y_val],
-                                [0, 0, 0],
-                                [0, 0, 0]
-                            ], device=self.device)
+                        # Reset temporary matrix
+                        Atmp = torch.zeros((3, 3), device=self.device)
                         
-                        if xyz.shape[1] > 0:
-                            x_val = xyz[i_atom, 0]
-                            skew_elements = skew_elements + torch.tensor([
-                                [0, 0, 0],
-                                [0, 0, x_val],
-                                [0, 0, 0]
-                            ], device=self.device)
-                        
-                        # Make skew-symmetric
-                        skew = skew_elements - skew_elements.transpose(0, 1)
-                        
-                        # Concatenate identity and skew
-                        atom_component = torch.cat([identity, skew], dim=1)
-                        asu_components.append(atom_component)
-                    
-                    # Pad with identity if needed
-                    while len(asu_components) < self.n_atoms_per_asu:
-                        identity_pad = torch.cat([identity, torch.zeros((3, 3), device=self.device)], dim=1)
-                        asu_components.append(identity_pad)
-                        
+                        # Set skew-symmetric matrix elements (rotations)
+                        if i_atom < xyz.shape[0]:  # Check if atom exists in coordinates
+                            Atmp[0, 1] = xyz[i_atom, 2]  # z
+                            Atmp[0, 2] = -xyz[i_atom, 1]  # -y
+                            Atmp[1, 2] = xyz[i_atom, 0]  # x
+                            
+                            # Make skew-symmetric
+                            Atmp = Atmp - Atmp.transpose(0, 1)
+                            
+                            # Set rotation part
+                            self.Amat[i_asu, i_atom*3:(i_atom+1)*3, 3:6] = Atmp
+                            
                 except Exception as e:
                     print(f"Error in _build_A for ASU {i_asu}: {e}")
-                    # Fill with identity for this ASU as fallback
-                    for i_atom in range(self.n_atoms_per_asu):
-                        identity_pad = torch.cat([identity, torch.zeros((3, 3), device=self.device)], dim=1)
-                        asu_components.append(identity_pad)
-                
-                # Stack atoms for this ASU
-                amat_components.append(torch.stack(asu_components))
-            
-            # Stack all ASUs
-            self.Amat = torch.stack(amat_components)
-            
-            # Reshape to final dimensions
-            self.Amat = self.Amat.reshape((self.n_asu, self.n_dof_per_asu_actual, self.n_dof_per_asu))
+                    # Leave as zeros for this ASU
             
             # Set requires_grad after construction
             self.Amat.requires_grad_(True)
@@ -300,61 +260,45 @@ class OnePhonon:
         """
         try:
             # Create a default mass array of ones
-            mass_array = torch.ones(self.n_asu * self.n_atoms_per_asu, 
-                                   dtype=torch.float32, 
-                                   device=self.device, 
-                                   requires_grad=True)
+            if hasattr(self, 'model') and hasattr(self.model, 'elements'):
+                # Extract weights from model elements
+                weights = []
+                for structure in self.model.elements:
+                    for element in structure:
+                        weights.append(element.weight)
+                
+                if weights:
+                    mass_array = torch.tensor(weights, dtype=torch.float32, device=self.device)
+                else:
+                    mass_array = torch.ones(self.n_asu * self.n_atoms_per_asu, dtype=torch.float32, device=self.device)
+            else:
+                # Fallback to ones
+                mass_array = torch.ones(self.n_asu * self.n_atoms_per_asu, dtype=torch.float32, device=self.device)
             
-            # Try to extract weights from model_data if available
-            if hasattr(self, 'model_data') and 'elements' in self.model_data:
-                try:
-                    elements = self.model_data['elements']
-                    if elements:
-                        weights = [element.weight for structure in elements for element in structure]
-                        if weights:
-                            mass_array = torch.tensor(weights, 
-                                                    dtype=torch.float32, 
-                                                    device=self.device, 
-                                                    requires_grad=True)
-                except Exception as e:
-                    print(f"Warning: Could not extract weights from elements: {e}")
-                
-            # Alternative: try to get weights from the original model if available
-            elif hasattr(self, 'crystal') and hasattr(self.crystal, '_original') and hasattr(self.crystal['_original'].model, 'elements'):
-                try:
-                    elements = self.crystal['_original'].model.elements
-                    if elements:
-                        weights = [element.weight for structure in elements for element in structure]
-                        if weights:
-                            mass_array = torch.tensor(weights, 
-                                                    dtype=torch.float32, 
-                                                    device=self.device, 
-                                                    requires_grad=True)
-                except Exception as e:
-                    print(f"Warning: Could not extract weights from crystal elements: {e}")
-                
             # Ensure mass_array has enough elements
             if mass_array.shape[0] < self.n_asu * self.n_atoms_per_asu:
                 # Pad with ones if needed
                 padding = torch.ones(self.n_asu * self.n_atoms_per_asu - mass_array.shape[0], 
-                                    dtype=torch.float32, device=self.device, requires_grad=True)
+                                    dtype=torch.float32, device=self.device)
                 mass_array = torch.cat([mass_array, padding])
-                
-            eye3 = torch.eye(3, device=self.device)
-            total_atoms = self.n_asu * self.n_atoms_per_asu
-            mass_blocks = []
             
-            for i in range(total_atoms):
-                mass_block = mass_array[i] * eye3
-                for j in range(3):
-                    row_block = torch.zeros(total_atoms * 3, device=self.device)
-                    start_row = 3 * i
-                    row_block[start_row:start_row+3] = mass_block[j]
-                    mass_blocks.append(row_block)
-                    
-            M_allatoms = torch.stack(mass_blocks)
-            M_allatoms = M_allatoms.reshape((self.n_asu, self.n_dof_per_asu_actual,
-                                            self.n_asu, self.n_dof_per_asu_actual))
+            # Create block diagonal matrix
+            eye3 = torch.eye(3, device=self.device)
+            blocks = []
+            
+            for i in range(self.n_asu * self.n_atoms_per_asu):
+                # Create 3x3 block for each atom
+                blocks.append(mass_array[i] * eye3)
+            
+            # Create block diagonal matrix
+            M_block_diag = torch.block_diag(*blocks)
+            
+            # Reshape to 4D tensor
+            M_allatoms = M_block_diag.reshape(self.n_asu, self.n_dof_per_asu_actual,
+                                             self.n_asu, self.n_dof_per_asu_actual)
+            
+            # Set requires_grad
+            M_allatoms.requires_grad_(True)
             
             return M_allatoms
             
