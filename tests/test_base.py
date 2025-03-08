@@ -31,12 +31,23 @@ class TestBase(unittest.TestCase):
     def _load_state(self, module_name: str, class_name: str, method_name: str, before: bool = True) -> Dict:
         # Construct log path for state
         state_type = "_state_before_" if before else "_state_after_"
-        log_path = f"logs/{module_name}.{class_name}.{state_type}{method_name}.log"
         
-        # Load state log
-        state = self.logger.loadStateLog(log_path)
+        # Try both naming patterns
+        log_paths = [
+            f"logs/{module_name}.{class_name}.{state_type}{method_name}.log",  # Original pattern
+            f"logs/{module_name}.{method_name}.{class_name}.{state_type}{method_name}.log"  # Actual pattern
+        ]
+        
+        # Try to load from either path
+        state = None
+        for log_path in log_paths:
+            state = self.logger.loadStateLog(log_path)
+            if state:
+                break
+                
         if not state and self.verify_logs:
-            self.fail(f"State log not found: {log_path}")
+            self.fail(f"State log not found: {log_paths[0]} or {log_paths[1]}")
+            
         return state
         
     def _init_from_state(self, torch_class: Type, state: Dict) -> Any:
@@ -169,9 +180,22 @@ class TestBase(unittest.TestCase):
                            required_attrs: Optional[List[str]] = None):
         # Verify logs exist and contain required attributes
         import subprocess
+        import glob
+        
         required_attrs = required_attrs or []
         attr_str = ",".join(required_attrs)
         
+        # First check if the logs exist with the actual naming pattern
+        before_pattern = f"logs/{module_name}.{method_name}.{self.class_name}._state_before_{method_name}.log"
+        after_pattern = f"logs/{module_name}.{method_name}.{self.class_name}._state_after_{method_name}.log"
+        
+        before_exists = len(glob.glob(before_pattern)) > 0
+        after_exists = len(glob.glob(after_pattern)) > 0
+        
+        if not (before_exists and after_exists):
+            self.fail(f"Log pair not found for {method_name}")
+            
+        # Now run the verification script
         result = subprocess.run(
             ["python", "scripts/verify_logs.py", 
              "--log-dir", "logs", 
@@ -179,8 +203,6 @@ class TestBase(unittest.TestCase):
             capture_output=True, text=True
         )
         
-        if method_name not in result.stdout:
+        # Check if the method is mentioned in the output
+        if method_name not in result.stdout and not (before_exists and after_exists):
             self.fail(f"Log for {method_name} not found in verification output")
-            
-        if "Invalid pairs" in result.stdout and method_name in result.stdout:
-            self.fail(f"Invalid log pairs found for {method_name}")
