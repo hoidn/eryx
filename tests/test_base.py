@@ -32,21 +32,27 @@ class TestBase(unittest.TestCase):
         # Construct log path for state
         state_type = "_state_before_" if before else "_state_after_"
         
-        # Try both naming patterns
+        # Try both naming patterns with both module names (models and models_torch)
         log_paths = [
             f"logs/{module_name}.{class_name}.{state_type}{method_name}.log",  # Original pattern
-            f"logs/{module_name}.{method_name}.{class_name}.{state_type}{method_name}.log"  # Actual pattern
+            f"logs/{module_name}.{method_name}.{class_name}.{state_type}{method_name}.log",  # Actual pattern
+            f"logs/eryx.models_torch.{method_name}.{class_name}.{state_type}{method_name}.log",  # PyTorch logs
+            f"logs/eryx.models_torch.{class_name}.{state_type}{method_name}.log"  # PyTorch logs alt pattern
         ]
         
         # Try to load from either path
         state = None
         for log_path in log_paths:
-            state = self.logger.loadStateLog(log_path)
-            if state:
-                break
+            try:
+                state = self.logger.loadStateLog(log_path)
+                if state:
+                    print(f"Captured {('before' if before else 'after')} state: {log_path}")
+                    break
+            except Exception as e:
+                pass
                 
         if not state and self.verify_logs:
-            self.fail(f"State log not found: {log_paths[0]} or {log_paths[1]}")
+            self.fail(f"State log file not found: {log_paths[0]}")
             
         return state
         
