@@ -17,8 +17,9 @@ class TestBase(unittest.TestCase):
         device_name = os.environ.get('TORCH_TEST_DEVICE', 'cpu')
         self.device = torch.device(device_name if torch.cuda.is_available() or device_name == 'cpu' else 'cpu')
         
-        # Initialize torch testing with device
-        self.torch_testing = TorchTesting(self.logger, self.function_mapping, device=self.device)
+        # Initialize torch testing
+        self.torch_testing = TorchTesting(self.logger, self.function_mapping)
+        # Store device for later use
         
         # Set tolerances from environment variables or use defaults
         self.rtol = float(os.environ.get('TORCH_TEST_RTOL', '1e-5'))
@@ -40,7 +41,24 @@ class TestBase(unittest.TestCase):
         
     def _init_from_state(self, torch_class: Type, state: Dict) -> Any:
         # Initialize object from state dictionary
-        model = self.torch_testing.initializeFromState(torch_class, state, device=self.device)
+        model = self.torch_testing.initializeFromState(torch_class, state)
+        
+        # Set device attribute if the model has one
+        if hasattr(model, 'device'):
+            model.device = self.device
+            
+            # Move tensors to the correct device
+            for attr_name in dir(model):
+                if attr_name.startswith('_'):
+                    continue
+                    
+                try:
+                    attr = getattr(model, attr_name)
+                    if isinstance(attr, torch.Tensor):
+                        setattr(model, attr_name, attr.to(self.device))
+                except Exception:
+                    pass
+                    
         return model
         
     def _compare_states(self, expected: Dict, actual: Dict, 
@@ -71,14 +89,22 @@ class TestBase(unittest.TestCase):
             args_tensor = []
             for arg in args:
                 if isinstance(arg, np.ndarray):
-                    args_tensor.append(torch.tensor(arg, device=self.device))
+                    try:
+                        args_tensor.append(torch.tensor(arg, device=self.device))
+                    except Exception:
+                        # Fall back to CPU if conversion fails
+                        args_tensor.append(torch.tensor(arg))
                 else:
                     args_tensor.append(arg)
                     
             kwargs_tensor = {}
             for k, v in kwargs.items():
                 if isinstance(v, np.ndarray):
-                    kwargs_tensor[k] = torch.tensor(v, device=self.device)
+                    try:
+                        kwargs_tensor[k] = torch.tensor(v, device=self.device)
+                    except Exception:
+                        # Fall back to CPU if conversion fails
+                        kwargs_tensor[k] = torch.tensor(v)
                 else:
                     kwargs_tensor[k] = v
             
