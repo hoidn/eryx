@@ -292,23 +292,26 @@ class OnePhonon:
         Build the all-atom mass matrix M_0.
         """
         try:
-            # Safely extract mass array with error handling
-            if hasattr(self.model, 'elements') and self.model.elements:
-                # Try to extract weights from elements
-                try:
-                    mass_array = np.array([element.weight for structure in self.model.elements 
-                                          for element in structure])
-                except (AttributeError, IndexError) as e:
-                    print(f"Error extracting weights from elements: {e}")
-                    # Fallback to default weights
-                    mass_array = np.ones(self.n_asu * self.n_atoms_per_asu)
-            else:
-                # No elements found, use default weights
-                mass_array = np.ones(self.n_asu * self.n_atoms_per_asu)
-                
-            # Convert to tensor with requires_grad=True
-            mass_array = torch.tensor(mass_array, dtype=torch.float32, device=self.device, requires_grad=True)
+            # Create a default mass array of ones
+            mass_array = torch.ones(self.n_asu * self.n_atoms_per_asu, 
+                                   dtype=torch.float32, 
+                                   device=self.device, 
+                                   requires_grad=True)
             
+            # Try to extract weights from model_data if available
+            if hasattr(self, 'model_data') and 'elements' in self.model_data:
+                try:
+                    elements = self.model_data['elements']
+                    if elements:
+                        weights = [element.weight for structure in elements for element in structure]
+                        if weights:
+                            mass_array = torch.tensor(weights, 
+                                                    dtype=torch.float32, 
+                                                    device=self.device, 
+                                                    requires_grad=True)
+                except Exception as e:
+                    print(f"Warning: Could not extract weights from elements: {e}")
+                
             # Ensure mass_array has enough elements
             if mass_array.shape[0] < self.n_asu * self.n_atoms_per_asu:
                 # Pad with ones if needed
