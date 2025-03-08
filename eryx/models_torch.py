@@ -366,7 +366,7 @@ class OnePhonon:
                              device=self.device, requires_grad=True)
     
     @debug
-    def _project_M(self, M_allatoms: torch.Tensor) -> torch.Tensor:
+    def _project_M(self, M_allatoms: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
         """
         Project the all-atom mass matrix M_0 using the A matrix.
         """
@@ -383,9 +383,18 @@ class OnePhonon:
                 else:
                     M_block = M_allatoms[i_asu, :, j_asu, :]
                 
-                Mmat[i_asu, :, j_asu, :] = torch.matmul(self.Amat[i_asu].T,
+                # Ensure Amat is a tensor
+                if not isinstance(self.Amat, torch.Tensor):
+                    self.Amat = adapter.array_to_tensor(self.Amat)
+                
+                # Ensure all operands are on the same device
+                M_block = M_block.to(self.device)
+                Amat_i = self.Amat[i_asu].to(self.device)
+                Amat_j = self.Amat[j_asu].to(self.device)
+                
+                Mmat[i_asu, :, j_asu, :] = torch.matmul(Amat_i.T,
                                                         torch.matmul(M_block,
-                                                                    self.Amat[j_asu]))
+                                                                    Amat_j))
         return Mmat
     
     @debug

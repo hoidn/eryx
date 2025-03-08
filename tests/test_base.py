@@ -57,7 +57,7 @@ class TestBase(unittest.TestCase):
         # Always set device attribute for OnePhonon models
         model.device = self.device
             
-        # Move tensors to the correct device
+        # Move tensors to the correct device and convert numpy arrays to tensors
         for attr_name in dir(model):
             if attr_name.startswith('_'):
                 continue
@@ -66,7 +66,13 @@ class TestBase(unittest.TestCase):
                 attr = getattr(model, attr_name)
                 if isinstance(attr, torch.Tensor):
                     setattr(model, attr_name, attr.to(self.device))
-            except Exception:
+                elif isinstance(attr, np.ndarray):
+                    # Convert numpy arrays to tensors
+                    tensor = torch.tensor(attr, device=self.device)
+                    if tensor.dtype.is_floating_point:
+                        tensor.requires_grad_(True)
+                    setattr(model, attr_name, tensor)
+            except Exception as e:
                 pass
                 
         return model
