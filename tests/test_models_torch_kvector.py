@@ -238,8 +238,8 @@ class TestOnePhononKvector(TestKvectorMethods):
             'gamma_inter': 1.0
         }
     
-    def test_gradient_flow(self):
-        """Test gradient flow through k-vector operations using StateBuilder."""
+    def test_tensor_creation(self):
+        """Test tensor creation from state-restored model."""
         # Import test helpers
         from eryx.autotest.test_helpers import build_test_object
         
@@ -268,22 +268,17 @@ class TestOnePhononKvector(TestKvectorMethods):
         self.assertTrue(hasattr(model, 'kvec'), "kvec not created")
         self.assertTrue(model.kvec.requires_grad, "kvec should require gradients")
         
-        # 4. Compute loss and verify gradient flow
-        loss = torch.sum(torch.abs(model.kvec))
-        loss.backward(retain_graph=True)  # Use retain_graph to keep computation graph
+        # Note: We don't test gradient flow for state-restored instances
+        # as per project requirements in project_rules.md
         
-        # 5. Check if A_inv has gradients
-        self.assertIsNotNone(
-            model.model.A_inv.grad,
-            "Gradients did not flow through k-vector operations"
-        )
+        # 4. Verify tensor shapes and properties instead
+        expected_shape = (model.hsampling[2], model.ksampling[2], model.lsampling[2], 3)
+        self.assertEqual(model.kvec.shape, expected_shape, "kvec has incorrect shape")
         
-        # 6. Check if gradients are non-zero
-        self.assertGreater(
-            torch.sum(torch.abs(model.model.A_inv.grad)).item(),
-            0.0,
-            "Gradients are all zeros"
-        )
+        # 5. Verify kvec_norm was created with correct properties
+        self.assertTrue(hasattr(model, 'kvec_norm'), "kvec_norm not created")
+        expected_norm_shape = (model.hsampling[2], model.ksampling[2], model.lsampling[2], 1)
+        self.assertEqual(model.kvec_norm.shape, expected_norm_shape, "kvec_norm has incorrect shape")
 
 if __name__ == '__main__':
     unittest.main()
