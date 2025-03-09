@@ -87,10 +87,22 @@ class Logger:
                 if callable(attr) or attr_name in ('__dict__', '__class__'):
                     continue
                 
+                # Check if it's a Gemmi object before trying to serialize
+                if hasattr(self.serializer, 'gemmi_serializer') and self.serializer.gemmi_serializer.is_gemmi_object(attr):
+                    try:
+                        gemmi_dict = self.serializer.gemmi_serializer.serialize_gemmi_object(attr)
+                        state[attr_name] = self.serializer.serialize(gemmi_dict)
+                        continue
+                    except Exception as e:
+                        import logging
+                        logging.warning(f"Failed to serialize Gemmi object {attr_name}: {e}")
+                        # Fall through to standard serialization as a fallback
+                
                 # Serialize the attribute
                 state[attr_name] = self.serializer.serialize(attr)
             except Exception as e:
-                print(f"Error capturing attribute {attr_name}: {e}", file=sys.stderr)
+                import logging
+                logging.warning(f"Error capturing attribute {attr_name}: {e}")
                 state[attr_name] = self.serializer.serialize(f"<Error capturing: {str(e)}>")
         
         return state
