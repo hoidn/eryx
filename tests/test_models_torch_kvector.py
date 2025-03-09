@@ -71,6 +71,24 @@ class TestKvectorMethods(TestBase):
             "Atomic model does not contain A_inv"
         )
         
+        # DEBUGGING: Print A_inv before method call
+        print("\nDEBUGGING A_inv before method call:")
+        print(f"A_inv shape: {model.model.A_inv.shape}")
+        print(f"A_inv dtype: {model.model.A_inv.dtype}")
+        print(f"A_inv requires_grad: {model.model.A_inv.requires_grad}")
+        print(f"A_inv device: {model.model.A_inv.device}")
+        print(f"A_inv first few values: {model.model.A_inv.flatten()[:5]}")
+        
+        # DEBUGGING: Test _center_kvec function
+        print("\nDEBUGGING _center_kvec function:")
+        h_dim = int(model.hsampling[2])
+        k_dim = int(model.ksampling[2])
+        l_dim = int(model.lsampling[2])
+        
+        for x, L in [(0, h_dim), (1, h_dim), (h_dim-1, h_dim)]:
+            result = model._center_kvec(x, L)
+            print(f"_center_kvec({x}, {L}) = {result}")
+        
         # 4. Call the method
         model._build_kvec_Brillouin()
         
@@ -86,6 +104,13 @@ class TestKvectorMethods(TestBase):
         expected_norm_shape = (model.hsampling[2], model.ksampling[2], model.lsampling[2], 1)
         self.assertEqual(model.kvec_norm.shape, expected_norm_shape)
         self.assertTrue(model.kvec_norm.requires_grad, "kvec_norm should require gradients")
+        
+        # DEBUGGING: Print some kvec values
+        print("\nDEBUGGING kvec after method call:")
+        print(f"kvec shape: {model.kvec.shape}")
+        print(f"kvec[0,0,0]: {model.kvec[0,0,0]}")
+        print(f"kvec[0,1,0]: {model.kvec[0,1,0]}")
+        print(f"kvec[1,0,0]: {model.kvec[1,0,0]}")
         
         # 7. Load after state and compare
         after_state = load_test_state(
@@ -105,6 +130,27 @@ class TestKvectorMethods(TestBase):
             kvec_expected = self.serializer.deserialize(kvec_expected)
         if isinstance(kvec_norm_expected, bytes):
             kvec_norm_expected = self.serializer.deserialize(kvec_norm_expected)
+        
+        # DEBUGGING: Print expected values
+        print("\nDEBUGGING expected values:")
+        print(f"expected kvec shape: {kvec_expected.shape}")
+        print(f"expected kvec[0,0,0]: {kvec_expected[0,0,0]}")
+        print(f"expected kvec[0,1,0]: {kvec_expected[0,1,0]}")
+        print(f"expected kvec[1,0,0]: {kvec_expected[1,0,0]}")
+        
+        # DEBUGGING: Print differences
+        print("\nDEBUGGING differences:")
+        kvec_numpy = model.kvec.detach().cpu().numpy()
+        max_diff = np.max(np.abs(kvec_numpy - kvec_expected))
+        print(f"Maximum difference: {max_diff}")
+        
+        # Compare specific points
+        for i, j, k in [(0,0,0), (0,1,0), (1,0,0), (1,1,1)]:
+            if i < h_dim and j < k_dim and k < l_dim:
+                diff = np.max(np.abs(kvec_numpy[i,j,k] - kvec_expected[i,j,k]))
+                print(f"Difference at [{i},{j},{k}]: {diff}")
+                print(f"  Actual: {kvec_numpy[i,j,k]}")
+                print(f"  Expected: {kvec_expected[i,j,k]}")
         
         # Compare tensor values
         tolerances = {'rtol': 1e-4, 'atol': 1e-5}
