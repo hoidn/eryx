@@ -93,17 +93,17 @@ class TestBase(unittest.TestCase):
                     if 'A_inv' in attr_value or 'cell' in attr_value:
                         # This might be a model state dictionary - flatten key attributes to parent
                         for nested_key, nested_value in attr_value.items():
-                            if nested_key in ['A_inv', 'cell', 'xyz', 'unit_cell_axes'] and not hasattr(model, nested_key):
+                            if nested_key in ['A_inv', 'cell', 'xyz', 'unit_cell_axes'] and not hasattr(obj, nested_key):
                                 # Convert numpy arrays to tensors
                                 if isinstance(nested_value, np.ndarray):
                                     if np.issubdtype(nested_value.dtype, np.floating):
                                         tensor = torch.tensor(nested_value, device=self.device, dtype=torch.float32)
                                         tensor.requires_grad_(True)
-                                        setattr(model, nested_key, tensor)
+                                        setattr(obj, nested_key, tensor)
                                     else:
-                                        setattr(model, nested_key, torch.tensor(nested_value, device=self.device))
+                                        setattr(obj, nested_key, torch.tensor(nested_value, device=self.device))
                                 else:
-                                    setattr(model, nested_key, nested_value)
+                                    setattr(obj, nested_key, nested_value)
                 
                 if isinstance(attr_value, np.ndarray):
                     # Convert numpy arrays to tensors with consistent dtype

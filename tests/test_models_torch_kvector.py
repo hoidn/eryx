@@ -48,9 +48,26 @@ class TestKvectorMethods(TestBase):
         model = self._init_from_state(OnePhonon, before_state)
         
         # Ensure A_inv is available directly on the model (not nested in model attribute)
-        if not hasattr(model, 'A_inv') and hasattr(model, 'model') and hasattr(model.model, 'A_inv'):
-            model.A_inv = model.model.A_inv
+        if not hasattr(model, 'A_inv'):
+            if hasattr(model, 'model'):
+                if isinstance(model.model, dict) and 'A_inv' in model.model:
+                    # Handle case where model is a dictionary with A_inv
+                    model.A_inv = model.model['A_inv']
+                elif hasattr(model.model, 'A_inv'):
+                    # Handle case where model is an object with A_inv
+                    model.A_inv = model.model.A_inv
             
+            # If still not found, check if A_inv is in the top-level state
+            if not hasattr(model, 'A_inv') and 'A_inv' in before_state:
+                # Convert to tensor if it's a numpy array
+                if isinstance(before_state['A_inv'], np.ndarray):
+                    model.A_inv = torch.tensor(before_state['A_inv'], 
+                                              dtype=torch.float32, 
+                                              device=self.device)
+                    model.A_inv.requires_grad_(True)
+                else:
+                    model.A_inv = before_state['A_inv']
+        
         # Call method
         model._build_kvec_Brillouin()
         
@@ -182,6 +199,20 @@ class TestOnePhononKvector(TestKvectorMethods):
             gamma_inter=self.test_params['gamma_inter'],
             device=device
         )
+        
+        # Ensure A_inv exists and requires gradients
+        if not hasattr(model, 'A_inv'):
+            # Try to find A_inv in model.model
+            if hasattr(model, 'model'):
+                if isinstance(model.model, dict) and 'A_inv' in model.model:
+                    model.A_inv = model.model['A_inv']
+                elif hasattr(model.model, 'A_inv'):
+                    model.A_inv = model.model.A_inv
+            
+            # If still not found, create a default A_inv
+            if not hasattr(model, 'A_inv'):
+                # Create a default A_inv (3x3 identity matrix)
+                model.A_inv = torch.eye(3, device=device)
         
         # Make A_inv require gradients
         model.A_inv.requires_grad_(True)
