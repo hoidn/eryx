@@ -108,6 +108,10 @@ class GemmiSerializer:
                 return True
             # Add more validations as needed
         
+        # Check for objects that contain Gemmi objects
+        if hasattr(obj, 'structure') and self.is_gemmi_object(obj.structure):
+            return True
+        
         return False
     
     def get_gemmi_type(self, obj: Any) -> Optional[str]:

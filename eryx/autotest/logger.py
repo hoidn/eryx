@@ -98,6 +98,19 @@ class Logger:
                         logging.warning(f"Failed to serialize Gemmi object {attr_name}: {e}")
                         # Fall through to standard serialization as a fallback
                 
+                # Check for objects that might contain Gemmi objects
+                if isinstance(attr, object) and hasattr(attr, '__dict__'):
+                    try:
+                        # Recursively capture state for complex objects
+                        nested_state = self.captureState(attr, include_private, max_depth - 1, exclude_attrs)
+                        if nested_state:  # Only serialize if we got something
+                            state[attr_name] = self.serializer.serialize(nested_state)
+                            continue
+                    except Exception as e:
+                        import logging
+                        logging.warning(f"Failed to capture nested state for {attr_name}: {e}")
+                        # Fall through to standard serialization
+                
                 # Serialize the attribute
                 state[attr_name] = self.serializer.serialize(attr)
             except Exception as e:

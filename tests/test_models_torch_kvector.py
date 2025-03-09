@@ -47,6 +47,10 @@ class TestKvectorMethods(TestBase):
         # Initialize model from state
         model = self._init_from_state(OnePhonon, before_state)
         
+        # Ensure A_inv is available directly on the model (not nested in model attribute)
+        if not hasattr(model, 'A_inv') and hasattr(model, 'model') and hasattr(model.model, 'A_inv'):
+            model.A_inv = model.model.A_inv
+            
         # Call method
         model._build_kvec_Brillouin()
         
@@ -140,6 +144,22 @@ class TestKvectorMethods(TestBase):
 
 class TestOnePhononKvector(TestKvectorMethods):
     """Legacy class for backward compatibility."""
+    
+    def setUp(self):
+        # Call parent setUp
+        super().setUp()
+        # Initialize test_params
+        self.test_params = {
+            'pdb_path': 'tests/pdbs/5zck_p1.pdb',
+            'hsampling': [-2, 2, 2],
+            'ksampling': [-2, 2, 2],
+            'lsampling': [-2, 2, 2],
+            'expand_p1': True,
+            'res_limit': 0.0,
+            'gnm_cutoff': 4.0,
+            'gamma_intra': 1.0,
+            'gamma_inter': 1.0
+        }
     
     def test_gradient_flow(self):
         """Test gradient flow through k-vector operations."""

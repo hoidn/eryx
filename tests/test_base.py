@@ -87,6 +87,24 @@ class TestBase(unittest.TestCase):
                         # Keep as dictionary if deserialization fails
                         print(f"Warning: Could not deserialize Gemmi object {attr_name}: {e}")
                 
+                # Handle nested state dictionaries
+                elif isinstance(attr_value, dict) and all(isinstance(k, str) for k in attr_value.keys()):
+                    # Check if this is a nested state dictionary
+                    if 'A_inv' in attr_value or 'cell' in attr_value:
+                        # This might be a model state dictionary - flatten key attributes to parent
+                        for nested_key, nested_value in attr_value.items():
+                            if nested_key in ['A_inv', 'cell', 'xyz', 'unit_cell_axes'] and not hasattr(model, nested_key):
+                                # Convert numpy arrays to tensors
+                                if isinstance(nested_value, np.ndarray):
+                                    if np.issubdtype(nested_value.dtype, np.floating):
+                                        tensor = torch.tensor(nested_value, device=self.device, dtype=torch.float32)
+                                        tensor.requires_grad_(True)
+                                        setattr(model, nested_key, tensor)
+                                    else:
+                                        setattr(model, nested_key, torch.tensor(nested_value, device=self.device))
+                                else:
+                                    setattr(model, nested_key, nested_value)
+                
                 if isinstance(attr_value, np.ndarray):
                     # Convert numpy arrays to tensors with consistent dtype
                     if np.issubdtype(attr_value.dtype, np.floating):
