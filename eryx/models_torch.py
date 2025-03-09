@@ -377,8 +377,10 @@ class OnePhonon:
                     hkl = np.array([k_dh, k_dk, k_dl])
                     hkl_tensor = torch.tensor(hkl, device=self.device, dtype=torch.float32)
                     
-                    # Use the exact same calculation as NumPy: 2π * A_inv.T * hkl
-                    self.kvec[dh, dk, dl] = 2 * np.pi * torch.matmul(A_inv_tensor.T, hkl_tensor)
+                    # Use the exact same calculation as NumPy: A_inv.T * hkl
+                    # Note: NumPy implementation doesn't multiply by 2*pi here despite the comment
+                    # in the original code suggesting it does
+                    self.kvec[dh, dk, dl] = torch.matmul(A_inv_tensor.T, hkl_tensor)
                     
                     # Calculate norm exactly as NumPy does
                     self.kvec_norm[dh, dk, dl] = torch.norm(self.kvec[dh, dk, dl])
