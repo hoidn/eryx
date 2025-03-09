@@ -62,10 +62,10 @@ class TestBase(unittest.TestCase):
         
     def _init_from_state(self, torch_class: Type, state: Dict) -> Any:
         # Create empty instance without calling __init__
-        model = torch_class.__new__(torch_class)
+        obj = torch_class.__new__(torch_class)
         
         # Always set device attribute for OnePhonon models
-        model.device = self.device
+        obj.device = self.device
             
         # Set all attributes from state dictionary
         for attr_name, attr_value in state.items():
