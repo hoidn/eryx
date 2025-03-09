@@ -41,52 +41,95 @@ class TestKvectorMethods(TestBase):
         )
         
     def test_build_kvec_Brillouin_state_based(self):
-        # Load before state
-        before_state = self._load_state(self.module_name, self.class_name, "_build_kvec_Brillouin")
-        
-        # Initialize model from state
-        model = self._init_from_state(OnePhonon, before_state)
-        
-        # Instead, verify that the atomic model (accessible as model.model) contains A_inv.
-        self.assertTrue(
-            hasattr(model, 'model') and hasattr(model.model, 'A_inv'),
-            "Atomic model does not contain A_inv; please access it via model.model.A_inv"
+        """Test _build_kvec_Brillouin using state-based approach."""
+        # Import test helpers
+        from eryx.autotest.test_helpers import (
+            load_test_state, 
+            build_test_object,
+            verify_gradient_flow
         )
         
-        # Call _build_kvec_Brillouin(), which should internally use model.model.A_inv.
+        # 1. Load before state
+        before_state = load_test_state(
+            self.logger, 
+            self.module_name, 
+            self.class_name, 
+            "_build_kvec_Brillouin"
+        )
+        
+        # 2. Build model with StateBuilder
+        model = build_test_object(OnePhonon, before_state, device=self.device)
+        
+        # 3. Verify initial structure
+        self.assertTrue(
+            hasattr(model, 'model') and hasattr(model.model, 'A_inv'),
+            "Atomic model does not contain A_inv"
+        )
+        
+        # 4. Call the method
         model._build_kvec_Brillouin()
         
-        # Verify kvec tensor properties
+        # 5. Verify results
+        # Check kvec tensor
         self.assertTrue(hasattr(model, 'kvec'), "kvec not created")
         expected_kvec_shape = (model.hsampling[2], model.ksampling[2], model.lsampling[2], 3)
-        self._verify_tensor(model.kvec, expected_shape=expected_kvec_shape, requires_grad=True)
+        self.assertEqual(model.kvec.shape, expected_kvec_shape)
+        self.assertTrue(model.kvec.requires_grad, "kvec should require gradients")
         
-        # Verify kvec_norm tensor properties
+        # Check kvec_norm tensor
         self.assertTrue(hasattr(model, 'kvec_norm'), "kvec_norm not created")
         expected_norm_shape = (model.hsampling[2], model.ksampling[2], model.lsampling[2], 1)
-        self._verify_tensor(model.kvec_norm, expected_shape=expected_norm_shape, requires_grad=True)
+        self.assertEqual(model.kvec_norm.shape, expected_norm_shape)
+        self.assertTrue(model.kvec_norm.requires_grad, "kvec_norm should require gradients")
         
-        # Verify norm calculation correctness (sample a few points)
-        for h in range(min(2, model.hsampling[2])):
-            for k in range(min(2, model.ksampling[2])):
-                for l in range(min(2, model.lsampling[2])):
-                    k_vec = model.kvec[h, k, l]
-                    k_norm = model.kvec_norm[h, k, l].item()
-                    actual_norm = torch.norm(k_vec).item()
-                    self.assertAlmostEqual(k_norm, actual_norm, delta=1e-5, 
-                                         msg=f"Incorrect norm at [{h},{k},{l}]")
+        # 6. Verify gradient flow
+        loss = torch.sum(torch.abs(model.kvec))
+        loss.backward()
+        self.assertIsNotNone(model.model.A_inv.grad, "No gradients on A_inv")
+        self.assertGreater(
+            torch.sum(torch.abs(model.model.A_inv.grad)).item(), 
+            0.0, 
+            "Gradients are all zeros"
+        )
         
-        # Load expected after state
-        after_state = self._load_state(self.module_name, self.class_name, "_build_kvec_Brillouin", before=False)
+        # 7. Load after state and compare
+        after_state = load_test_state(
+            self.logger, 
+            self.module_name, 
+            self.class_name, 
+            "_build_kvec_Brillouin", 
+            before=False
+        )
         
-        # Compare states with appropriate tolerances
-        tolerances = {
-            'kvec': {'rtol': self.rtol, 'atol': self.atol},
-            'kvec_norm': {'rtol': self.rtol, 'atol': self.atol}
-        }
+        # 8. Compare only the tensors that should have changed
+        kvec_expected = after_state.get('kvec')
+        kvec_norm_expected = after_state.get('kvec_norm')
+        
+        # Handle serialized values
+        if isinstance(kvec_expected, bytes):
+            kvec_expected = self.serializer.deserialize(kvec_expected)
+        if isinstance(kvec_norm_expected, bytes):
+            kvec_norm_expected = self.serializer.deserialize(kvec_norm_expected)
+        
+        # Compare tensor values
+        tolerances = {'rtol': 1e-5, 'atol': 1e-8}
         self.assertTrue(
-            self._compare_states(after_state, model.__dict__, tolerances),
-            "State mismatch after _build_kvec_Brillouin execution"
+            np.allclose(
+                model.kvec.detach().cpu().numpy(), 
+                kvec_expected, 
+                rtol=tolerances['rtol'], 
+                atol=tolerances['atol']
+            ),
+            "kvec values don't match expected"
+        )
+        self.assertTrue(
+            np.allclose(
+                model.kvec_norm.detach().cpu().numpy(), 
+                kvec_norm_expected, 
+                rtol=tolerances['rtol'], 
+                atol=tolerances['atol']
+            ),
+            "kvec_norm values don't match expected"
         )
         
     def test_center_kvec(self):
@@ -164,80 +207,40 @@ class TestOnePhononKvector(TestKvectorMethods):
         }
     
     def test_gradient_flow(self):
-        """Test gradient flow through k-vector operations."""
-        # Create a model with parameters that require gradients
-        device = torch.device('cpu')
+        """Test gradient flow through k-vector operations using StateBuilder."""
+        # Import test helpers
+        from eryx.autotest.test_helpers import build_test_object
         
-        # Create a model with minimal parameters
-        from eryx.models_torch import OnePhonon
+        # 1. Create minimal state data
+        minimal_state = {
+            'pdb_path': self.test_params['pdb_path'],
+            'hsampling': self.test_params['hsampling'],
+            'ksampling': self.test_params['ksampling'],
+            'lsampling': self.test_params['lsampling'],
+            'model': {
+                'A_inv': np.eye(3, dtype=np.float32)
+            }
+        }
         
-        # Create a model with parameters that require gradients
-        model = OnePhonon(
-            pdb_path=self.test_params['pdb_path'],
-            hsampling=self.test_params['hsampling'],
-            ksampling=self.test_params['ksampling'],
-            lsampling=self.test_params['lsampling'],
-            expand_p1=self.test_params['expand_p1'],
-            res_limit=self.test_params['res_limit'],
-            gnm_cutoff=self.test_params['gnm_cutoff'],
-            gamma_intra=self.test_params['gamma_intra'],
-            gamma_inter=self.test_params['gamma_inter'],
-            device=device
-        )
+        # 2. Build model with StateBuilder 
+        model = build_test_object(OnePhonon, minimal_state, device=self.device)
         
-        # Ensure A_inv exists and requires gradients
-        if not hasattr(model, 'A_inv'):
-            # Try to find A_inv in model.model
-            if hasattr(model, 'model'):
-                if isinstance(model.model, dict) and 'A_inv' in model.model:
-                    model.A_inv = model.model['A_inv']
-                elif hasattr(model.model, 'A_inv'):
-                    model.A_inv = model.model.A_inv
-            
-            # If still not found, create a default A_inv
-            if not hasattr(model, 'A_inv'):
-                # Create a default A_inv (3x3 identity matrix)
-                model.A_inv = torch.eye(3, device=device)
-        
-        # Ensure A_inv is a tensor with requires_grad
-        if isinstance(model.A_inv, np.ndarray):
-            model.A_inv = torch.tensor(model.A_inv, dtype=torch.float32, device=device)
-        
-        # Make A_inv require gradients
-        model.A_inv.requires_grad_(True)
-        
-        # Patch for models_torch implementation - modify the model structure
-        # to match what _build_kvec_Brillouin expects
-        if hasattr(model, 'model') and not hasattr(model.model, 'A_inv'):
-            # Create a wrapper object to hold A_inv if needed
-            if isinstance(model.model, dict):
-                class ModelWrapper:
-                    pass
-                wrapper = ModelWrapper()
-                wrapper.A_inv = model.A_inv
-                model.model = wrapper
-            else:
-                # Add A_inv to existing model object
-                model.model.A_inv = model.A_inv
-        
-        # Build k-vectors
+        # 3. Build k-vectors
         model._build_kvec_Brillouin()
         
-        # Compute a loss based on k-vectors
+        # 4. Compute loss and verify gradient flow
         loss = torch.sum(torch.abs(model.kvec))
-        
-        # Check if gradients flow through
         loss.backward()
         
-        # Check if A_inv has gradients
+        # 5. Check if A_inv has gradients
         self.assertIsNotNone(
-            model.A_inv.grad,
+            model.model.A_inv.grad,
             "Gradients did not flow through k-vector operations"
         )
         
-        # Check if gradients are non-zero
+        # 6. Check if gradients are non-zero
         self.assertGreater(
-            torch.sum(torch.abs(model.A_inv.grad)),
+            torch.sum(torch.abs(model.model.A_inv.grad)).item(),
             0.0,
             "Gradients are all zeros"
         )
