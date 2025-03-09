@@ -136,108 +136,22 @@ class TorchTesting(Testing):
             print(f"Error in state-based testing: {e}")
             return False
     
-    def initializeFromState(self, torch_class: Type, state_data: Dict[str, Any]) -> Any:
+    def initializeFromState(self, torch_class: Type, state_data: Dict[str, Any], device=None) -> Any:
         """
-        Initialize a PyTorch object from state data.
+        Initialize a PyTorch object from state data with proper object structure.
         
         Args:
-            torch_class: PyTorch class to initialize
-            state_data: State data dictionary
+            torch_class: PyTorch class to instantiate
+            state_data: State dictionary loaded from log file
+            device: Optional device override
             
         Returns:
-            Initialized PyTorch object
+            Initialized instance with proper structure
         """
-        # Create empty instance
-        obj = torch_class.__new__(torch_class)
-        
-        # Check if this is a PyTorch class (to determine whether to convert arrays to tensors)
-        is_torch_class = torch_class.__name__.startswith('Torch') or hasattr(torch_class, 'forward')
-        
-        # Initialize each attribute
-        for key, value in state_data.items():
-            # First deserialize if the value is bytes
-            if isinstance(value, bytes):
-                try:
-                    value = self.logger.serializer.deserialize(value)
-                except Exception as e:
-                    print(f"Warning: Could not deserialize {key}: {e}")
-                    continue
-            
-            # If the value is already a tensor, keep it as is
-            if isinstance(value, torch.Tensor):
-                if value.dtype.is_floating_point and is_torch_class:
-                    value.requires_grad_(True)
-                setattr(obj, key, value)
-                continue
-                
-            # Check if the deserialized value is a dict representing a numpy array
-            if isinstance(value, dict) and value.get('_array_type') == 'numpy.ndarray':
-                if is_torch_class:
-                    # For PyTorch classes, convert to tensor
-                    if '_array_data' in value:
-                        import io
-                        buffer = io.BytesIO(value['_array_data'])
-                        array = np.load(buffer)
-                        tensor = torch.tensor(array)
-                        if tensor.dtype.is_floating_point:
-                            tensor.requires_grad_(True)
-                        setattr(obj, key, tensor)
-                    else:
-                        print(f"Warning: Missing array data for {key}")
-                else:
-                    # For non-PyTorch classes, keep as numpy array
-                    if '_array_data' in value:
-                        import io
-                        buffer = io.BytesIO(value['_array_data'])
-                        array = np.load(buffer)
-                        setattr(obj, key, array)
-                    else:
-                        print(f"Warning: Missing array data for {key}")
-            elif isinstance(value, np.ndarray):
-                if is_torch_class:
-                    # Convert NumPy arrays to PyTorch tensors for PyTorch classes
-                    tensor = torch.tensor(value)
-                    if tensor.dtype.is_floating_point:
-                        tensor.requires_grad_(True)
-                    setattr(obj, key, tensor)
-                else:
-                    # Keep as NumPy arrays for non-PyTorch classes
-                    setattr(obj, key, value)
-            elif isinstance(value, dict):
-                # Handle nested dictionaries
-                if any(isinstance(v, np.ndarray) for v in value.values()):
-                    # Convert NumPy arrays in dict to tensors if PyTorch class
-                    processed_dict = {}
-                    for k, v in value.items():
-                        if isinstance(v, np.ndarray) and is_torch_class:
-                            tensor = torch.tensor(v)
-                            if tensor.dtype.is_floating_point:
-                                tensor.requires_grad_(True)
-                            processed_dict[k] = tensor
-                        else:
-                            processed_dict[k] = v
-                    setattr(obj, key, processed_dict)
-                else:
-                    setattr(obj, key, value)
-            else:
-                setattr(obj, key, value)
-        
-        # If the class has an __init__ method, check if we need to call it
-        if hasattr(torch_class, '__init__') and callable(getattr(torch_class, '__init__')):
-            # Check if __init__ has required parameters beyond self
-            init_params = inspect.signature(torch_class.__init__).parameters
-            if len(init_params) > 1:
-                # Check if any required parameters are missing from state_data
-                required_params = [p for p in list(init_params.keys())[1:] 
-                                 if init_params[p].default == inspect.Parameter.empty]
-                if not all(p in state_data for p in required_params):
-                    # Call a minimal initialization if needed
-                    try:
-                        obj.__init__()
-                    except Exception as e:
-                        print(f"Warning: Could not call __init__: {e}")
-        
-        return obj
+        # Use StateBuilder for proper object construction
+        from eryx.autotest.state_builder import StateBuilder
+        builder = StateBuilder(device=device or self.device)
+        return builder.build(torch_class, state_data)
     
     def compareStates(self, expected_state, actual_state, tolerances=None):
         """

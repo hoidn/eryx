@@ -40,6 +40,33 @@ class TestKvectorMethods(TestBase):
             device=self.device
         )
         
+    def create_models(self, test_params=None):
+        """Create NumPy and PyTorch models for comparative testing."""
+        # Import NumPy model for comparison
+        from eryx.models import OnePhonon as NumpyOnePhonon
+        
+        # Default test parameters
+        self.test_params = test_params or {
+            'pdb_path': 'tests/pdbs/5zck_p1.pdb',
+            'hsampling': [-2, 2, 2],
+            'ksampling': [-2, 2, 2],
+            'lsampling': [-2, 2, 2],
+            'expand_p1': True,
+            'res_limit': 0.0,
+            'gnm_cutoff': 4.0,
+            'gamma_intra': 1.0,
+            'gamma_inter': 1.0
+        }
+        
+        # Create NumPy model for reference
+        self.np_model = NumpyOnePhonon(**self.test_params)
+        
+        # Create PyTorch model
+        self.torch_model = OnePhonon(
+            **self.test_params,
+            device=self.device
+        )
+        
     def test_build_kvec_Brillouin_state_based(self):
         """Test _build_kvec_Brillouin using state-based approach."""
         # Import test helpers
