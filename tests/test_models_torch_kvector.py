@@ -47,39 +47,13 @@ class TestKvectorMethods(TestBase):
         # Initialize model from state
         model = self._init_from_state(OnePhonon, before_state)
         
-        # Ensure A_inv is available directly on the model (not nested in model attribute)
-        if not hasattr(model, 'A_inv'):
-            if hasattr(model, 'model'):
-                if isinstance(model.model, dict) and 'A_inv' in model.model:
-                    # Handle case where model is a dictionary with A_inv
-                    model.A_inv = model.model['A_inv']
-                elif hasattr(model.model, 'A_inv'):
-                    # Handle case where model is an object with A_inv
-                    model.A_inv = model.model.A_inv
-            
-            # If still not found, check if A_inv is in the top-level state
-            if not hasattr(model, 'A_inv') and 'A_inv' in before_state:
-                # Convert to tensor if it's a numpy array
-                if isinstance(before_state['A_inv'], np.ndarray):
-                    model.A_inv = torch.tensor(before_state['A_inv'], 
-                                              dtype=torch.float32, 
-                                              device=self.device)
-                    model.A_inv.requires_grad_(True)
-                else:
-                    model.A_inv = before_state['A_inv']
+        # Instead, verify that the atomic model (accessible as model.model) contains A_inv.
+        self.assertTrue(
+            hasattr(model, 'model') and hasattr(model.model, 'A_inv'),
+            "Atomic model does not contain A_inv; please access it via model.model.A_inv"
+        )
         
-        # Patch for models_torch implementation - modify the model structure
-        # to match what _build_kvec_Brillouin expects
-        if hasattr(model, 'model') and isinstance(model.model, dict):
-            if hasattr(model, 'A_inv') and not hasattr(model.model, 'A_inv'):
-                # Create a wrapper object to hold A_inv
-                class ModelWrapper:
-                    pass
-                wrapper = ModelWrapper()
-                wrapper.A_inv = model.A_inv
-                model.model = wrapper
-        
-        # Call method
+        # Call _build_kvec_Brillouin(), which should internally use model.model.A_inv.
         model._build_kvec_Brillouin()
         
         # Verify kvec tensor properties
