@@ -373,9 +373,14 @@ class OnePhonon:
                 k_dk = self._center_kvec(dk, k_dim)
                 for dl in range(l_dim):
                     k_dl = self._center_kvec(dl, l_dim)
-                    hkl = torch.tensor([k_dh, k_dk, k_dl], device=self.device, dtype=torch.float32)
-                    # Ensure exact match with NumPy implementation by using the same calculation approach
-                    self.kvec[dh, dk, dl] = 2 * torch.pi * torch.matmul(A_inv_tensor.T, hkl)
+                    # Create hkl vector exactly as in NumPy
+                    hkl = np.array([k_dh, k_dk, k_dl])
+                    hkl_tensor = torch.tensor(hkl, device=self.device, dtype=torch.float32)
+                    
+                    # Use the exact same calculation as NumPy: 2π * A_inv.T * hkl
+                    self.kvec[dh, dk, dl] = 2 * np.pi * torch.matmul(A_inv_tensor.T, hkl_tensor)
+                    
+                    # Calculate norm exactly as NumPy does
                     self.kvec_norm[dh, dk, dl] = torch.norm(self.kvec[dh, dk, dl])
         
         # Set requires_grad after construction
@@ -392,6 +397,8 @@ class OnePhonon:
         
         This matches the NumPy implementation exactly.
         """
+        # Exactly match the NumPy implementation
+        # The key is to use integer division and modulo operations in the same order
         return int(((x - L / 2) % L) - L / 2) / L
     
     #@debug
