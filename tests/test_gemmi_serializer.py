@@ -97,7 +97,31 @@ class TestGemmiSerializer(unittest.TestCase):
         self.assertEqual(res_rest.seqid.num, 10)
         
         # atom
+        print("\n=== GEMMI RESIDUE ATOM ACCESS DEMONSTRATION ===")
+        
+        # Try to access .atoms directly (will fail but we'll catch it)
+        try:
+            print(f"Trying to access res_rest.atoms directly...")
+            atoms_attr = res_rest.atoms
+            print(f"  Result: {atoms_attr}")  # This won't execute
+        except AttributeError as e:
+            print(f"  Error: {e}")
+            
+        # Show the correct way - iteration
+        print("\nCorrect way - iterate over residue:")
+        atom_count = 0
+        for atom in res_rest:
+            atom_count += 1
+            print(f"  Found atom: {atom.name}, element: {atom.element.name}, position: ({atom.pos.x:.3f}, {atom.pos.y:.3f}, {atom.pos.z:.3f})")
+        print(f"  Total atoms found by iteration: {atom_count}")
+        
+        # Convert to list for easier handling
+        print("\nUsing list conversion:")
         atoms_list = list(res_rest)  # Convert atoms iterator to list
+        print(f"  Number of atoms in list: {len(atoms_list)}")
+        print(f"  First atom in list: {atoms_list[0].name}")
+        
+        # Now do the actual test assertions
         self.assertEqual(len(atoms_list), 1)
         atom_rest = atoms_list[0]
         self.assertEqual(atom_rest.name, "CA")
