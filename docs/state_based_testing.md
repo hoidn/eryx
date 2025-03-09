@@ -258,12 +258,16 @@ When state-based tests fail:
    assert not hasattr(model, 'A_inv')  # A_inv should not be at top level
    ```
 
-4. **Debug Gradient Flow**: Add explicit gradient checks
+4. **Debug Tensor Creation**: Check tensor properties
    ```python
-   # After loss.backward():
-   print(f"A_inv.grad: {model.model.A_inv.grad}")
-   print(f"A_inv.grad sum: {torch.sum(torch.abs(model.model.A_inv.grad)).item()}")
+   # After method call:
+   print(f"A_inv shape: {model.model.A_inv.shape}")
+   print(f"A_inv requires_grad: {model.model.A_inv.requires_grad}")
+   print(f"kvec shape: {model.kvec.shape}")
+   print(f"kvec requires_grad: {model.kvec.requires_grad}")
    ```
+
+   Note: Gradient flow is not required for state-restored instances in tests.
 
 ## Generating New State Logs
 

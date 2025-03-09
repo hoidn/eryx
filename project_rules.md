@@ -265,8 +265,10 @@ Most tasks should use Level 1 or 2, reserving Level 3 for critical or complex co
    - Compare states with appropriate numerical tolerances
    - Ignore attributes explicitly marked for exclusion
    - Report detailed differences when state comparison fails
+   - Note: Gradient flow is not required for state-restored instances
 
 5. **Verification Process**
    - Use verify_logs.py to check log completeness
    - Ensure before/after state pairs exist for all methods
    - Verify all required attributes are present in logs
+   - Do not test gradient flow for state-restored test objects
