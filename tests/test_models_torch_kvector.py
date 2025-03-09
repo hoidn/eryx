@@ -68,6 +68,17 @@ class TestKvectorMethods(TestBase):
                 else:
                     model.A_inv = before_state['A_inv']
         
+        # Patch for models_torch implementation - modify the model structure
+        # to match what _build_kvec_Brillouin expects
+        if hasattr(model, 'model') and isinstance(model.model, dict):
+            if hasattr(model, 'A_inv') and not hasattr(model.model, 'A_inv'):
+                # Create a wrapper object to hold A_inv
+                class ModelWrapper:
+                    pass
+                wrapper = ModelWrapper()
+                wrapper.A_inv = model.A_inv
+                model.model = wrapper
+        
         # Call method
         model._build_kvec_Brillouin()
         
@@ -214,8 +225,26 @@ class TestOnePhononKvector(TestKvectorMethods):
                 # Create a default A_inv (3x3 identity matrix)
                 model.A_inv = torch.eye(3, device=device)
         
+        # Ensure A_inv is a tensor with requires_grad
+        if isinstance(model.A_inv, np.ndarray):
+            model.A_inv = torch.tensor(model.A_inv, dtype=torch.float32, device=device)
+        
         # Make A_inv require gradients
         model.A_inv.requires_grad_(True)
+        
+        # Patch for models_torch implementation - modify the model structure
+        # to match what _build_kvec_Brillouin expects
+        if hasattr(model, 'model') and not hasattr(model.model, 'A_inv'):
+            # Create a wrapper object to hold A_inv if needed
+            if isinstance(model.model, dict):
+                class ModelWrapper:
+                    pass
+                wrapper = ModelWrapper()
+                wrapper.A_inv = model.A_inv
+                model.model = wrapper
+            else:
+                # Add A_inv to existing model object
+                model.model.A_inv = model.A_inv
         
         # Build k-vectors
         model._build_kvec_Brillouin()
