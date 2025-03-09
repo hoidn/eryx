@@ -21,11 +21,19 @@ def load_test_state(logger, module_name: str, class_name: str, method_name: str,
         state = load_test_state(self.logger, 'eryx.models', 'OnePhonon', '_build_kvec_Brillouin')
     """
     state_type = 'before' if before else 'after'
-    log_path = f"logs/{module_name}.{class_name}._state_{state_type}_{method_name}.log"
+    # Try both naming conventions
+    log_paths = [
+        f"logs/{module_name}.{class_name}._state_{state_type}_{method_name}.log",
+        f"logs/{module_name}.{method_name}.{class_name}._state_{state_type}_{method_name}.log"
+    ]
     
-    # Check if log exists
-    if not os.path.exists(log_path):
-        raise FileNotFoundError(f"Log file not found: {log_path}")
+    # Check if any log exists
+    for log_path in log_paths:
+        if os.path.exists(log_path):
+            return logger.loadStateLog(log_path)
+    
+    # If we get here, no log was found
+    raise FileNotFoundError(f"Log files not found: {log_paths}")
     
     # Load state data
     return logger.loadStateLog(log_path)

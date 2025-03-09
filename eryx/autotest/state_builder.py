@@ -88,8 +88,9 @@ class StateBuilder:
                 if self.pdb_adapter:
                     obj.model.A_inv = self.pdb_adapter.array_to_tensor(model_data['A_inv'], requires_grad=True)
                 else:
-                    # Fallback conversion
-                    obj.model.A_inv = torch.tensor(model_data['A_inv'], device=self.device, requires_grad=True)
+                    # Fallback conversion - use clone().detach() to avoid warning
+                    A_inv_tensor = torch.tensor(model_data['A_inv'], device=self.device)
+                    obj.model.A_inv = A_inv_tensor.clone().detach().requires_grad_(True)
             
             # Apply other model attributes
             for k, v in model_data.items():
@@ -127,10 +128,10 @@ class StateBuilder:
                 elif self.pdb_adapter:
                     setattr(obj, k, self.pdb_adapter.array_to_tensor(v))
                 else:
-                    # Fallback conversion
+                    # Fallback conversion - use clone().detach() to avoid warning
                     tensor = torch.tensor(v, device=self.device)
                     if tensor.dtype.is_floating_point:
-                        tensor.requires_grad_(True)
+                        tensor = tensor.clone().detach().requires_grad_(True)
                     setattr(obj, k, tensor)
             elif isinstance(v, dict):
                 # Handle dictionary attributes
