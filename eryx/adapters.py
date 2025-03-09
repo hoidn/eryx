@@ -74,6 +74,10 @@ class PDBToTensor:
             
         result = {}
         
+        # Handle Gemmi structure specially
+        if hasattr(model, 'structure'):
+            result['structure_dict'] = self.convert_gemmi_to_tensor_dict(model.structure)
+        
         # Convert key array attributes to tensors
         tensor_attributes = {
             'xyz': True,           # Atomic coordinates (n_conf, n_atoms, 3)
@@ -233,6 +237,46 @@ class PDBToTensor:
                 result['crystal'] = self.convert_crystal(gnm.crystal)
         
         return result
+    
+    def convert_gemmi_to_tensor_dict(self, gemmi_obj: Any) -> Dict[str, torch.Tensor]:
+        """
+        Convert Gemmi object to dictionary of tensors.
+        
+        Args:
+            gemmi_obj: Gemmi object to convert
+            
+        Returns:
+            Dictionary with tensor representations of numerical properties
+        """
+        from eryx.autotest.serializer import GemmiSerializer
+        
+        # First serialize to dictionary
+        try:
+            gemmi_serializer = GemmiSerializer()
+            serialized = gemmi_serializer.serialize_gemmi_object(gemmi_obj)
+            
+            # Now convert numerical values to tensors
+            result = {"_gemmi_type": serialized.get("_gemmi_type", "Unknown")}
+            
+            # Process based on type
+            if serialized.get("_gemmi_type") == "Structure":
+                # Handle Structure specially
+                if "cell" in serialized and isinstance(serialized["cell"], dict):
+                    cell_params = []
+                    for param in ["a", "b", "c", "alpha", "beta", "gamma"]:
+                        if param in serialized["cell"]:
+                            cell_params.append(serialized["cell"][param])
+                    
+                    if len(cell_params) == 6:
+                        result["cell_tensor"] = torch.tensor(
+                            cell_params, device=self.device, dtype=torch.float32, 
+                            requires_grad=True
+                        )
+            
+            return result
+        except Exception as e:
+            print(f"Warning: Failed to convert Gemmi object to tensors: {e}")
+            return {"_gemmi_type": "ConversionFailed"}
     
     def array_to_tensor(self, array: np.ndarray, requires_grad: bool = True, dtype=None) -> torch.Tensor:
         """

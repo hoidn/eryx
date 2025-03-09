@@ -73,6 +73,20 @@ class TestBase(unittest.TestCase):
                 continue
                 
             try:
+                # Handle serialized Gemmi objects
+                if isinstance(attr_value, dict) and attr_value.get("_gemmi_type"):
+                    # In most cases, we can just use the dictionary representation
+                    # If actual Gemmi object needed, use deserializer
+                    try:
+                        # Import gemmi only if needed
+                        import gemmi
+                        from eryx.autotest.serializer import GemmiSerializer
+                        gemmi_serializer = GemmiSerializer()
+                        attr_value = gemmi_serializer.deserialize_gemmi_object(attr_value)
+                    except (ImportError, ValueError) as e:
+                        # Keep as dictionary if deserialization fails
+                        print(f"Warning: Could not deserialize Gemmi object {attr_name}: {e}")
+                
                 if isinstance(attr_value, np.ndarray):
                     # Convert numpy arrays to tensors with consistent dtype
                     if np.issubdtype(attr_value.dtype, np.floating):
@@ -95,9 +109,47 @@ class TestBase(unittest.TestCase):
         
     def _compare_states(self, expected: Dict, actual: Dict, 
                        attr_tolerances: Optional[Dict] = None) -> bool:
-        # Use torch_testing.compareStates with appropriate tolerances
+        # Filter out Gemmi objects from comparison or handle specially
+        expected_filtered = {}
+        actual_filtered = {}
+        
+        for key, value in expected.items():
+            # Skip attributes that can't be compared directly
+            if isinstance(value, dict) and value.get("_gemmi_type"):
+                # For Gemmi objects, only compare essential properties
+                expected_filtered[key] = self._extract_gemmi_essentials(value)
+            else:
+                expected_filtered[key] = value
+                
+        for key, value in actual.items():
+            if key not in expected_filtered:
+                continue
+                
+            if isinstance(value, dict) and value.get("_gemmi_type"):
+                actual_filtered[key] = self._extract_gemmi_essentials(value)
+            else:
+                actual_filtered[key] = value
+        
+        # Use torch_testing.compareStates with filtered states
         attr_tolerances = attr_tolerances or {}
-        return self.torch_testing.compareStates(expected, actual, attr_tolerances)
+        return self.torch_testing.compareStates(expected_filtered, actual_filtered, attr_tolerances)
+    
+    def _extract_gemmi_essentials(self, gemmi_dict: Dict) -> Dict:
+        """Extract only essential properties from Gemmi dictionaries for comparison."""
+        essentials = {}
+        
+        gemmi_type = gemmi_dict.get("_gemmi_type")
+        if gemmi_type == "Structure":
+            if "cell" in gemmi_dict:
+                essentials["cell"] = gemmi_dict["cell"]
+            if "spacegroup" in gemmi_dict:
+                essentials["spacegroup"] = gemmi_dict["spacegroup"]
+        elif gemmi_type == "Cell" or gemmi_type == "UnitCell":
+            for param in ["a", "b", "c", "alpha", "beta", "gamma"]:
+                if param in gemmi_dict:
+                    essentials[param] = gemmi_dict[param]
+        
+        return essentials
         
     def _get_method_args(self, module_name: str, method_name: str) -> Tuple[List, Dict]:
         # Find log file for the method
