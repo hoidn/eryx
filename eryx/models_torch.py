@@ -31,7 +31,7 @@ class OnePhonon:
         - Original NumPy implementation in eryx/models.py:OnePhonon
     """
     
-    @debug
+    #@debug
     def __init__(self, pdb_path: str, hsampling: Tuple[float, float, float], 
                  ksampling: Tuple[float, float, float], lsampling: Tuple[float, float, float],
                  expand_p1: bool = True, group_by: str = 'asu',
@@ -68,7 +68,7 @@ class OnePhonon:
         self._setup(pdb_path, expand_p1, res_limit, group_by)
         self._setup_phonons(pdb_path, model, gnm_cutoff, gamma_intra, gamma_inter)
     
-    @debug
+    #@debug
     def _setup(self, pdb_path: str, expand_p1: bool, res_limit: float, group_by: str):
         """
         Compute q-vectors to evaluate and build the unit cell and its neighbors.
@@ -124,7 +124,7 @@ class OnePhonon:
             self.n_dof_per_asu = 6
         self.n_dof_per_cell = self.n_asu * self.n_dof_per_asu
     
-    @debug
+    #@debug
     def _setup_phonons(self, pdb_path: str, model: str, 
                        gnm_cutoff: float, gamma_intra: float, gamma_inter: float):
         """
@@ -169,7 +169,7 @@ class OnePhonon:
         else:
             self.compute_rb_phonons()
     
-    @debug
+    #@debug
     def _build_A(self):
         """
         Build the displacement projection matrix A that projects rigid-body
@@ -233,7 +233,7 @@ class OnePhonon:
         else:
             self.Amat = None
     
-    @debug
+    #@debug
     def _build_M(self):
         """
         Build the mass matrix M and compute its inverse (via Cholesky).
@@ -253,7 +253,7 @@ class OnePhonon:
             L = torch.linalg.cholesky(Mmat)
             self.Linv = torch.linalg.inv(L)
     
-    @debug
+    #@debug
     def _build_M_allatoms(self) -> torch.Tensor:
         """
         Build the all-atom mass matrix M_0.
@@ -309,7 +309,7 @@ class OnePhonon:
                               self.n_asu, self.n_dof_per_asu_actual),
                              device=self.device, requires_grad=True)
     
-    @debug
+    ##@debug
     def _project_M(self, M_allatoms: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
         """
         Project the all-atom mass matrix M_0 using the A matrix.
@@ -341,7 +341,7 @@ class OnePhonon:
                                                                     Amat_j))
         return Mmat
     
-    @debug
+    #@debug
     def _build_kvec_Brillouin(self):
         """
         Compute all k-vectors and their norm in the first Brillouin zone.
@@ -378,7 +378,7 @@ class OnePhonon:
         self.kvec.requires_grad_(True)
         self.kvec_norm.requires_grad_(True)
     
-    @debug
+    #@debug
     def _center_kvec(self, x: int, L: int) -> float:
         """
         Center a k-vector index.
@@ -390,7 +390,7 @@ class OnePhonon:
         """
         return int(((x - L / 2) % L) - L / 2) / L
     
-    @debug
+    #@debug
     def _at_kvec_from_miller_points(self, hkl_kvec: tuple) -> torch.Tensor:
         """
         Return the indices of all q-vectors that are k-vector away from given Miller indices.
@@ -426,7 +426,7 @@ class OnePhonon:
                   
         return indices
     
-    @debug
+    #@debug
     def compute_gnm_hessian(self) -> torch.Tensor:
         """
         Compute the Hessian matrix using the Gaussian Network Model.
@@ -457,7 +457,7 @@ class OnePhonon:
                 hessian[i_asu, i_at, self.id_cell_ref, i_asu, i_at] = hessian_diagonal[i_asu, i_at] - gamma_self
         return hessian
     
-    @debug
+    #@debug
     def compute_gnm_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
         """
         Compute the dynamical matrix K(kvec) from the Hessian.
@@ -484,7 +484,7 @@ class OnePhonon:
                     Kmat[i_asu, :, j_asu, :] += hessian[i_asu, :, j_cell, j_asu, :] * eikr
         return Kmat
     
-    @debug
+    #@debug
     def compute_Kinv(self, hessian: torch.Tensor, kvec: torch.Tensor = None, 
                      reshape: bool = True) -> torch.Tensor:
         """
@@ -503,7 +503,7 @@ class OnePhonon:
             Kinv = Kinv.reshape((Kshape[0], Kshape[1], Kshape[2], Kshape[3]))
         return Kinv
     
-    @debug
+    #@debug
     def compute_hessian(self) -> torch.Tensor:
         """
         Compute the projected Hessian matrix for the supercell.
@@ -544,7 +544,7 @@ class OnePhonon:
                     hessian[i_asu, :, i_cell, j_asu, :] = proj
         return hessian
     
-    @debug
+    #@debug
     def compute_gnm_phonons(self):
         """
         Compute phonon modes for each k-vector in the first Brillouin zone.
@@ -576,7 +576,7 @@ class OnePhonon:
                     self.Winv[dh, dk, dl] = 1.0 / (w ** 2)
                     self.V[dh, dk, dl] = torch.matmul(Linv_complex.T, v)
     
-    @debug
+    #@debug
     def compute_gnm_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
         """
         Compute the dynamical matrix K(kvec) from the Hessian.
@@ -603,7 +603,7 @@ class OnePhonon:
                     Kmat[i_asu, :, j_asu, :] += hessian[i_asu, :, j_cell, j_asu, :] * eikr
         return Kmat
     
-    @debug
+    #@debug
     def compute_Kinv(self, hessian: torch.Tensor, kvec: torch.Tensor = None, 
                      reshape: bool = True) -> torch.Tensor:
         """
@@ -630,7 +630,7 @@ class OnePhonon:
             Kinv = Kinv.reshape((Kshape[0], Kshape[1], Kshape[2], Kshape[3]))
         return Kinv
     
-    @debug
+    #@debug
     def compute_covariance_matrix(self):
         """
         Compute the covariance matrix for atomic displacements.
@@ -664,7 +664,7 @@ class OnePhonon:
         self.covar = torch.real(self.covar.reshape((self.n_asu, self.n_dof_per_asu,
                                                      self.n_cell, self.n_asu, self.n_dof_per_asu)))
     
-    @debug
+    #@debug
     def apply_disorder(self, rank: int = -1, outdir: Optional[str] = None, 
                        use_data_adp: bool = False) -> torch.Tensor:
         """
@@ -726,7 +726,7 @@ class OnePhonon:
             np.save(os.path.join(outdir, f"rank_{rank:05d}.npy"), Id_masked.detach().cpu().numpy())
         return Id_masked
 
-    @debug
+    #@debug
     def array_to_tensor(self, array: np.ndarray, requires_grad: bool = True, dtype=None) -> torch.Tensor:
         """
         Convert a NumPy array to a Torch tensor.
@@ -738,7 +738,7 @@ class OnePhonon:
             tensor.requires_grad_(True)
         return tensor
 
-    @debug
+    #@debug
     def compute_rb_phonons(self):
         """
         Compute phonons for the rigid-body model.
@@ -748,17 +748,17 @@ class OnePhonon:
 # Minimal implementations for additional models
 
 class RigidBodyTranslations:
-    @debug
+    #@debug
     def __init__(self, *args, **kwargs):
         pass
 
 class LiquidLikeMotions:
-    @debug
+    #@debug
     def __init__(self, *args, **kwargs):
         pass
 
 class RigidBodyRotations:
-    @debug
+    #@debug
     def __init__(self, *args, **kwargs):
         pass
 

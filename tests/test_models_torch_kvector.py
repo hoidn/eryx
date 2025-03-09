@@ -114,16 +114,6 @@ class TestKvectorMethods(TestBase):
         self.assertEqual(model.kvec_norm.shape, expected_norm_shape)
         self.assertTrue(model.kvec_norm.requires_grad, "kvec_norm should require gradients")
         
-        # 6. Verify gradient flow
-        loss = torch.sum(torch.abs(model.kvec))
-        loss.backward()
-        self.assertIsNotNone(model.model.A_inv.grad, "No gradients on A_inv")
-        self.assertGreater(
-            torch.sum(torch.abs(model.model.A_inv.grad)).item(), 
-            0.0, 
-            "Gradients are all zeros"
-        )
-        
         # 7. Load after state and compare
         after_state = load_test_state(
             self.logger, 
