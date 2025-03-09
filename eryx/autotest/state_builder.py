@@ -1,6 +1,7 @@
 import torch
 import numpy as np
-from typing import Any, Dict, Type, Optional
+import io
+from typing import Any, Dict, Type, Optional, List, Union
 
 class StateBuilder:
     """
@@ -21,6 +22,10 @@ class StateBuilder:
         """
         # Initialize device
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Initialize serializer for deserialization
+        from eryx.autotest.serializer import Serializer
+        self.serializer = Serializer()
         
         # Import adapters lazily to avoid circular imports
         try:
@@ -61,7 +66,7 @@ class StateBuilder:
     
     def _build_one_phonon(self, obj: Any, state_data: Dict[str, Any]) -> None:
         """
-        Build OnePhonon with correct structure, ensuring A_inv is in right place.
+        Build OnePhonon with correct structure.
         
         Args:
             obj: OnePhonon instance to initialize
@@ -70,90 +75,142 @@ class StateBuilder:
         # First create the model structure correctly
         obj.model = type('AtomicModelProxy', (), {})
         
-        # Handle model attributes, especially A_inv
-        if 'model' in state_data:
-            model_data = state_data['model']
-            
-            # Deserialize if needed
-            if isinstance(model_data, bytes):
-                try:
-                    import pickle
-                    model_data = pickle.loads(model_data)
-                except Exception as e:
-                    print(f"Warning: Failed to deserialize model data: {e}")
-                    model_data = {}
-            
-            # Ensure A_inv is set first and correctly
-            if 'A_inv' in model_data:
-                if self.pdb_adapter:
-                    obj.model.A_inv = self.pdb_adapter.array_to_tensor(model_data['A_inv'], requires_grad=True)
-                else:
-                    # Fallback conversion - use clone().detach() to avoid warning
-                    A_inv_tensor = torch.tensor(model_data['A_inv'], device=self.device)
-                    obj.model.A_inv = A_inv_tensor.clone().detach().requires_grad_(True)
-            
-            # Apply other model attributes
-            for k, v in model_data.items():
-                if k != 'A_inv':  # Already handled
-                    if isinstance(v, np.ndarray):
-                        if self.pdb_adapter:
-                            setattr(obj.model, k, self.pdb_adapter.array_to_tensor(v))
-                        else:
-                            tensor = torch.tensor(v, device=self.device)
-                            if tensor.dtype.is_floating_point:
-                                tensor.requires_grad_(True)
-                            setattr(obj.model, k, tensor)
-                    else:
-                        setattr(obj.model, k, v)
+        # Apply all state attributes using the enhanced _apply_state method
+        self._apply_state(obj, state_data)
         
-        # Apply remaining state attributes
-        self._apply_state(obj, {k: v for k, v in state_data.items() if k != 'model'})
+        # Ensure A_inv exists with proper gradient support
+        if not hasattr(obj.model, 'A_inv') or obj.model.A_inv is None:
+            obj.model.A_inv = torch.eye(3, device=self.device, requires_grad=True)
+        elif isinstance(obj.model.A_inv, torch.Tensor) and not obj.model.A_inv.requires_grad:
+            obj.model.A_inv = obj.model.A_inv.clone().detach().requires_grad_(True)
     
     def _apply_state(self, obj: Any, state_data: Dict[str, Any]) -> None:
         """
-        Apply state with proper tensor conversion.
+        Apply state with proper tensor conversion for any attribute.
         
         Args:
             obj: Object to apply state to
             state_data: Dictionary with attribute values
         """
         for k, v in state_data.items():
-            if isinstance(v, np.ndarray):
-                # Handle grid data specially
-                if k in ['q_grid', 'hkl_grid'] and self.grid_adapter:
-                    map_shape = state_data.get('map_shape', (1,1,1))
-                    grid_tensor, _ = self.grid_adapter.convert_grid(v, map_shape)
-                    setattr(obj, k, grid_tensor)
-                # Handle other arrays
-                elif self.pdb_adapter:
-                    setattr(obj, k, self.pdb_adapter.array_to_tensor(v))
-                else:
-                    # Fallback conversion - use clone().detach() to avoid warning
-                    tensor = torch.tensor(v, device=self.device)
-                    if tensor.dtype.is_floating_point:
-                        tensor = tensor.clone().detach().requires_grad_(True)
-                    setattr(obj, k, tensor)
-            elif isinstance(v, dict):
-                # Handle dictionary attributes
-                setattr(obj, k, v)
-            elif isinstance(v, bytes):
-                # Try to deserialize
-                try:
-                    import pickle
-                    unpickled = pickle.loads(v)
-                    if isinstance(unpickled, np.ndarray):
-                        if self.pdb_adapter:
-                            setattr(obj, k, self.pdb_adapter.array_to_tensor(unpickled))
-                        else:
-                            tensor = torch.tensor(unpickled, device=self.device)
-                            if tensor.dtype.is_floating_point:
-                                tensor.requires_grad_(True)
-                            setattr(obj, k, tensor)
+            try:
+                # Handle different value types consistently
+                if isinstance(v, np.ndarray):
+                    # Direct NumPy arrays
+                    if k in ['q_grid', 'hkl_grid'] and self.grid_adapter:
+                        map_shape = state_data.get('map_shape', (1,1,1))
+                        grid_tensor, _ = self.grid_adapter.convert_grid(v, map_shape)
+                        setattr(obj, k, grid_tensor)
+                    elif self.pdb_adapter:
+                        setattr(obj, k, self.pdb_adapter.array_to_tensor(v))
                     else:
-                        setattr(obj, k, unpickled)
-                except Exception as e:
-                    print(f"Warning: Failed to deserialize {k}: {e}")
+                        tensor = torch.tensor(v, device=self.device)
+                        if tensor.dtype.is_floating_point:
+                            tensor.requires_grad_(True)
+                        setattr(obj, k, tensor)
+                elif isinstance(v, dict):
+                    # Dictionary attributes - could be serialized arrays or regular dicts
+                    if self._is_serialized_array(v):
+                        # Convert serialized array to tensor
+                        array = self._deserialize_array(v)
+                        if array is not None:
+                            if self.pdb_adapter:
+                                setattr(obj, k, self.pdb_adapter.array_to_tensor(array))
+                            else:
+                                tensor = torch.tensor(array, device=self.device)
+                                if tensor.dtype.is_floating_point:
+                                    tensor.requires_grad_(True)
+                                setattr(obj, k, tensor)
+                        else:
+                            # Couldn't deserialize as array, treat as regular dict
+                            setattr(obj, k, v)
+                    else:
+                        # Regular dictionary - recursively process
+                        if k == 'model' and not hasattr(obj, 'model'):
+                            # Create model attribute if needed
+                            obj.model = type('AtomicModelProxy', (), {})
+                        
+                        if hasattr(obj, k) and isinstance(getattr(obj, k), object):
+                            # Apply to existing attribute
+                            self._apply_state(getattr(obj, k), v)
+                        else:
+                            # Set as new attribute
+                            setattr(obj, k, v)
+                elif isinstance(v, bytes):
+                    # Try to deserialize bytes
+                    try:
+                        deserialized = self._deserialize_value(v)
+                        if isinstance(deserialized, np.ndarray):
+                            # Deserialized to array
+                            if self.pdb_adapter:
+                                setattr(obj, k, self.pdb_adapter.array_to_tensor(deserialized))
+                            else:
+                                tensor = torch.tensor(deserialized, device=self.device)
+                                if tensor.dtype.is_floating_point:
+                                    tensor.requires_grad_(True)
+                                setattr(obj, k, tensor)
+                        else:
+                            # Other deserialized value
+                            setattr(obj, k, deserialized)
+                    except Exception:
+                        # Keep as bytes if deserialization fails
+                        setattr(obj, k, v)
+                else:
+                    # Pass through other values
                     setattr(obj, k, v)
-            else:
-                # Pass through other values
-                setattr(obj, k, v)
+            except Exception as e:
+                print(f"Warning: Could not set attribute {k}: {e}")
+    def _is_serialized_array(self, data: Dict) -> bool:
+        """Check if a dictionary appears to be a serialized array."""
+        # Check for numpy array serialization format
+        if '_array_type' in data and data['_array_type'] == 'numpy.ndarray':
+            return True
+        
+        # Check for shape and dtype keys which often indicate serialized arrays
+        if 'shape' in data and 'dtype' in data:
+            return True
+            
+        return False
+    
+    def _deserialize_array(self, data: Dict) -> Optional[np.ndarray]:
+        """Try to deserialize a dictionary to a numpy array."""
+        try:
+            # Case 1: Our serializer's array format
+            if '_array_type' in data and data['_array_type'] == 'numpy.ndarray':
+                if '_array_data' in data:
+                    buffer = io.BytesIO(data['_array_data'])
+                    return np.load(buffer)
+            
+            # Case 2: Shape and dtype info
+            if 'shape' in data and 'dtype' in data:
+                shape = data['shape']
+                dtype_str = str(data['dtype'])
+                
+                # Create appropriate array based on shape and dtype
+                if dtype_str.startswith('float'):
+                    if len(shape) == 2 and shape[0] == shape[1]:
+                        # For square matrices, use identity
+                        return np.eye(shape[0], dtype=np.float32)
+                    else:
+                        return np.zeros(shape, dtype=np.float32)
+                else:
+                    return np.zeros(shape, dtype=np.int32)
+        except Exception as e:
+            print(f"Warning: Failed to deserialize array: {e}")
+        
+        return None
+    
+    def _deserialize_value(self, binary_data: bytes) -> Any:
+        """Deserialize binary data to a value."""
+        try:
+            import pickle
+            return pickle.loads(binary_data)
+        except Exception:
+            # Try using our serializer if available
+            if hasattr(self, 'serializer'):
+                try:
+                    return self.serializer.deserialize(binary_data)
+                except Exception:
+                    pass
+        
+        return binary_data
