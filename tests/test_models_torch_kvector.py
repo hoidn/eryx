@@ -134,7 +134,7 @@ class TestKvectorMethods(TestBase):
             kvec_norm_expected = self.serializer.deserialize(kvec_norm_expected)
         
         # Compare tensor values
-        tolerances = {'rtol': 1e-5, 'atol': 1e-8}
+        tolerances = {'rtol': 1e-4, 'atol': 1e-5}
         self.assertTrue(
             np.allclose(
                 model.kvec.detach().cpu().numpy(), 

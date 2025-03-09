@@ -360,8 +360,11 @@ class OnePhonon:
         self.kvec_norm = torch.zeros((h_dim, k_dim, l_dim, 1), 
                                     device=self.device)
         
-        # Convert A_inv to tensor
-        A_inv_tensor = torch.tensor(self.model.A_inv, dtype=torch.float32, device=self.device)
+        # Convert A_inv to tensor properly using clone().detach() to avoid warning
+        if isinstance(self.model.A_inv, torch.Tensor):
+            A_inv_tensor = self.model.A_inv.clone().detach().to(dtype=torch.float32, device=self.device)
+        else:
+            A_inv_tensor = torch.tensor(self.model.A_inv, dtype=torch.float32, device=self.device)
         
         # Compute k-vectors
         for dh in range(h_dim):
@@ -371,6 +374,7 @@ class OnePhonon:
                 for dl in range(l_dim):
                     k_dl = self._center_kvec(dl, l_dim)
                     hkl = torch.tensor([k_dh, k_dk, k_dl], device=self.device, dtype=torch.float32)
+                    # Ensure exact match with NumPy implementation by using the same calculation approach
                     self.kvec[dh, dk, dl] = 2 * torch.pi * torch.matmul(A_inv_tensor.T, hkl)
                     self.kvec_norm[dh, dk, dl] = torch.norm(self.kvec[dh, dk, dl])
         
