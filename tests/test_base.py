@@ -116,14 +116,14 @@ class TestBase(unittest.TestCase):
                         tensor.requires_grad_(True)
                     else:
                         tensor = torch.tensor(attr_value, device=self.device)
-                    setattr(model, attr_name, tensor)
+                    setattr(obj, attr_name, tensor)
                 else:
                     # Set non-array attributes directly
-                    setattr(model, attr_name, attr_value)
+                    setattr(obj, attr_name, attr_value)
             except Exception as e:
                 print(f"Warning: Could not set attribute {attr_name}: {e}")
                 
-        return model
+        return obj
         
     def _compare_states(self, expected: Dict, actual: Dict, 
                        attr_tolerances: Optional[Dict] = None) -> bool:
