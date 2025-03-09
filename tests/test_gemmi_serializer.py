@@ -97,8 +97,9 @@ class TestGemmiSerializer(unittest.TestCase):
         self.assertEqual(res_rest.seqid.num, 10)
         
         # atom
-        self.assertEqual(len(res_rest.atoms), 1)
-        atom_rest = res_rest.atoms[0]
+        atoms_list = list(res_rest)  # Convert atoms iterator to list
+        self.assertEqual(len(atoms_list), 1)
+        atom_rest = atoms_list[0]
         self.assertEqual(atom_rest.name, "CA")
         self.assertAlmostEqual(atom_rest.pos.x, 1.234, places=3)
         self.assertAlmostEqual(atom_rest.b_iso, 20.0)
