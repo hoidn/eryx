@@ -77,6 +77,9 @@ class GemmiSerializer:
             "Atom": self.deserialize_atom,
             "SpaceGroup": self.deserialize_spacegroup
         }
+        
+        # Flag to indicate if gemmi is available
+        global GEMMI_AVAILABLE
     
     def is_gemmi_object(self, obj: Any) -> bool:
         """
@@ -165,32 +168,72 @@ class GemmiSerializer:
         Raises:
             ValueError: If object is not a recognized Gemmi type
         """
-        # Handle eryx.pdb objects specially
-        module_name = getattr(obj.__class__, "__module__", "")
-        class_name = obj.__class__.__name__
-        
-        if module_name == "eryx.pdb":
-            if class_name == "AtomicModel":
-                return self.serialize_atomic_model(obj)
-            elif class_name == "GaussianNetworkModel":
-                return self.serialize_gnm(obj)
-            elif class_name == "Crystal":
-                return self.serialize_crystal(obj)
-        
-        gemmi_type = self.get_gemmi_type(obj)
-        if not gemmi_type:
-            raise ValueError(f"Not a recognized Gemmi object: {type(obj)}")
+        try:
+            # Handle eryx.pdb objects specially
+            module_name = getattr(obj.__class__, "__module__", "")
+            class_name = obj.__class__.__name__
             
-        # Get the appropriate serializer function
-        serializer = self.serializers.get(gemmi_type)
-        if not serializer:
-            raise ValueError(f"No serializer available for Gemmi type: {gemmi_type}")
+            if module_name == "eryx.pdb":
+                if class_name == "AtomicModel":
+                    return self.serialize_atomic_model(obj)
+                elif class_name == "GaussianNetworkModel":
+                    return self.serialize_gnm(obj)
+                elif class_name == "Crystal":
+                    return self.serialize_crystal(obj)
             
-        # Call the serializer and add type metadata
-        result = serializer(obj)
-        result["_gemmi_type"] = gemmi_type
-        
-        return result
+            gemmi_type = self.get_gemmi_type(obj)
+            if not gemmi_type:
+                # Create a generic representation for unrecognized Gemmi objects
+                result = {
+                    "_gemmi_type": "Unknown",
+                    "_module": module_name,
+                    "_class": class_name,
+                    "_repr": repr(obj)[:1000]  # Limit length of representation
+                }
+                
+                # Try to extract common attributes
+                for attr in ["name", "id", "serial", "number"]:
+                    if hasattr(obj, attr):
+                        try:
+                            result[attr] = getattr(obj, attr)
+                        except Exception:
+                            pass
+                
+                return result
+                
+            # Get the appropriate serializer function
+            serializer = self.serializers.get(gemmi_type)
+            if not serializer:
+                # Create a basic representation if no specific serializer is available
+                result = {
+                    "_gemmi_type": gemmi_type,
+                    "_module": module_name,
+                    "_class": class_name,
+                    "_repr": repr(obj)[:1000]  # Limit length of representation
+                }
+                
+                # Try to extract common attributes
+                for attr in ["name", "id", "serial", "number"]:
+                    if hasattr(obj, attr):
+                        try:
+                            result[attr] = getattr(obj, attr)
+                        except Exception:
+                            pass
+                
+                return result
+                
+            # Call the serializer and add type metadata
+            result = serializer(obj)
+            result["_gemmi_type"] = gemmi_type
+            
+            return result
+        except Exception as e:
+            # Return a minimal representation if serialization fails
+            return {
+                "_gemmi_type": "SerializationFailed",
+                "_error": str(e),
+                "_repr": repr(obj)[:1000] if obj is not None else "None"
+            }
     
     def deserialize_gemmi_object(self, data: Dict[str, Any]) -> Any:
         """
@@ -719,7 +762,7 @@ class Serializer:
         """
         try:
             # Check if it's a Gemmi object
-            if self.gemmi_serializer.is_gemmi_object(input_data):
+            if hasattr(self, 'gemmi_serializer') and self.gemmi_serializer.is_gemmi_object(input_data):
                 # Convert Gemmi object to serializable dictionary
                 serialized_dict = self.gemmi_serializer.serialize_gemmi_object(input_data)
                 # Then pickle the dictionary
@@ -759,8 +802,173 @@ class Serializer:
             # Standard pickle for other types
             return pickle.dumps(input_data)
         except (pickle.PicklingError, AttributeError, TypeError) as e:
-            raise ValueError(f"Input data is not picklable: {str(e)}")
+            # Handle unserializable objects gracefully
+            return self._serialize_unserializable(input_data, str(e))
 
+    def _serialize_unserializable(self, obj: Any, error_msg: str) -> bytes:
+        """
+        Create a serializable placeholder for unserializable objects.
+        
+        Args:
+            obj: The object that couldn't be serialized
+            error_msg: The error message from the serialization attempt
+            
+        Returns:
+            Serialized bytes of a placeholder dictionary
+        """
+        # Get type information
+        type_name = type(obj).__name__
+        module_name = getattr(type(obj), "__module__", "unknown")
+        full_type = f"{module_name}.{type_name}"
+        
+        # Create base placeholder
+        placeholder = {
+            "__unserializable__": True,
+            "__type__": full_type,
+            "__error__": error_msg,
+            "__repr__": repr(obj)[:1000]  # Limit length of representation
+        }
+        
+        # Check if it's a Gemmi object
+        if self._is_gemmi_object(obj):
+            placeholder["__gemmi_type__"] = True
+            # Extract useful information if possible
+            gemmi_info = self._extract_gemmi_info(obj)
+            if gemmi_info:
+                placeholder["__gemmi_info__"] = gemmi_info
+        
+        # Handle collections containing unserializable objects
+        if isinstance(obj, dict):
+            # Process dictionary items
+            serialized_dict = {}
+            for k, v in obj.items():
+                try:
+                    # Try to serialize the key
+                    key = str(k)  # Convert key to string if not serializable
+                    
+                    # Try to serialize the value
+                    try:
+                        serialized_dict[key] = self.serialize(v)
+                    except Exception as e:
+                        # Create placeholder for unserializable value
+                        serialized_dict[key] = self._serialize_unserializable(v, str(e))
+                except Exception:
+                    # Skip items that can't be processed at all
+                    continue
+            
+            placeholder["__items__"] = serialized_dict
+            
+        elif isinstance(obj, (list, tuple)):
+            # Process list/tuple items
+            serialized_items = []
+            for item in obj:
+                try:
+                    serialized_items.append(self.serialize(item))
+                except Exception as e:
+                    # Create placeholder for unserializable item
+                    serialized_items.append(self._serialize_unserializable(item, str(e)))
+            
+            placeholder["__items__"] = serialized_items
+            placeholder["__collection_type__"] = "list" if isinstance(obj, list) else "tuple"
+        
+        # Try to extract common attributes
+        try:
+            attrs = {}
+            for attr_name in dir(obj):
+                # Skip methods, private attributes, and special methods
+                if attr_name.startswith('_') or callable(getattr(obj, attr_name, None)):
+                    continue
+                
+                try:
+                    attr_value = getattr(obj, attr_name)
+                    # Only include simple types
+                    if isinstance(attr_value, (str, int, float, bool, type(None))):
+                        attrs[attr_name] = attr_value
+                except Exception:
+                    continue
+            
+            if attrs:
+                placeholder["__attributes__"] = attrs
+        except Exception:
+            # Ignore errors in attribute extraction
+            pass
+        
+        return pickle.dumps(placeholder)
+    
+    def _is_gemmi_object(self, obj: Any) -> bool:
+        """
+        Check if an object is from the gemmi module.
+        
+        Args:
+            obj: Object to check
+            
+        Returns:
+            True if it's a Gemmi object, False otherwise
+        """
+        if obj is None:
+            return False
+        
+        # Check module name
+        module_name = getattr(type(obj), "__module__", "")
+        if module_name.startswith("gemmi"):
+            return True
+        
+        # Check class name and module path
+        type_str = str(type(obj))
+        return "gemmi." in type_str
+    
+    def _extract_gemmi_info(self, obj: Any) -> Dict[str, Any]:
+        """
+        Extract useful information from a Gemmi object.
+        
+        Args:
+            obj: Gemmi object
+            
+        Returns:
+            Dictionary with extracted properties
+        """
+        info = {}
+        
+        # Try to extract common properties
+        for attr in ["name", "id", "serial", "number"]:
+            if hasattr(obj, attr):
+                try:
+                    info[attr] = getattr(obj, attr)
+                except Exception:
+                    pass
+        
+        # Extract cell parameters if available
+        if hasattr(obj, "cell"):
+            try:
+                cell = obj.cell
+                info["cell"] = {
+                    "a": getattr(cell, "a", 0.0),
+                    "b": getattr(cell, "b", 0.0),
+                    "c": getattr(cell, "c", 0.0),
+                    "alpha": getattr(cell, "alpha", 0.0),
+                    "beta": getattr(cell, "beta", 0.0),
+                    "gamma": getattr(cell, "gamma", 0.0)
+                }
+            except Exception:
+                pass
+        
+        # Extract space group if available
+        if hasattr(obj, "spacegroup_hm"):
+            try:
+                info["spacegroup"] = obj.spacegroup_hm
+            except Exception:
+                pass
+        
+        # Extract position if available (for atoms)
+        if hasattr(obj, "pos"):
+            try:
+                pos = obj.pos
+                info["position"] = [pos.x, pos.y, pos.z]
+            except Exception:
+                pass
+        
+        return info
+    
     def deserialize(self, serialized_data: bytes) -> Any:
         """
         Deserializes Python objects from a binary format using pickle.
@@ -787,8 +995,17 @@ class Serializer:
             
             # Check if this is a serialized Gemmi object
             if isinstance(data, dict) and data.get("_serialized_gemmi", False):
-                # Deserialize Gemmi object
-                return self.gemmi_serializer.deserialize_gemmi_object(data["data"])
+                # Deserialize Gemmi object if gemmi_serializer is available
+                if hasattr(self, 'gemmi_serializer'):
+                    return self.gemmi_serializer.deserialize_gemmi_object(data["data"])
+                else:
+                    # Return the data dictionary if gemmi_serializer is not available
+                    return data["data"]
+            
+            # Handle unserializable object placeholders
+            if isinstance(data, dict) and data.get("__unserializable__", False):
+                # Return the placeholder dictionary
+                return data
             
             # Handle special case for PyTorch tensors
             if isinstance(data, dict) and '_tensor_type' in data and data['_tensor_type'] == 'torch.Tensor':

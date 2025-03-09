@@ -79,12 +79,13 @@ class StateCapture:
                 if callable(attr_value):
                     continue
                 
-                # Serialize the attribute
+                # Serialize the attribute - this will now handle unserializable objects gracefully
                 state[attr_name] = self.serializer.serialize(attr_value)
             except Exception as e:
                 # Log error but continue capturing other attributes
                 logging.warning(f"Error capturing attribute {attr_name}: {str(e)}")
-                state[f"__error_{attr_name}__"] = str(e)
+                # Create a placeholder for the error
+                state[f"__error_{attr_name}__"] = self.serializer.serialize(str(e))
         
         return state
     

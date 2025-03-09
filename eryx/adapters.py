@@ -248,11 +248,38 @@ class PDBToTensor:
         Returns:
             Dictionary with tensor representations of numerical properties
         """
-        from eryx.autotest.serializer import GemmiSerializer
+        # Import GemmiSerializer with fallback
+        try:
+            from eryx.autotest.serializer import GemmiSerializer
+            gemmi_serializer = GemmiSerializer()
+        except ImportError:
+            # Create a minimal serializer if the full one is not available
+            class MinimalGemmiSerializer:
+                def serialize_gemmi_object(self, obj):
+                    # Extract basic info
+                    result = {"_gemmi_type": "Unknown"}
+                    
+                    # Try to get cell parameters if available
+                    if hasattr(obj, "cell"):
+                        try:
+                            cell = obj.cell
+                            result["cell"] = {
+                                "a": getattr(cell, "a", 0.0),
+                                "b": getattr(cell, "b", 0.0),
+                                "c": getattr(cell, "c", 0.0),
+                                "alpha": getattr(cell, "alpha", 0.0),
+                                "beta": getattr(cell, "beta", 0.0),
+                                "gamma": getattr(cell, "gamma", 0.0)
+                            }
+                        except Exception:
+                            pass
+                    
+                    return result
+            
+            gemmi_serializer = MinimalGemmiSerializer()
         
         # First serialize to dictionary
         try:
-            gemmi_serializer = GemmiSerializer()
             serialized = gemmi_serializer.serialize_gemmi_object(gemmi_obj)
             
             # Now convert numerical values to tensors
@@ -273,10 +300,39 @@ class PDBToTensor:
                             requires_grad=True
                         )
             
+            # Extract any other numerical properties that could be useful as tensors
+            for key, value in serialized.items():
+                if isinstance(value, (list, tuple)) and all(isinstance(x, (int, float)) for x in value):
+                    # Convert numerical lists to tensors
+                    result[f"{key}_tensor"] = torch.tensor(
+                        value, device=self.device, dtype=torch.float32,
+                        requires_grad=True
+                    )
+                elif isinstance(value, dict) and key not in ["cell"]:  # Skip cell as we handled it above
+                    # Look for numerical values in dictionaries
+                    tensor_values = []
+                    tensor_keys = []
+                    for k, v in value.items():
+                        if isinstance(v, (int, float)):
+                            tensor_keys.append(k)
+                            tensor_values.append(v)
+                    
+                    if tensor_values:
+                        result[f"{key}_tensor"] = torch.tensor(
+                            tensor_values, device=self.device, dtype=torch.float32,
+                            requires_grad=True
+                        )
+                        result[f"{key}_keys"] = tensor_keys
+            
             return result
         except Exception as e:
             print(f"Warning: Failed to convert Gemmi object to tensors: {e}")
-            return {"_gemmi_type": "ConversionFailed"}
+            return {
+                "_gemmi_type": "ConversionFailed",
+                "_error": str(e),
+                # Create an empty tensor to avoid downstream errors
+                "empty_tensor": torch.tensor([], device=self.device, dtype=torch.float32)
+            }
     
     def array_to_tensor(self, array: np.ndarray, requires_grad: bool = True, dtype=None) -> torch.Tensor:
         """
