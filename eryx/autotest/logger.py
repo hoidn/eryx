@@ -100,6 +100,10 @@ class Logger:
                 
                 # Check for objects that might contain Gemmi objects
                 if isinstance(attr, object) and hasattr(attr, '__dict__'):
+                    # Skip already processed Gemmi objects
+                    if hasattr(self.serializer, 'gemmi_serializer') and self.serializer.gemmi_serializer.is_gemmi_object(attr):
+                        continue
+                        
                     try:
                         # Recursively capture state for complex objects
                         nested_state = self.captureState(attr, include_private, max_depth - 1, exclude_attrs)

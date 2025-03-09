@@ -111,6 +111,18 @@ class GemmiSerializer:
         # Check for objects that contain Gemmi objects
         if hasattr(obj, 'structure') and self.is_gemmi_object(obj.structure):
             return True
+            
+        # Check for AtomicModel objects from eryx.pdb
+        if module_name == "eryx.pdb" and class_name == "AtomicModel":
+            return True
+            
+        # Check for GaussianNetworkModel objects from eryx.pdb
+        if module_name == "eryx.pdb" and class_name == "GaussianNetworkModel":
+            return True
+            
+        # Check for Crystal objects from eryx.pdb
+        if module_name == "eryx.pdb" and class_name == "Crystal":
+            return True
         
         return False
     
@@ -127,7 +139,12 @@ class GemmiSerializer:
         if not self.is_gemmi_object(obj):
             return None
             
+        module_name = getattr(obj.__class__, "__module__", "")
         class_name = obj.__class__.__name__
+        
+        # Handle eryx.pdb objects
+        if module_name == "eryx.pdb":
+            return class_name
         
         # Handle special cases
         if class_name == "UnitCell":
@@ -148,6 +165,18 @@ class GemmiSerializer:
         Raises:
             ValueError: If object is not a recognized Gemmi type
         """
+        # Handle eryx.pdb objects specially
+        module_name = getattr(obj.__class__, "__module__", "")
+        class_name = obj.__class__.__name__
+        
+        if module_name == "eryx.pdb":
+            if class_name == "AtomicModel":
+                return self.serialize_atomic_model(obj)
+            elif class_name == "GaussianNetworkModel":
+                return self.serialize_gnm(obj)
+            elif class_name == "Crystal":
+                return self.serialize_crystal(obj)
+        
         gemmi_type = self.get_gemmi_type(obj)
         if not gemmi_type:
             raise ValueError(f"Not a recognized Gemmi object: {type(obj)}")
@@ -182,6 +211,10 @@ class GemmiSerializer:
         gemmi_type = data.get("_gemmi_type")
         if not gemmi_type:
             raise ValueError("Missing _gemmi_type in serialized data")
+            
+        # Handle eryx.pdb objects - always return the dictionary
+        if gemmi_type in ["AtomicModel", "GaussianNetworkModel", "Crystal"]:
+            return data
             
         # Check if gemmi is available
         if not GEMMI_AVAILABLE:
@@ -541,6 +574,115 @@ class GemmiSerializer:
         return (self._has_attributes(obj, ["name"]) and
                 hasattr(obj, "__iter__") and  # Has chains
                 self._has_attributes(obj, ["add_chain"]))
+                
+    def serialize_atomic_model(self, model: Any) -> Dict[str, Any]:
+        """
+        Serialize an AtomicModel to a dictionary.
+        
+        Args:
+            model: eryx.pdb.AtomicModel object
+            
+        Returns:
+            Dictionary with serialized model data
+        """
+        result = {
+            "_gemmi_type": "AtomicModel",
+            "_module": "eryx.pdb"
+        }
+        
+        # Extract basic properties
+        for attr in ["n_asu", "n_conf", "space_group"]:
+            if hasattr(model, attr):
+                result[attr] = getattr(model, attr)
+        
+        # Handle numpy arrays
+        for array_attr in ["xyz", "ff_a", "ff_b", "ff_c", "adp", "cell", "A_inv", "unit_cell_axes"]:
+            if hasattr(model, array_attr):
+                attr_value = getattr(model, array_attr)
+                if attr_value is not None:
+                    # Store shape and dtype info for reconstruction
+                    result[array_attr] = {
+                        "shape": attr_value.shape,
+                        "dtype": str(attr_value.dtype)
+                    }
+        
+        # Handle structure if present
+        if hasattr(model, "structure") and model.structure is not None:
+            try:
+                result["structure"] = self.serialize_structure(model.structure)
+            except Exception as e:
+                print(f"Warning: Failed to serialize structure: {e}")
+        
+        return result
+    
+    def serialize_gnm(self, gnm: Any) -> Dict[str, Any]:
+        """
+        Serialize a GaussianNetworkModel to a dictionary.
+        
+        Args:
+            gnm: eryx.pdb.GaussianNetworkModel object
+            
+        Returns:
+            Dictionary with serialized GNM data
+        """
+        result = {
+            "_gemmi_type": "GaussianNetworkModel",
+            "_module": "eryx.pdb"
+        }
+        
+        # Extract basic properties
+        for attr in ["enm_cutoff", "gamma_intra", "gamma_inter"]:
+            if hasattr(gnm, attr):
+                result[attr] = getattr(gnm, attr)
+        
+        # Handle numpy arrays
+        for array_attr in ["gamma"]:
+            if hasattr(gnm, array_attr):
+                attr_value = getattr(gnm, array_attr)
+                if attr_value is not None:
+                    # Store shape and dtype info for reconstruction
+                    result[array_attr] = {
+                        "shape": attr_value.shape,
+                        "dtype": str(attr_value.dtype)
+                    }
+        
+        # Handle crystal if present
+        if hasattr(gnm, "crystal") and gnm.crystal is not None:
+            try:
+                result["crystal"] = self.serialize_crystal(gnm.crystal)
+            except Exception as e:
+                print(f"Warning: Failed to serialize crystal: {e}")
+        
+        return result
+    
+    def serialize_crystal(self, crystal: Any) -> Dict[str, Any]:
+        """
+        Serialize a Crystal to a dictionary.
+        
+        Args:
+            crystal: eryx.pdb.Crystal object
+            
+        Returns:
+            Dictionary with serialized Crystal data
+        """
+        result = {
+            "_gemmi_type": "Crystal",
+            "_module": "eryx.pdb"
+        }
+        
+        # Extract basic properties
+        for attr in ["n_cell"]:
+            if hasattr(crystal, attr):
+                result[attr] = getattr(crystal, attr)
+        
+        # Handle model if present
+        if hasattr(crystal, "model") and crystal.model is not None:
+            try:
+                result["model"] = self.serialize_atomic_model(crystal.model)
+            except Exception as e:
+                print(f"Warning: Failed to serialize model: {e}")
+        
+        return result
 
 
 class Serializer:
