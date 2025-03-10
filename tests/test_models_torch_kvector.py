@@ -279,23 +279,36 @@ class TestKvectorMethods(TestBase):
         # DEBUGGING: Print differences
         print("\nDEBUGGING differences:")
         kvec_numpy = model.kvec.detach().cpu().numpy()
-        max_diff = np.max(np.abs(kvec_numpy - kvec_expected))
+        # Convert expected tensor to numpy if it's a tensor
+        if isinstance(kvec_expected, torch.Tensor):
+            kvec_expected_numpy = kvec_expected.detach().cpu().numpy()
+        else:
+            kvec_expected_numpy = kvec_expected
+            
+        max_diff = np.max(np.abs(kvec_numpy - kvec_expected_numpy))
         print(f"Maximum difference: {max_diff}")
         
         # Compare specific points
         for i, j, k in [(0,0,0), (0,1,0), (1,0,0), (1,1,1)]:
             if i < h_dim and j < k_dim and k < l_dim:
-                diff = np.max(np.abs(kvec_numpy[i,j,k] - kvec_expected[i,j,k]))
+                diff = np.max(np.abs(kvec_numpy[i,j,k] - kvec_expected_numpy[i,j,k]))
                 print(f"Difference at [{i},{j},{k}]: {diff}")
                 print(f"  Actual: {kvec_numpy[i,j,k]}")
-                print(f"  Expected: {kvec_expected[i,j,k]}")
+                print(f"  Expected: {kvec_expected_numpy[i,j,k]}")
         
         # Compare tensor values
         tolerances = {'rtol': 1e-4, 'atol': 1e-5}
+        
+        # Convert kvec_norm_expected to numpy if it's a tensor
+        if isinstance(kvec_norm_expected, torch.Tensor):
+            kvec_norm_expected_numpy = kvec_norm_expected.detach().cpu().numpy()
+        else:
+            kvec_norm_expected_numpy = kvec_norm_expected
+            
         self.assertTrue(
             np.allclose(
                 model.kvec.detach().cpu().numpy(), 
-                kvec_expected, 
+                kvec_expected_numpy, 
                 rtol=tolerances['rtol'], 
                 atol=tolerances['atol']
             ),
@@ -304,7 +317,7 @@ class TestKvectorMethods(TestBase):
         self.assertTrue(
             np.allclose(
                 model.kvec_norm.detach().cpu().numpy(), 
-                kvec_norm_expected, 
+                kvec_norm_expected_numpy, 
                 rtol=tolerances['rtol'], 
                 atol=tolerances['atol']
             ),
