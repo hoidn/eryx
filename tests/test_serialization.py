@@ -244,6 +244,53 @@ class TestObjectSerializer(unittest.TestCase):
         self.assertEqual(deserialized.x, 10)
         self.assertEqual(deserialized.y, 20)
 
+    def test_numpy_array_format(self):
+        """Test the specific binary format used for NumPy array serialization."""
+        try:
+            # Create test arrays of different shapes and types
+            array1 = np.array([1, 2, 3, 4, 5])
+            array2 = np.array([[1.1, 2.2], [3.3, 4.4]])
+            
+            # Test array1 serialization format
+            serialized = self.serializer.serialize(array1)
+            
+            # Check required fields
+            self.assertEqual(serialized["__type__"], "numpy.ndarray")
+            self.assertEqual(serialized["__shape__"], (5,))
+            self.assertEqual(serialized["__dtype__"], str(array1.dtype))
+            self.assertTrue("__binary__" in serialized)
+            
+            # Verify binary data is valid base64
+            import base64
+            binary_data = serialized["__binary__"]
+            try:
+                decoded = base64.b64decode(binary_data)
+                self.assertTrue(len(decoded) > 0)
+            except Exception as e:
+                self.fail(f"Failed to decode binary data: {e}")
+            
+            # Test that deserialization works with the binary format
+            deserialized = self.serializer.deserialize(serialized)
+            np.testing.assert_array_equal(array1, deserialized)
+            
+            # Test 2D array
+            serialized2 = self.serializer.serialize(array2)
+            deserialized2 = self.serializer.deserialize(serialized2)
+            np.testing.assert_array_equal(array2, deserialized2)
+            
+            # Test fallback mechanism
+            fallback_data = {
+                "__type__": "numpy.ndarray",
+                "__shape__": (3, 3),
+                "__dtype__": "float64"
+                # No __binary__ field
+            }
+            fallback_array = self.serializer.deserialize(fallback_data)
+            self.assertEqual(fallback_array.shape, (3, 3))
+            self.assertEqual(fallback_array.dtype, np.dtype('float64'))
+            
+        except ImportError:
+            self.skipTest("NumPy not available")
 
 if __name__ == '__main__':
     unittest.main()
