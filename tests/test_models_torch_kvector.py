@@ -90,13 +90,10 @@ class TestKvectorMethods(TestBase):
             result = model._center_kvec(x, L)
             print(f"_center_kvec({x}, {L}) = {result}")
         
-        # Set the correct A_inv matrix explicitly
-        # This is a workaround until we fix the state log serialization
-        model.model.A_inv = torch.tensor([
-            [1.30546132, 0.00000000, 0.00000000],
-            [0.00000000, 0.36634513, 0.00000000],
-            [0.00000000, 0.00000000, 0.21252826]
-        ], device=model.device, requires_grad=True)
+        # Check if A_inv is a placeholder (created by StateBuilder when missing from state)
+        if hasattr(model.model, '_a_inv_is_placeholder') and model.model._a_inv_is_placeholder:
+            print("\nWARNING: Using placeholder A_inv matrix. Please regenerate state logs.")
+            self.skipTest("A_inv matrix is a placeholder. Regenerate state logs with the command below.")
         
         # 4. Call the method
         model._build_kvec_Brillouin()

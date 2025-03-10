@@ -80,7 +80,11 @@ class StateBuilder:
         
         # Ensure A_inv exists with proper gradient support
         if not hasattr(obj.model, 'A_inv') or obj.model.A_inv is None:
+            # Log a warning instead of silently creating an identity matrix
+            print("Warning: A_inv not found in state data, model may not behave correctly")
+            # Create a default A_inv but mark it as a placeholder
             obj.model.A_inv = torch.eye(3, device=self.device, requires_grad=True)
+            obj.model._a_inv_is_placeholder = True
         elif isinstance(obj.model.A_inv, torch.Tensor) and not obj.model.A_inv.requires_grad:
             obj.model.A_inv = obj.model.A_inv.clone().detach().requires_grad_(True)
     
@@ -177,22 +181,30 @@ class StateBuilder:
         try:
             # Case 1: Our serializer's array format
             if '_array_type' in data and data['_array_type'] == 'numpy.ndarray':
+                # First try to use the binary data if available
                 if '_array_data' in data:
-                    buffer = io.BytesIO(data['_array_data'])
-                    return np.load(buffer)
+                    try:
+                        buffer = io.BytesIO(data['_array_data'])
+                        return np.load(buffer)
+                    except Exception:
+                        pass  # Fall through to other methods if binary loading fails
+                
+                # Next try to use the array values if available
+                if '_array_values' in data:
+                    try:
+                        array = np.array(data['_array_values'])
+                        # Convert to the correct dtype if specified
+                        if '_array_dtype' in data:
+                            array = array.astype(np.dtype(data['_array_dtype']))
+                        return array
+                    except Exception:
+                        pass  # Fall through if this fails
             
-            # Case 2: Shape and dtype info
+            # Case 2: Shape and dtype info only (no actual data)
             if 'shape' in data and 'dtype' in data:
-                shape = data['shape']
-                dtype_str = str(data['dtype'])
-                
-                # Instead of creating an identity matrix for square matrices,
-                # we should extract the actual A_inv values from the expected kvec values
-                # in the after state log. This is a temporary solution until we fix
-                # the state log generation.
-                
-                # For now, return None to indicate we couldn't deserialize the array
-                # This will cause the StateBuilder to use the default A_inv from the model
+                print(f"Warning: Array data missing, only shape {data['shape']} and dtype {data['dtype']} available")
+                # Return None to indicate we couldn't deserialize the array
+                # This will allow the caller to handle the missing data appropriately
                 return None
         except Exception as e:
             print(f"Warning: Failed to deserialize array: {e}")

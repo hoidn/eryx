@@ -792,11 +792,14 @@ class Serializer:
             if isinstance(input_data, np.ndarray):
                 buffer = io.BytesIO()
                 np.save(buffer, input_data)
+                # Store the actual array data, not just metadata
                 return pickle.dumps({
                     '_array_data': buffer.getvalue(),
                     '_array_type': 'numpy.ndarray',
                     '_array_dtype': str(input_data.dtype),
-                    '_array_shape': input_data.shape
+                    '_array_shape': input_data.shape,
+                    # Add the actual array data as a list for better serialization
+                    '_array_values': input_data.tolist()
                 })
             
             # Standard pickle for other types
