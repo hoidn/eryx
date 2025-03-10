@@ -217,8 +217,14 @@ class ObjectSerializer:
             # Try object deserialization as fallback
             return self._deserialize_object(data)
             
+        except DeserializationError:
+            # Re-raise DeserializationError without wrapping
+            raise
         except Exception as e:
-            raise DeserializationError(f"Failed to deserialize object of type {data.get('__type__', 'unknown')}: {str(e)}")
+            if isinstance(data, dict):
+                raise DeserializationError(f"Failed to deserialize object of type {data.get('__type__', 'unknown')}: {str(e)}")
+            else:
+                raise DeserializationError(f"Failed to deserialize non-dictionary data of type {type(data).__name__}: {str(e)}")
     
     def dumps(self, obj: Any) -> str:
         """
