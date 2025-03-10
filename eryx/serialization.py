@@ -131,10 +131,13 @@ class ObjectSerializer:
                 
             # Handle dictionaries
             if isinstance(obj, dict):
-                items = {
-                    str(self.serialize(key)): self.serialize(value)
-                    for key, value in obj.items()
-                }
+                items = {}
+                for key, value in obj.items():
+                    # Serialize key and value separately
+                    serialized_key = self.serialize(key)
+                    serialized_value = self.serialize(value)
+                    # Use JSON string representation of the key as dictionary key
+                    items[json.dumps(serialized_key)] = serialized_value
                 return {
                     "__type__": "dict",
                     "__items__": items
@@ -193,11 +196,13 @@ class ObjectSerializer:
                 items = data["__items__"]
                 result = {}
                 for key_str, value in items.items():
-                    # The key is serialized as a string representation of a serialized object
-                    # We need to extract the actual key by parsing the string
-                    key_data = json.loads(key_str)
-                    key = self.deserialize(key_data)
-                    result[key] = self.deserialize(value)
+                    try:
+                        # The key is serialized as a JSON string representation of a serialized object
+                        key_data = json.loads(key_str)
+                        key = self.deserialize(key_data)
+                        result[key] = self.deserialize(value)
+                    except json.JSONDecodeError as e:
+                        raise DeserializationError(f"Failed to parse dictionary key: {e}")
                 return result
                 
             if type_name == "set":
@@ -347,6 +352,11 @@ class ObjectSerializer:
             if obj.__class__.__name__ == "Structure":
                 serialized = gemmi_serializer.serialize_structure(obj)
                 serialized["__type__"] = "gemmi.Structure"
+                
+                # Ensure name is included in the serialized data
+                if hasattr(obj, "name"):
+                    serialized["name"] = obj.name
+                    
                 return serialized
             
             # For other Gemmi types, create a simple serialization
@@ -369,13 +379,19 @@ class ObjectSerializer:
             
         except ImportError:
             # Fallback if GemmiSerializer is not available
-            return {
+            result = {
                 "__type__": f"gemmi.{obj.__class__.__name__}",
                 "__module__": obj.__class__.__module__,
                 "__class__": obj.__class__.__name__,
                 "__repr__": repr(obj),
                 "__error__": "GemmiSerializer not available"
             }
+            
+            # Still try to extract name and other common attributes
+            if hasattr(obj, "name"):
+                result["name"] = obj.name
+                
+            return result
     
     def _deserialize_gemmi_object(self, data: Dict[str, Any]) -> Any:
         """Deserialize Gemmi object using GemmiSerializer."""
@@ -424,39 +440,54 @@ class ObjectSerializer:
     
     def _deserialize_object(self, data: Dict[str, Any]) -> Any:
         """Deserialize a custom object instance."""
-        module_name = data["__module__"]
-        class_name = data["__class__"]
+        # Check if this is a custom object with type information
+        if "__type__" in data and data["__type__"] == "object":
+            module_name = data.get("__module__", "")
+            class_name = data.get("__class__", "")
+            
+            # Check if we have attributes
+            if "__attributes__" not in data:
+                return data  # Return as-is if no attributes
+            
+            # Try to import the module and get the class
+            try:
+                module = self._try_import(module_name)
+                if module:
+                    cls = getattr(module, class_name, None)
+                    if cls:
+                        # Create an empty instance
+                        obj = cls.__new__(cls)
+                        
+                        # Set attributes from deserialized __dict__
+                        for key, value in data["__attributes__"].items():
+                            if not key.startswith("__error_"):
+                                setattr(obj, key, self.deserialize(value))
+                        
+                        return obj
+            except Exception as e:
+                # Fall back to dictionary if class can't be imported or instantiated
+                print(f"Warning: Could not deserialize object of type {module_name}.{class_name}: {str(e)}")
+            
+            # Return a dictionary with the attributes as fallback
+            result = {}
+            for key, value in data["__attributes__"].items():
+                if not key.startswith("__error_"):
+                    result[key] = self.deserialize(value)
+            
+            # Add type information to the result
+            result["__module__"] = module_name
+            result["__class__"] = class_name
+            
+            return result
         
-        # Try to import the module and get the class
-        try:
-            module = self._try_import(module_name)
-            if module:
-                cls = getattr(module, class_name, None)
-                if cls:
-                    # Create an empty instance
-                    obj = cls.__new__(cls)
-                    
-                    # Set attributes from deserialized __dict__
-                    for key, value in data["__attributes__"].items():
-                        if not key.startswith("__error_"):
-                            setattr(obj, key, self.deserialize(value))
-                    
-                    return obj
-        except Exception as e:
-            # Fall back to dictionary if class can't be imported or instantiated
-            print(f"Warning: Could not deserialize object of type {module_name}.{class_name}: {str(e)}")
+        # For custom handlers like Point
+        elif "__type__" in data and "." in data["__type__"]:
+            # This is likely a custom type with a custom handler
+            # Return as-is since we couldn't find a handler
+            return data
         
-        # Return a dictionary with the attributes as fallback
-        result = {}
-        for key, value in data["__attributes__"].items():
-            if not key.startswith("__error_"):
-                result[key] = self.deserialize(value)
-        
-        # Add type information to the result
-        result["__module__"] = module_name
-        result["__class__"] = class_name
-        
-        return result
+        # Default case
+        return data
     
     def _try_import(self, module_name: str) -> Optional[Any]:
         """Safely import a module."""
