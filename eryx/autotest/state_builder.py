@@ -186,15 +186,14 @@ class StateBuilder:
                 shape = data['shape']
                 dtype_str = str(data['dtype'])
                 
-                # Create appropriate array based on shape and dtype
-                if dtype_str.startswith('float'):
-                    if len(shape) == 2 and shape[0] == shape[1]:
-                        # For square matrices, use identity
-                        return np.eye(shape[0], dtype=np.float32)
-                    else:
-                        return np.zeros(shape, dtype=np.float32)
-                else:
-                    return np.zeros(shape, dtype=np.int32)
+                # Instead of creating an identity matrix for square matrices,
+                # we should extract the actual A_inv values from the expected kvec values
+                # in the after state log. This is a temporary solution until we fix
+                # the state log generation.
+                
+                # For now, return None to indicate we couldn't deserialize the array
+                # This will cause the StateBuilder to use the default A_inv from the model
+                return None
         except Exception as e:
             print(f"Warning: Failed to deserialize array: {e}")
         
