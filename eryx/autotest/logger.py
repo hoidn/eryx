@@ -188,10 +188,25 @@ class Logger:
             # Create directory if it doesn't exist
             os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
             
+            # Process state data to handle problematic values
+            processed_state = {}
+            for key, value in state_data.items():
+                try:
+                    # Try to serialize each value individually
+                    processed_state[key] = value
+                except Exception as e:
+                    # If serialization fails, store error information
+                    processed_state[f"__error_{key}__"] = str(e)
+                    # Try to store a string representation as fallback
+                    try:
+                        processed_state[f"__str_{key}__"] = str(value)
+                    except Exception:
+                        pass
+            
             # Use ObjectSerializer to write state to file
             with open(log_file_path, 'w') as log_file:
-                # Handle complex numbers by converting to strings
-                self.serializer.dump(state_data, log_file)
+                self.serializer.dump(processed_state, log_file)
+                
         except Exception as e:
             # Try a more robust approach if the first attempt fails
             try:
@@ -199,12 +214,15 @@ class Logger:
                 sanitized_state = {}
                 for key, value in state_data.items():
                     try:
-                        # Test if the value can be serialized
+                        # Test if the value can be serialized with str conversion
                         json.dumps({key: value}, default=str)
                         sanitized_state[key] = value
                     except (TypeError, OverflowError):
                         # Convert problematic values to strings
-                        sanitized_state[key] = str(value)
+                        try:
+                            sanitized_state[key] = str(value)
+                        except Exception:
+                            sanitized_state[f"__error_{key}__"] = "Unserializable value"
                 
                 # Write sanitized state to file
                 with open(log_file_path, 'w') as log_file:

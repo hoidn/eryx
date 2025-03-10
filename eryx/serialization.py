@@ -302,6 +302,13 @@ class ObjectSerializer:
         try:
             import numpy as np
             self.register_handler(np.ndarray, self._serialize_ndarray, self._deserialize_ndarray)
+            
+            # Register handlers for NumPy scalar types
+            for np_type in [np.int8, np.int16, np.int32, np.int64, 
+                           np.uint8, np.uint16, np.uint32, np.uint64,
+                           np.float16, np.float32, np.float64,
+                           np.complex64, np.complex128]:
+                self.register_handler(np_type, self._serialize_numpy_scalar, self._deserialize_numpy_scalar)
         except ImportError:
             pass
             
@@ -316,6 +323,7 @@ class ObjectSerializer:
             self.register_handler(gemmi.Chain, self._serialize_gemmi_object, self._deserialize_gemmi_object)
             self.register_handler(gemmi.Residue, self._serialize_gemmi_object, self._deserialize_gemmi_object)
             self.register_handler(gemmi.Atom, self._serialize_gemmi_object, self._deserialize_gemmi_object)
+            self.register_handler(gemmi.Element, self._serialize_gemmi_element, self._deserialize_gemmi_element)
         except ImportError:
             pass
     
@@ -341,6 +349,42 @@ class ObjectSerializer:
     def _deserialize_complex(self, data: Dict[str, Any]) -> complex:
         """Deserialize complex number."""
         return complex(data["__real__"], data["__imag__"])
+        
+    def _serialize_numpy_scalar(self, obj: Any) -> Dict[str, Any]:
+        """Serialize NumPy scalar types."""
+        return {
+            "__type__": f"numpy.{type(obj).__name__}",
+            "__value__": obj.item()  # Convert to Python scalar
+        }
+    
+    def _deserialize_numpy_scalar(self, data: Dict[str, Any]) -> Any:
+        """Deserialize NumPy scalar types."""
+        import numpy as np
+        type_name = data["__type__"]
+        value = data["__value__"]
+        
+        # Map type name to NumPy type
+        type_map = {
+            "numpy.int8": np.int8,
+            "numpy.int16": np.int16,
+            "numpy.int32": np.int32,
+            "numpy.int64": np.int64,
+            "numpy.uint8": np.uint8,
+            "numpy.uint16": np.uint16,
+            "numpy.uint32": np.uint32,
+            "numpy.uint64": np.uint64,
+            "numpy.float16": np.float16,
+            "numpy.float32": np.float32,
+            "numpy.float64": np.float64,
+            "numpy.complex64": np.complex64,
+            "numpy.complex128": np.complex128
+        }
+        
+        # Get the NumPy type and convert
+        np_type = type_map.get(type_name)
+        if np_type:
+            return np_type(value)
+        return value  # Fallback
     
     def _serialize_ndarray(self, obj: Any) -> Dict[str, Any]:
         """Serialize NumPy ndarray."""
@@ -438,6 +482,32 @@ class ObjectSerializer:
                 
             return result
     
+    def _serialize_gemmi_element(self, obj: Any) -> Dict[str, Any]:
+        """Serialize Gemmi Element."""
+        try:
+            # Element objects have a name attribute that is a string representation
+            return {
+                "__type__": "gemmi.Element",
+                "__name__": obj.name,
+                "__symbol__": str(obj)
+            }
+        except Exception:
+            # Fallback if attributes are not accessible
+            return {
+                "__type__": "gemmi.Element",
+                "__symbol__": str(obj)
+            }
+    
+    def _deserialize_gemmi_element(self, data: Dict[str, Any]) -> Any:
+        """Deserialize Gemmi Element."""
+        try:
+            import gemmi
+            symbol = data.get("__symbol__", "")
+            return gemmi.Element(symbol)
+        except ImportError:
+            # Return a placeholder if Gemmi is not available
+            return data
+    
     def _deserialize_gemmi_object(self, data: Dict[str, Any]) -> Any:
         """Deserialize Gemmi object using GemmiSerializer."""
         try:
@@ -468,10 +538,43 @@ class ObjectSerializer:
     
     def _serialize_object(self, obj: Any) -> Dict[str, Any]:
         """Serialize a custom object instance."""
+        # Handle objects without __dict__ by creating a simplified representation
         if not hasattr(obj, "__dict__"):
-            raise SerializationError(f"Cannot serialize object of type {type(obj).__name__}: no __dict__ attribute")
+            # Try to extract basic information about the object
+            try:
+                module_name = obj.__class__.__module__
+                class_name = obj.__class__.__name__
+                
+                # Create a simplified representation with string conversion
+                result = {
+                    "__type__": "simplified_object",
+                    "__module__": module_name,
+                    "__class__": class_name,
+                    "__str__": str(obj),
+                    "__repr__": repr(obj)
+                }
+                
+                # Try to extract common attributes that might be properties
+                for attr_name in ["name", "value", "id", "type", "shape", "dtype"]:
+                    try:
+                        if hasattr(obj, attr_name):
+                            attr_value = getattr(obj, attr_name)
+                            if not callable(attr_value):
+                                result[f"__{attr_name}__"] = self.serialize(attr_value)
+                    except Exception:
+                        pass
+                
+                return result
+            except Exception as e:
+                # Last resort: just store the string representation
+                return {
+                    "__type__": "unserializable_object",
+                    "__class__": type(obj).__name__,
+                    "__str__": str(obj),
+                    "__error__": str(e)
+                }
         
-        # Process __dict__ recursively
+        # Process __dict__ recursively for normal objects
         attributes = {}
         for key, value in obj.__dict__.items():
             try:
