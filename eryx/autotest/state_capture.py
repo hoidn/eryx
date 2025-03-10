@@ -43,16 +43,19 @@ class StateCapture:
         # Compile attribute pattern regexes for faster matching
         self.exclude_patterns = [re.compile(pattern) for pattern in self.exclude_attrs]
         
-    def capture_state(self, obj: Any, current_depth: int = 0) -> Dict[str, Any]:
+    def capture_state_v2(self, obj: Any, current_depth: int = 0) -> Dict[str, Any]:
         """
-        Capture the state of an object recursively.
+        Recursively capture the state of an object, including nested objects.
+        
+        This ensures that nested attributes (like A_inv inside AtomicModel)
+        are properly captured and can be restored later.
         
         Args:
             obj: Object to capture state from
             current_depth: Current recursion depth (for internal use)
             
         Returns:
-            Dictionary containing serialized object state
+            Dictionary containing serialized object state with nested structure
         """
         # Check recursion limit
         if current_depth >= self.max_depth:
@@ -75,11 +78,53 @@ class StateCapture:
                 if callable(attr_value):
                     continue
                 
-                # Store attribute directly - serialization handled by ObjectSerializer
-                state[attr_name] = attr_value
+                # For basic types, store directly
+                if isinstance(attr_value, (int, float, bool, str, np.ndarray)) or attr_value is None:
+                    state[attr_name] = attr_value
+                # For lists, process each item recursively if it's an object
+                elif isinstance(attr_value, list):
+                    state[attr_name] = [
+                        self.capture_state_v2(item, current_depth + 1)
+                        if hasattr(item, "__dict__") and not isinstance(item, (int, float, bool, str))
+                        else item
+                        for item in attr_value
+                    ]
+                # For dictionaries, process each value recursively if it's an object
+                elif isinstance(attr_value, dict):
+                    state[attr_name] = {
+                        key: self.capture_state_v2(val, current_depth + 1)
+                        if hasattr(val, "__dict__") and not isinstance(val, (int, float, bool, str))
+                        else val
+                        for key, val in attr_value.items()
+                    }
+                # For objects with a __dict__, capture state recursively
+                elif hasattr(attr_value, "__dict__"):
+                    state[attr_name] = self.capture_state_v2(attr_value, current_depth + 1)
+                else:
+                    # For other types, store directly
+                    state[attr_name] = attr_value
             except Exception as e:
                 logging.warning(f"Error capturing attribute {attr_name}: {str(e)}")
                 state[f"__error_{attr_name}__"] = str(e)
+        
+        return state
+    
+    def capture_state(self, obj: Any, current_depth: int = 0) -> Dict[str, Any]:
+        """
+        Capture the state of an object recursively.
+        
+        Args:
+            obj: Object to capture state from
+            current_depth: Current recursion depth (for internal use)
+            
+        Returns:
+            Dictionary containing serialized object state
+        """
+        # Use the v2 implementation for recursive capture
+        state = self.capture_state_v2(obj, current_depth)
+        
+        # Add format version marker
+        state["__format_version__"] = 2
         
         return state
     

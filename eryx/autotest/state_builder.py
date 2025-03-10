@@ -243,7 +243,15 @@ class StateBuilder:
         
         return binary_data
     def _apply_state_v2(self, obj: Any, state_data: Dict[str, Any]) -> None:
-        """Apply state that was serialized with ObjectSerializer."""
+        """
+        Apply state that was serialized with ObjectSerializer or StateCapture v2.
+        
+        This method handles nested objects and properly converts arrays to tensors.
+        
+        Args:
+            obj: Object to apply state to
+            state_data: Dictionary with attribute values
+        """
         for key, value in state_data.items():
             # Skip special fields
             if key.startswith("__"):
@@ -263,6 +271,20 @@ class StateBuilder:
                     if tensor.dtype.is_floating_point:
                         tensor.requires_grad_(True)
                     setattr(obj, key, tensor)
+                # Handle nested dictionaries recursively
+                elif isinstance(value, dict) and not self._is_serialized_array(value):
+                    # Check if this is a nested object state
+                    if not hasattr(obj, key) or getattr(obj, key) is None:
+                        # Create a new object
+                        setattr(obj, key, type('DynamicObject', (), {}))
+                    
+                    # Apply state recursively
+                    self._apply_state_v2(getattr(obj, key), value)
+                # Handle lists that might contain nested objects
+                elif isinstance(value, list) and len(value) > 0 and isinstance(value[0], dict):
+                    # This might be a list of object states
+                    # For now, just set it directly - could be enhanced to handle lists of objects
+                    setattr(obj, key, value)
                 else:
                     # Set attribute directly
                     setattr(obj, key, value)
