@@ -243,7 +243,16 @@ class Logger:
         try:
             # Load using ObjectSerializer
             with open(log_file_path, 'r') as log_file:
-                return self.serializer.load(log_file)
+                try:
+                    return self.serializer.load(log_file)
+                except Exception as e:
+                    # If ObjectSerializer fails, try loading as plain JSON
+                    log_file.seek(0)
+                    try:
+                        return json.load(log_file)
+                    except Exception:
+                        # Re-raise the original error if JSON loading also fails
+                        raise e
         except FileNotFoundError:
             print(f"State log file not found: {log_file_path}", file=sys.stderr)
             return {}
