@@ -81,8 +81,6 @@ class StateCapture:
                 logging.warning(f"Error capturing attribute {attr_name}: {str(e)}")
                 state[f"__error_{attr_name}__"] = str(e)
         
-        # Add format version to indicate new serialization format
-        state["__format_version__"] = 2
         return state
     
     def _should_capture_attr(self, attr_name: str) -> bool:

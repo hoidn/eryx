@@ -152,39 +152,9 @@ class Logger:
             Dictionary with deserialized state data
         """
         try:
-            # Try to load using ObjectSerializer
+            # Load using ObjectSerializer
             with open(log_file_path, 'r') as log_file:
-                try:
-                    return self.serializer.load(log_file)
-                except Exception as e1:
-                    # If loading fails, try legacy format
-                    log_file.seek(0)
-                    try:
-                        # Legacy format had hex-encoded binary data
-                        serialized_state = json.load(log_file)
-                        legacy_state = {}
-                        
-                        # Convert hex-encoded values back to objects
-                        for key, value_hex in serialized_state.items():
-                            if isinstance(value_hex, str) and len(value_hex) > 0:
-                                try:
-                                    binary_data = bytes.fromhex(value_hex)
-                                    legacy_state[key] = self.serializer.deserialize({
-                                        "__type__": "binary",
-                                        "__data__": value_hex
-                                    })
-                                except ValueError:
-                                    # If not hex, keep as string
-                                    legacy_state[key] = value_hex
-                            else:
-                                legacy_state[key] = value_hex
-                        
-                        # Mark as legacy format
-                        legacy_state["__format_version__"] = 1
-                        return legacy_state
-                    except Exception as e2:
-                        print(f"Error loading legacy state format: {e2}", file=sys.stderr)
-                        raise
+                return self.serializer.load(log_file)
         except FileNotFoundError:
             print(f"State log file not found: {log_file_path}", file=sys.stderr)
             return {}

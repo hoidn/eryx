@@ -55,16 +55,8 @@ class StateBuilder:
         if not hasattr(obj, 'device'):
             obj.device = self.device
         
-        # Check format version
-        format_version = state_data.get("__format_version__", 1)
-        
-        # Apply state with format-specific handling
-        if format_version >= 2:
-            # New format - cleaner handling
-            self._apply_state_v2(obj, state_data)
-        else:
-            # Legacy format - maintain complex handling
-            self._apply_state(obj, state_data)
+        # Apply state
+        self._apply_state_v2(obj, state_data)
         
         return obj
     

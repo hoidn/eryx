@@ -172,15 +172,12 @@ def ensure_tensor(value, device=None):
     Ensure value is a PyTorch tensor with gradients.
     
     Args:
-        value: Value to convert (can be tensor, ndarray, or serialized)
+        value: Value to convert (can be tensor or ndarray)
         device: Device to place tensor on
         
     Returns:
         PyTorch tensor with proper gradients and device
     """
-    from eryx.serialization import ObjectSerializer
-    serializer = ObjectSerializer()
-    
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             
@@ -196,31 +193,6 @@ def ensure_tensor(value, device=None):
         if tensor.dtype.is_floating_point:
             tensor.requires_grad_(True)
         return tensor
-    elif isinstance(value, bytes):
-        # Try to deserialize
-        try:
-            deserialized = serializer.deserialize({
-                "__type__": "binary",
-                "__data__": value.hex()
-            })
-            if isinstance(deserialized, np.ndarray):
-                tensor = torch.tensor(deserialized, device=device)
-                if tensor.dtype.is_floating_point:
-                    tensor.requires_grad_(True)
-                return tensor
-        except Exception:
-            pass
-    elif isinstance(value, dict) and '__type__' in value:
-        # Already serialized object
-        try:
-            deserialized = serializer.deserialize(value)
-            if isinstance(deserialized, np.ndarray):
-                tensor = torch.tensor(deserialized, device=device)
-                if tensor.dtype.is_floating_point:
-                    tensor.requires_grad_(True)
-                return tensor
-        except Exception:
-            pass
     
     # Fallback to original value
     return value
