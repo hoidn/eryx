@@ -196,3 +196,58 @@ def ensure_tensor(value, device=None):
     
     # Fallback to original value
     return value
+
+def inspect_state_attribute(state_dict: Dict[str, Any], attr_path: str, detailed: bool = True) -> Dict[str, Any]:
+    """
+    Inspect a specific attribute in a state dictionary.
+    
+    Args:
+        state_dict: State dictionary from load_test_state
+        attr_path: Path to attribute (e.g., 'model.A_inv')
+        detailed: Whether to return detailed info
+        
+    Returns:
+        Dictionary with inspection results
+    """
+    parts = attr_path.split('.')
+    current = state_dict
+    
+    # Track our path
+    results = {
+        'found': False,
+        'path': attr_path,
+        'partial_path': '',
+        'type': None,
+        'value': None,
+        'details': {}
+    }
+    
+    # Navigate through the path
+    for i, part in enumerate(parts):
+        results['partial_path'] = '.'.join(parts[:i+1])
+        
+        if not isinstance(current, dict) or part not in current:
+            return results
+        
+        current = current[part]
+    
+    # We found the attribute
+    results['found'] = True
+    results['type'] = type(current).__name__
+    
+    # Add appropriate details based on type
+    if isinstance(current, dict):
+        results['details']['keys'] = list(current.keys())
+        if '__type__' in current:
+            results['details']['serialized_type'] = current['__type__']
+        results['value'] = f"Dict with {len(current)} keys"
+    elif isinstance(current, np.ndarray):
+        results['details']['shape'] = current.shape
+        results['details']['dtype'] = str(current.dtype)
+        results['value'] = f"Array shape {current.shape}"
+    elif isinstance(current, str) and len(current) > 100:
+        results['value'] = current[:100] + "..."
+    else:
+        results['value'] = current
+        
+    return results

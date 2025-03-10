@@ -387,34 +387,77 @@ class ObjectSerializer:
         return value  # Fallback
     
     def _serialize_ndarray(self, obj: Any) -> Dict[str, Any]:
-        """Serialize NumPy ndarray."""
+        """
+        Serialize NumPy ndarray using binary format.
+        
+        Args:
+            obj: NumPy ndarray to serialize
+            
+        Returns:
+            Dictionary with serialized array data and metadata
+        """
+        import io
+        import base64
         import numpy as np
+        
+        # Use BytesIO to store the array in binary format
         buffer = io.BytesIO()
         np.save(buffer, obj)
+        buffer.seek(0)
+        
+        # Base64 encode the binary data for JSON compatibility
+        binary_data = buffer.getvalue()
+        encoded_data = base64.b64encode(binary_data).decode('ascii')
         
         return {
             "__type__": "numpy.ndarray",
             "__shape__": obj.shape,
             "__dtype__": str(obj.dtype),
-            "__data__": buffer.getvalue().hex(),
-            # Include a sample of values for debugging
-            "__sample__": obj.flatten()[:10].tolist() if obj.size > 0 else []
+            "__binary__": encoded_data
         }
     
     def _deserialize_ndarray(self, data: Dict[str, Any]) -> Any:
-        """Deserialize NumPy ndarray."""
-        import numpy as np
-        buffer = io.BytesIO(bytes.fromhex(data["__data__"]))
-        array = np.load(buffer)
+        """
+        Deserialize NumPy ndarray from binary format.
         
-        # Verify shape and dtype match
-        expected_shape = data["__shape__"]
-        expected_dtype = data["__dtype__"]
-        
-        if array.shape != tuple(expected_shape):
-            print(f"Warning: Array shape mismatch. Expected {expected_shape}, got {array.shape}")
+        Args:
+            data: Dictionary with serialized array data
             
-        return array
+        Returns:
+            NumPy ndarray
+        """
+        import io
+        import base64
+        import numpy as np
+        
+        # Check for binary data
+        if "__binary__" in data:
+            try:
+                # Decode base64 and load using NumPy
+                binary_data = base64.b64decode(data["__binary__"])
+                buffer = io.BytesIO(binary_data)
+                return np.load(buffer)
+            except Exception as e:
+                import logging
+                logging.warning(f"Failed to deserialize array from binary: {e}")
+        
+        # Fallback for backward compatibility with hex format
+        if "__data__" in data:
+            try:
+                buffer = io.BytesIO(bytes.fromhex(data["__data__"]))
+                return np.load(buffer)
+            except Exception as e:
+                logging.warning(f"Failed to deserialize array from hex data: {e}")
+        
+        # Fallback - return empty array of correct shape
+        if "__shape__" in data:
+            shape = data["__shape__"]
+            dtype_str = data.get("__dtype__", "float32")
+            
+            print(f"Creating empty array of shape {shape} as fallback")
+            return np.zeros(shape, dtype=np.dtype(dtype_str))
+        
+        return np.array([])
     
     def _is_gemmi_object(self, obj: Any) -> bool:
         """

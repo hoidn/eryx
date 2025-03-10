@@ -105,11 +105,40 @@ class StateBuilder:
             obj: Object to apply state to
             state_data: Dictionary with attribute values
         """
+        # Import serializer for deserialization
+        from eryx.serialization import ObjectSerializer
+        serializer = ObjectSerializer()
+        
         for k, v in state_data.items():
             try:
-                # Handle different value types consistently
+                # Handle special case for model attribute
+                if k == 'model' and isinstance(v, dict):
+                    if not hasattr(obj, 'model'):
+                        obj.model = type('AtomicModelProxy', (), {})
+                    self._apply_state(obj.model, v)
+                    continue
+                
+                # Handle serialized numpy arrays 
+                if isinstance(v, dict) and v.get("__type__") == "numpy.ndarray":
+                    # Deserialize using the serializer
+                    array = serializer._deserialize_ndarray(v)
+                    
+                    # Convert to tensor with gradient support
+                    if k in ['q_grid', 'hkl_grid'] and self.grid_adapter:
+                        map_shape = state_data.get('map_shape', (1,1,1))
+                        grid_tensor, _ = self.grid_adapter.convert_grid(array, map_shape)
+                        setattr(obj, k, grid_tensor)
+                    elif self.pdb_adapter:
+                        setattr(obj, k, self.pdb_adapter.array_to_tensor(array))
+                    else:
+                        tensor = torch.tensor(array, device=self.device)
+                        if tensor.dtype.is_floating_point:
+                            tensor.requires_grad_(True)
+                        setattr(obj, k, tensor)
+                    continue
+                
+                # Handle direct NumPy arrays
                 if isinstance(v, np.ndarray):
-                    # Direct NumPy arrays
                     if k in ['q_grid', 'hkl_grid'] and self.grid_adapter:
                         map_shape = state_data.get('map_shape', (1,1,1))
                         grid_tensor, _ = self.grid_adapter.convert_grid(v, map_shape)
@@ -121,36 +150,20 @@ class StateBuilder:
                         if tensor.dtype.is_floating_point:
                             tensor.requires_grad_(True)
                         setattr(obj, k, tensor)
-                elif isinstance(v, dict):
-                    # Dictionary attributes - could be serialized arrays or regular dicts
-                    if self._is_serialized_array(v):
-                        # Convert serialized array to tensor
-                        array = self._deserialize_array(v)
-                        if array is not None:
-                            if self.pdb_adapter:
-                                setattr(obj, k, self.pdb_adapter.array_to_tensor(array))
-                            else:
-                                tensor = torch.tensor(array, device=self.device)
-                                if tensor.dtype.is_floating_point:
-                                    tensor.requires_grad_(True)
-                                setattr(obj, k, tensor)
-                        else:
-                            # Couldn't deserialize as array, treat as regular dict
-                            setattr(obj, k, v)
+                    continue
+                
+                # Handle nested dictionaries
+                if isinstance(v, dict):
+                    if hasattr(obj, k) and isinstance(getattr(obj, k), object) and not isinstance(getattr(obj, k), (int, float, bool, str)):
+                        # Apply to existing attribute
+                        self._apply_state(getattr(obj, k), v)
                     else:
-                        # Regular dictionary - recursively process
-                        if k == 'model' and not hasattr(obj, 'model'):
-                            # Create model attribute if needed
-                            obj.model = type('AtomicModelProxy', (), {})
-                        
-                        if hasattr(obj, k) and isinstance(getattr(obj, k), object):
-                            # Apply to existing attribute
-                            self._apply_state(getattr(obj, k), v)
-                        else:
-                            # Set as new attribute
-                            setattr(obj, k, v)
-                elif isinstance(v, bytes):
-                    # Try to deserialize bytes
+                        # Set as new attribute
+                        setattr(obj, k, v)
+                    continue
+                
+                # Handle bytes that might be serialized data
+                if isinstance(v, bytes):
                     try:
                         deserialized = self._deserialize_value(v)
                         if isinstance(deserialized, np.ndarray):
@@ -161,72 +174,21 @@ class StateBuilder:
                                 tensor = torch.tensor(deserialized, device=self.device)
                                 if tensor.dtype.is_floating_point:
                                     tensor.requires_grad_(True)
-                                setattr(obj, k, tensor)
+                            setattr(obj, k, tensor)
                         else:
                             # Other deserialized value
                             setattr(obj, k, deserialized)
                     except Exception:
                         # Keep as bytes if deserialization fails
                         setattr(obj, k, v)
-                else:
-                    # Pass through other values
-                    setattr(obj, k, v)
+                    continue
+                
+                # Default: set attribute directly
+                setattr(obj, k, v)
+                    
             except Exception as e:
                 print(f"Warning: Could not set attribute {k}: {e}")
-    def _is_serialized_array(self, data: Dict) -> bool:
-        """Check if a dictionary appears to be a serialized array."""
-        # Check for numpy array serialization format
-        if '_array_type' in data and data['_array_type'] == 'numpy.ndarray':
-            return True
-        
-        # Check for shape and dtype keys which often indicate serialized arrays
-        if 'shape' in data and 'dtype' in data:
-            return True
-            
-        return False
-    
-    def _deserialize_array(self, data: Dict) -> Optional[np.ndarray]:
-        """Try to deserialize a dictionary to a numpy array."""
-        try:
-            # Case 1: Our serializer's array format
-            if '_array_type' in data and data['_array_type'] == 'numpy.ndarray':
-                # First try to use the binary data if available
-                if '_array_data' in data:
-                    try:
-                        buffer = io.BytesIO(data['_array_data'])
-                        return np.load(buffer)
-                    except Exception:
-                        pass  # Fall through to other methods if binary loading fails
-                
-                # Next try to use the array values if available
-                if '_array_values' in data:
-                    try:
-                        array = np.array(data['_array_values'])
-                        # Convert to the correct dtype if specified
-                        if '_array_dtype' in data:
-                            array = array.astype(np.dtype(data['_array_dtype']))
-                        return array
-                    except Exception:
-                        pass  # Fall through if this fails
-            
-            # Case 2: Shape and dtype info only (no actual data)
-            if 'shape' in data and 'dtype' in data:
-                print(f"Warning: Array data missing, only shape {data['shape']} and dtype {data['dtype']} available")
-                # Create a placeholder array based on shape and dtype
-                shape = data['shape']
-                dtype_str = data['dtype']
-                
-                # Create an appropriate array based on shape
-                if len(shape) == 2 and shape[0] == shape[1]:
-                    # For square matrices, use identity matrix
-                    return np.eye(shape[0], dtype=np.dtype(dtype_str))
-                else:
-                    # For other shapes, use zeros
-                    return np.zeros(shape, dtype=np.dtype(dtype_str))
-        except Exception as e:
-            print(f"Warning: Failed to deserialize array: {e}")
-        
-        return None
+    # Removed complex array parsing methods in favor of using the serializer
     
     def _deserialize_value(self, binary_data: bytes) -> Any:
         """Deserialize binary data to a value."""
@@ -252,6 +214,10 @@ class StateBuilder:
             obj: Object to apply state to
             state_data: Dictionary with attribute values
         """
+        # Import serializer for deserialization
+        from eryx.serialization import ObjectSerializer
+        serializer = ObjectSerializer()
+        
         for key, value in state_data.items():
             # Skip special fields
             if key.startswith("__"):
@@ -265,14 +231,28 @@ class StateBuilder:
                     self._apply_state_v2(obj.model, value)
                     continue
                 
+                # Handle serialized numpy arrays
+                if isinstance(value, dict) and value.get("__type__") == "numpy.ndarray":
+                    # Deserialize using the serializer
+                    array = serializer._deserialize_ndarray(value)
+                    
+                    # Convert to tensor with gradient support
+                    tensor = torch.tensor(array, device=self.device)
+                    if tensor.dtype.is_floating_point:
+                        tensor.requires_grad_(True)
+                    setattr(obj, key, tensor)
+                    continue
+                
                 # Convert NumPy arrays to tensors with gradients
                 if isinstance(value, np.ndarray):
                     tensor = torch.tensor(value, device=self.device)
                     if tensor.dtype.is_floating_point:
                         tensor.requires_grad_(True)
                     setattr(obj, key, tensor)
+                    continue
+                
                 # Handle nested dictionaries recursively
-                elif isinstance(value, dict) and not self._is_serialized_array(value):
+                elif isinstance(value, dict):
                     # Check if this is a nested object state
                     if not hasattr(obj, key) or getattr(obj, key) is None:
                         # Create a new object
@@ -280,14 +260,17 @@ class StateBuilder:
                     
                     # Apply state recursively
                     self._apply_state_v2(getattr(obj, key), value)
+                    continue
+                
                 # Handle lists that might contain nested objects
                 elif isinstance(value, list) and len(value) > 0 and isinstance(value[0], dict):
                     # This might be a list of object states
                     # For now, just set it directly - could be enhanced to handle lists of objects
                     setattr(obj, key, value)
-                else:
-                    # Set attribute directly
-                    setattr(obj, key, value)
+                    continue
+                
+                # Set attribute directly
+                setattr(obj, key, value)
                     
             except Exception as e:
                 print(f"Warning: Could not set attribute {key}: {e}")
