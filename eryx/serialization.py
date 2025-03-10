@@ -296,6 +296,7 @@ class ObjectSerializer:
         self.register_handler(float, self._serialize_basic, self._deserialize_basic)
         self.register_handler(str, self._serialize_basic, self._deserialize_basic)
         self.register_handler(bool, self._serialize_basic, self._deserialize_basic)
+        self.register_handler(complex, self._serialize_complex, self._deserialize_complex)
         
         # Try to register NumPy handler if available
         try:
@@ -328,6 +329,18 @@ class ObjectSerializer:
     def _deserialize_basic(self, data: Dict[str, Any]) -> Union[int, float, str, bool]:
         """Deserialize basic Python types."""
         return data["__value__"]
+        
+    def _serialize_complex(self, obj: complex) -> Dict[str, Any]:
+        """Serialize complex number."""
+        return {
+            "__type__": "complex",
+            "__real__": obj.real,
+            "__imag__": obj.imag
+        }
+    
+    def _deserialize_complex(self, data: Dict[str, Any]) -> complex:
+        """Deserialize complex number."""
+        return complex(data["__real__"], data["__imag__"])
     
     def _serialize_ndarray(self, obj: Any) -> Dict[str, Any]:
         """Serialize NumPy ndarray."""

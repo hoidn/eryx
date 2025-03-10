@@ -10,24 +10,31 @@ class Logger:
     def __init__(self):
         self.serializer = ObjectSerializer()
 
-    def logCall(self, args: bytes, kwargs: bytes, log_file_path: str) -> None:
+    def logCall(self, args: Any, kwargs: Any, log_file_path: str) -> None:
         try:
             with open(log_file_path, 'a') as log_file:
+                # Convert to hex string if bytes, otherwise use serializer
+                args_data = args.hex() if isinstance(args, bytes) else self.serializer.serialize(args)
+                kwargs_data = kwargs.hex() if isinstance(kwargs, bytes) else self.serializer.serialize(kwargs)
+                
                 log_entry = json.dumps({
-                    "args": args.hex(),
-                    "kwargs": kwargs.hex()
-                })
+                    "args": args_data,
+                    "kwargs": kwargs_data
+                }, default=str)
                 log_file.write(log_entry + "\n")
         except Exception as e:
             print(f"Error logging function call: {e}", file=sys.stderr)
 
-    def logReturn(self, result: bytes, execution_time: float, log_file_path: str) -> None:
+    def logReturn(self, result: Any, execution_time: float, log_file_path: str) -> None:
         try:
             with open(log_file_path, 'a') as log_file:
+                # Convert to hex string if bytes, otherwise use serializer
+                result_data = result.hex() if isinstance(result, bytes) else self.serializer.serialize(result)
+                
                 log_entry = json.dumps({
-                    "result": result.hex(),
+                    "result": result_data,
                     "execution_time": execution_time
-                })
+                }, default=str)
                 log_file.write(log_entry + "\n")
         except Exception as e:
             print(f"Error logging function return: {e}", file=sys.stderr)
@@ -41,12 +48,58 @@ class Logger:
             with open(log_file_path, 'r') as log_file:
                 for line in log_file:
                     log_entry = json.loads(line)
+                    
+                    # Process args
                     if "args" in log_entry:
-                        log_entry["args"] = bytes.fromhex(log_entry["args"])
+                        if isinstance(log_entry["args"], str) and all(c in '0123456789abcdefABCDEF' for c in log_entry["args"]):
+                            # Looks like a hex string
+                            try:
+                                log_entry["args"] = bytes.fromhex(log_entry["args"])
+                            except ValueError:
+                                # Not a valid hex string, keep as is
+                                pass
+                        elif isinstance(log_entry["args"], dict) and "__type__" in log_entry["args"]:
+                            # Looks like a serialized object
+                            try:
+                                log_entry["args"] = self.serializer.deserialize(log_entry["args"])
+                            except Exception:
+                                # Failed to deserialize, keep as is
+                                pass
+                    
+                    # Process kwargs
                     if "kwargs" in log_entry:
-                        log_entry["kwargs"] = bytes.fromhex(log_entry["kwargs"])
+                        if isinstance(log_entry["kwargs"], str) and all(c in '0123456789abcdefABCDEF' for c in log_entry["kwargs"]):
+                            # Looks like a hex string
+                            try:
+                                log_entry["kwargs"] = bytes.fromhex(log_entry["kwargs"])
+                            except ValueError:
+                                # Not a valid hex string, keep as is
+                                pass
+                        elif isinstance(log_entry["kwargs"], dict) and "__type__" in log_entry["kwargs"]:
+                            # Looks like a serialized object
+                            try:
+                                log_entry["kwargs"] = self.serializer.deserialize(log_entry["kwargs"])
+                            except Exception:
+                                # Failed to deserialize, keep as is
+                                pass
+                    
+                    # Process result
                     if "result" in log_entry:
-                        log_entry["result"] = bytes.fromhex(log_entry["result"])
+                        if isinstance(log_entry["result"], str) and all(c in '0123456789abcdefABCDEF' for c in log_entry["result"]):
+                            # Looks like a hex string
+                            try:
+                                log_entry["result"] = bytes.fromhex(log_entry["result"])
+                            except ValueError:
+                                # Not a valid hex string, keep as is
+                                pass
+                        elif isinstance(log_entry["result"], dict) and "__type__" in log_entry["result"]:
+                            # Looks like a serialized object
+                            try:
+                                log_entry["result"] = self.serializer.deserialize(log_entry["result"])
+                            except Exception:
+                                # Failed to deserialize, keep as is
+                                pass
+                    
                     logs.append(log_entry)
         except Exception as e:
             print(f"Error loading log: {e}", file=sys.stderr)
@@ -137,9 +190,27 @@ class Logger:
             
             # Use ObjectSerializer to write state to file
             with open(log_file_path, 'w') as log_file:
+                # Handle complex numbers by converting to strings
                 self.serializer.dump(state_data, log_file)
         except Exception as e:
-            print(f"Error saving state log: {e}", file=sys.stderr)
+            # Try a more robust approach if the first attempt fails
+            try:
+                # Create a sanitized copy of the state data
+                sanitized_state = {}
+                for key, value in state_data.items():
+                    try:
+                        # Test if the value can be serialized
+                        json.dumps({key: value}, default=str)
+                        sanitized_state[key] = value
+                    except (TypeError, OverflowError):
+                        # Convert problematic values to strings
+                        sanitized_state[key] = str(value)
+                
+                # Write sanitized state to file
+                with open(log_file_path, 'w') as log_file:
+                    json.dump(sanitized_state, log_file, default=str, indent=2)
+            except Exception as e2:
+                print(f"Error saving state log (fallback also failed): {e2}", file=sys.stderr)
     
     def loadStateLog(self, log_file_path: str) -> Dict[str, Any]:
         """
