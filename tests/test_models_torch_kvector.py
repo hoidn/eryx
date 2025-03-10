@@ -44,100 +44,53 @@ class TestKvectorMethods(TestBase):
         """Test _build_kvec_Brillouin using state-based approach."""
         # Import test helpers
         from eryx.autotest.test_helpers import (
+            load_test_state,
             build_test_object,
             ensure_tensor
         )
         
         try:
-            # Try different path patterns for before state
-            for module_format in [
-                self.module_name,  # Regular format: eryx.models
-                f"{self.module_name}._build_kvec_Brillouin"  # With method: eryx.models._build_kvec_Brillouin
-            ]:
-                for class_format in [
-                    f"{self.class_name}",  # Regular format: OnePhonon
-                    ""  # Empty class
-                ]:
-                    for method_format in [
-                        "_build_kvec_Brillouin",  # Regular format
-                        ""  # Empty method
-                    ]:
-                        try:
-                            # Construct a potential log path
-                            log_path = f"logs/{module_format}"
-                            if class_format:
-                                log_path += f".{class_format}"
-                            log_path += "._state_before_"
-                            if method_format:
-                                log_path += f"{method_format}"
-                            log_path += ".log"
-                            
-                            # Try to load this path
-                            print(f"Trying log path: {log_path}")
-                            if os.path.exists(log_path):
-                                before_state = self.logger.loadStateLog(log_path)
-                                if before_state:
-                                    print(f"Successfully loaded state from: {log_path}")
-                                    break
-                        except FileNotFoundError:
-                            continue
-                    else:
-                        # Continue if inner loop didn't break
-                        continue
-                    # Break if middle loop broke
-                    break
-                else:
-                    # Continue if middle loop didn't break
-                    continue
-                # Break if outer loop broke
-                break
-            else:
-                # If all loops completed without finding a log file
-                import glob
-                available_logs = glob.glob("logs/*build_kvec*")
-                self.skipTest(f"Could not find state log. Available logs: {available_logs}")
-                return
+            # Load before state using the helper function which handles path flexibility
+            before_state = load_test_state(
+                self.logger, 
+                self.module_name, 
+                self.class_name, 
+                "_build_kvec_Brillouin"
+            )
+        except FileNotFoundError as e:
+            # If state logs aren't found, skip the test with informative message
+            import glob
+            available_logs = glob.glob("logs/*build_kvec*")
+            self.skipTest(f"Could not find state log. Available logs: {available_logs}\nError: {e}")
+            return
         except Exception as e:
             self.skipTest(f"Error loading state log: {e}")
             return
         
-        # 2. Build model with StateBuilder
+        # Build model with StateBuilder
         model = build_test_object(OnePhonon, before_state, device=self.device)
         
-        # 3. Verify initial structure
+        # Verify initial structure
         self.assertTrue(
             hasattr(model, 'model') and hasattr(model.model, 'A_inv'),
             "Atomic model does not contain A_inv"
         )
         
-        # DEBUGGING: Print A_inv before method call
+        # Print A_inv information for debugging
         print("\nDEBUGGING A_inv before method call:")
-        if isinstance(model.model.A_inv, dict):
-            print(f"A_inv is a dictionary: {model.model.A_inv}")
-            # Convert dictionary to tensor if needed
-            if 'shape' in model.model.A_inv and model.model.A_inv['shape'] == (3, 3):
-                print("Converting A_inv dictionary to tensor...")
-                # Try to use StateBuilder's _deserialize_array method
-                from eryx.autotest.state_builder import StateBuilder
-                builder = StateBuilder(device=model.device)
-                array = builder._deserialize_array(model.model.A_inv)
-                if array is not None:
-                    print(f"Successfully deserialized A_inv to array with shape {array.shape}")
-                    model.model.A_inv = torch.tensor(array, device=model.device, requires_grad=True)
-                else:
-                    # TODO raise error instead
-                    print("Failed to deserialize A_inv, using identity matrix")
-                    model.model.A_inv = torch.eye(3, device=model.device, requires_grad=True)
-                print(f"Created tensor for A_inv")
-        else:
-            print(f"A_inv shape: {model.model.A_inv.shape}")
-            print(f"A_inv dtype: {model.model.A_inv.dtype}")
-            print(f"A_inv requires_grad: {model.model.A_inv.requires_grad}")
-            print(f"A_inv device: {model.model.A_inv.device}")
-            print(f"A_inv first few values: {model.model.A_inv.flatten()[:5]}")
-            print(f"A_inv full matrix:\n{model.model.A_inv}")
+        if not isinstance(model.model.A_inv, torch.Tensor):
+            # If A_inv is not a tensor, raise an error - it should be properly initialized by StateBuilder
+            self.skipTest(f"A_inv is not a tensor: {type(model.model.A_inv)}. Please regenerate state logs.")
+            return
         
-        # DEBUGGING: Test _center_kvec function
+        print(f"A_inv shape: {model.model.A_inv.shape}")
+        print(f"A_inv dtype: {model.model.A_inv.dtype}")
+        print(f"A_inv requires_grad: {model.model.A_inv.requires_grad}")
+        print(f"A_inv device: {model.model.A_inv.device}")
+        print(f"A_inv first few values: {model.model.A_inv.flatten()[:5]}")
+        print(f"A_inv full matrix:\n{model.model.A_inv}")
+        
+        # Test _center_kvec function
         print("\nDEBUGGING _center_kvec function:")
         h_dim = int(model.hsampling[2])
         k_dim = int(model.ksampling[2])
@@ -147,14 +100,8 @@ class TestKvectorMethods(TestBase):
             result = model._center_kvec(x, L)
             print(f"_center_kvec({x}, {L}) = {result}")
         
-        # Check if A_inv is a placeholder (created by StateBuilder when missing from state)
-        if hasattr(model.model, '_a_inv_is_placeholder') and model.model._a_inv_is_placeholder:
-            print("\nWARNING: Using placeholder A_inv matrix. Please regenerate state logs.")
-            self.skipTest("A_inv matrix is a placeholder. Regenerate state logs with the command below.")
-        
-        # Add debug print for k-vector calculation
+        # Debug a sample calculation for a specific point
         print("\nDEBUGGING _build_kvec_Brillouin calculation:")
-        # Print a sample calculation for a specific point
         h_idx, k_idx, l_idx = 0, 1, 0  # Example point [0,1,0]
         print(f"\nDEBUGGING calculation for point [{h_idx},{k_idx},{l_idx}]:")
         
@@ -172,15 +119,14 @@ class TestKvectorMethods(TestBase):
         print(f"A_inv_tensor:\n{model.model.A_inv}")
         print(f"A_inv_tensor.T:\n{model.model.A_inv.T}")
         
-        # Calculate k-vector
+        # Calculate k-vector for this point
         result = torch.matmul(model.model.A_inv.T, hkl_tensor)
         print(f"Result of matmul: {result}")
         
-        # 4. Call the method
+        # Call the method under test
         model._build_kvec_Brillouin()
         
-        # 5. Verify results
-        # Check kvec tensor
+        # Verify results - check kvec tensor
         self.assertTrue(hasattr(model, 'kvec'), "kvec not created")
         expected_kvec_shape = (model.hsampling[2], model.ksampling[2], model.lsampling[2], 3)
         self.assertEqual(model.kvec.shape, expected_kvec_shape)
@@ -192,98 +138,58 @@ class TestKvectorMethods(TestBase):
         self.assertEqual(model.kvec_norm.shape, expected_norm_shape)
         self.assertTrue(model.kvec_norm.requires_grad, "kvec_norm should require gradients")
         
-        # DEBUGGING: Print some kvec values
+        # Print some kvec values for debugging
         print("\nDEBUGGING kvec after method call:")
         print(f"kvec shape: {model.kvec.shape}")
         print(f"kvec[0,0,0]: {model.kvec[0,0,0]}")
         print(f"kvec[0,1,0]: {model.kvec[0,1,0]}")
         print(f"kvec[1,0,0]: {model.kvec[1,0,0]}")
         
-        # 7. Load after state and compare
+        # Load after state for comparison
         try:
-            # Try different path patterns for after state
-            for module_format in [
-                self.module_name,  # Regular format: eryx.models
-                f"{self.module_name}._build_kvec_Brillouin"  # With method: eryx.models._build_kvec_Brillouin
-            ]:
-                for class_format in [
-                    f"{self.class_name}",  # Regular format: OnePhonon
-                    ""  # Empty class
-                ]:
-                    for method_format in [
-                        "_build_kvec_Brillouin",  # Regular format
-                        ""  # Empty method
-                    ]:
-                        try:
-                            # Construct a potential log path
-                            log_path = f"logs/{module_format}"
-                            if class_format:
-                                log_path += f".{class_format}"
-                            log_path += "._state_after_"
-                            if method_format:
-                                log_path += f"{method_format}"
-                            log_path += ".log"
-                            
-                            # Try to load this path
-                            print(f"Trying log path: {log_path}")
-                            if os.path.exists(log_path):
-                                after_state = self.logger.loadStateLog(log_path)
-                                if after_state:
-                                    print(f"Successfully loaded state from: {log_path}")
-                                    break
-                        except FileNotFoundError:
-                            continue
-                    else:
-                        # Continue if inner loop didn't break
-                        continue
-                    # Break if middle loop broke
-                    break
-                else:
-                    # Continue if middle loop didn't break
-                    continue
-                # Break if outer loop broke
-                break
-            else:
-                # If all loops completed without finding a log file
-                import glob
-                available_logs = glob.glob("logs/*build_kvec*after*")
-                self.skipTest(f"Could not find after state log. Available logs: {available_logs}")
-                return
+            after_state = load_test_state(
+                self.logger, 
+                self.module_name, 
+                self.class_name, 
+                "_build_kvec_Brillouin",
+                before=False
+            )
+        except FileNotFoundError as e:
+            import glob
+            available_logs = glob.glob("logs/*build_kvec*after*")
+            self.skipTest(f"Could not find after state log. Available logs: {available_logs}\nError: {e}")
+            return
         except Exception as e:
             self.skipTest(f"Error loading after state log: {e}")
             return
         
-        # 8. Compare only the tensors that should have changed
+        # Get expected tensors from after state
         kvec_expected = after_state.get('kvec')
         kvec_norm_expected = after_state.get('kvec_norm')
         
-        # Handle any format using ensure_tensor
-        from eryx.autotest.test_helpers import ensure_tensor
+        # Ensure tensors are in the right format for comparison
         kvec_expected = ensure_tensor(kvec_expected, device='cpu')
         kvec_norm_expected = ensure_tensor(kvec_norm_expected, device='cpu')
         
-        # DEBUGGING: Print expected values
+        # Print expected values for debugging
         print("\nDEBUGGING expected values:")
         print(f"expected kvec shape: {kvec_expected.shape}")
         print(f"expected kvec[0,0,0]: {kvec_expected[0,0,0]}")
         print(f"expected kvec[0,1,0]: {kvec_expected[0,1,0]}")
         print(f"expected kvec[1,0,0]: {kvec_expected[1,0,0]}")
         
-        # DEBUGGING: Print sampling parameters
+        # Print sampling parameters
         print("\nDEBUGGING sampling parameters:")
         print(f"hsampling: {model.hsampling}")
         print(f"ksampling: {model.ksampling}")
         print(f"lsampling: {model.lsampling}")
         
-        # DEBUGGING: Print differences
-        print("\nDEBUGGING differences:")
+        # Convert tensors to numpy for comparison
         kvec_numpy = model.kvec.detach().cpu().numpy()
-        # Convert expected tensor to numpy if it's a tensor
-        if isinstance(kvec_expected, torch.Tensor):
-            kvec_expected_numpy = kvec_expected.detach().cpu().numpy()
-        else:
-            kvec_expected_numpy = kvec_expected
-            
+        kvec_expected_numpy = kvec_expected.detach().cpu().numpy() if isinstance(kvec_expected, torch.Tensor) else kvec_expected
+        
+        # Print differences
+        print("\nDEBUGGING differences:")
         max_diff = np.max(np.abs(kvec_numpy - kvec_expected_numpy))
         print(f"Maximum difference: {max_diff}")
         
@@ -295,18 +201,16 @@ class TestKvectorMethods(TestBase):
                 print(f"  Actual: {kvec_numpy[i,j,k]}")
                 print(f"  Expected: {kvec_expected_numpy[i,j,k]}")
         
-        # Compare tensor values
+        # Compare tensor values with appropriate tolerances
         tolerances = {'rtol': 1e-4, 'atol': 1e-5}
         
-        # Convert kvec_norm_expected to numpy if it's a tensor
-        if isinstance(kvec_norm_expected, torch.Tensor):
-            kvec_norm_expected_numpy = kvec_norm_expected.detach().cpu().numpy()
-        else:
-            kvec_norm_expected_numpy = kvec_norm_expected
-            
+        # Convert kvec_norm_expected to numpy for comparison
+        kvec_norm_expected_numpy = kvec_norm_expected.detach().cpu().numpy() if isinstance(kvec_norm_expected, torch.Tensor) else kvec_norm_expected
+        
+        # Verify tensors match expected values
         self.assertTrue(
             np.allclose(
-                model.kvec.detach().cpu().numpy(), 
+                kvec_numpy, 
                 kvec_expected_numpy, 
                 rtol=tolerances['rtol'], 
                 atol=tolerances['atol']
