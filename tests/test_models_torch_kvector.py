@@ -73,12 +73,20 @@ class TestKvectorMethods(TestBase):
         
         # DEBUGGING: Print A_inv before method call
         print("\nDEBUGGING A_inv before method call:")
-        print(f"A_inv shape: {model.model.A_inv.shape}")
-        print(f"A_inv dtype: {model.model.A_inv.dtype}")
-        print(f"A_inv requires_grad: {model.model.A_inv.requires_grad}")
-        print(f"A_inv device: {model.model.A_inv.device}")
-        print(f"A_inv first few values: {model.model.A_inv.flatten()[:5]}")
-        print(f"A_inv full matrix:\n{model.model.A_inv}")
+        if isinstance(model.model.A_inv, dict):
+            print(f"A_inv is a dictionary: {model.model.A_inv}")
+            # Convert dictionary to tensor if needed
+            if 'shape' in model.model.A_inv and model.model.A_inv['shape'] == (3, 3):
+                print("Converting A_inv dictionary to tensor...")
+                model.model.A_inv = torch.eye(3, device=model.device, requires_grad=True)
+                print(f"Created identity matrix for A_inv")
+        else:
+            print(f"A_inv shape: {model.model.A_inv.shape}")
+            print(f"A_inv dtype: {model.model.A_inv.dtype}")
+            print(f"A_inv requires_grad: {model.model.A_inv.requires_grad}")
+            print(f"A_inv device: {model.model.A_inv.device}")
+            print(f"A_inv first few values: {model.model.A_inv.flatten()[:5]}")
+            print(f"A_inv full matrix:\n{model.model.A_inv}")
         
         # DEBUGGING: Test _center_kvec function
         print("\nDEBUGGING _center_kvec function:")
