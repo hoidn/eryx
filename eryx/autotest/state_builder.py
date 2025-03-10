@@ -88,8 +88,16 @@ class StateBuilder:
         elif isinstance(obj.model.A_inv, dict):
             # Handle case where A_inv is a dictionary (serialized array)
             print("Converting A_inv from dictionary to tensor")
-            # Convert dictionary to tensor
-            obj.model.A_inv = torch.eye(3, device=self.device, requires_grad=True)
+            # Try to deserialize the dictionary to a numpy array first
+            array = self._deserialize_array(obj.model.A_inv)
+            if array is not None:
+                print(f"Successfully deserialized A_inv to array with shape {array.shape}")
+                # Convert numpy array to tensor
+                obj.model.A_inv = torch.tensor(array, device=self.device, requires_grad=True)
+            else:
+                # Fallback to identity matrix
+                print("Failed to deserialize A_inv, using identity matrix")
+                obj.model.A_inv = torch.eye(3, device=self.device, requires_grad=True)
         elif isinstance(obj.model.A_inv, torch.Tensor) and not obj.model.A_inv.requires_grad:
             obj.model.A_inv = obj.model.A_inv.clone().detach().requires_grad_(True)
     
@@ -208,8 +216,17 @@ class StateBuilder:
             # Case 2: Shape and dtype info only (no actual data)
             if 'shape' in data and 'dtype' in data:
                 print(f"Warning: Array data missing, only shape {data['shape']} and dtype {data['dtype']} available")
-                # For arrays, return None to let the caller handle it
-                return None
+                # Create a placeholder array based on shape and dtype
+                shape = data['shape']
+                dtype_str = data['dtype']
+                
+                # Create an appropriate array based on shape
+                if len(shape) == 2 and shape[0] == shape[1]:
+                    # For square matrices, use identity matrix
+                    return np.eye(shape[0], dtype=np.dtype(dtype_str))
+                else:
+                    # For other shapes, use zeros
+                    return np.zeros(shape, dtype=np.dtype(dtype_str))
         except Exception as e:
             print(f"Warning: Failed to deserialize array: {e}")
         

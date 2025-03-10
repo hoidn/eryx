@@ -113,7 +113,14 @@ class TestStateBuilderFix(unittest.TestCase):
             'dtype': 'float32'
         }
         
+        # Add debug print
+        print(f"Testing _deserialize_array with: {dict_data}")
         result = builder._deserialize_array(dict_data)
+        print(f"Result type: {type(result)}")
+        if result is not None:
+            print(f"Result shape: {result.shape}, dtype: {result.dtype}")
+            print(f"Result values:\n{result}")
+            
         self.assertIsInstance(result, np.ndarray, "Result should be a numpy array")
         self.assertEqual(result.shape, (3, 3), "Result should have shape (3, 3)")
         self.assertEqual(result.dtype, np.float32, "Result should have dtype float32")

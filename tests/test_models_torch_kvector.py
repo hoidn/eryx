@@ -78,8 +78,17 @@ class TestKvectorMethods(TestBase):
             # Convert dictionary to tensor if needed
             if 'shape' in model.model.A_inv and model.model.A_inv['shape'] == (3, 3):
                 print("Converting A_inv dictionary to tensor...")
-                model.model.A_inv = torch.eye(3, device=model.device, requires_grad=True)
-                print(f"Created identity matrix for A_inv")
+                # Try to use StateBuilder's _deserialize_array method
+                from eryx.autotest.state_builder import StateBuilder
+                builder = StateBuilder(device=model.device)
+                array = builder._deserialize_array(model.model.A_inv)
+                if array is not None:
+                    print(f"Successfully deserialized A_inv to array with shape {array.shape}")
+                    model.model.A_inv = torch.tensor(array, device=model.device, requires_grad=True)
+                else:
+                    print("Failed to deserialize A_inv, using identity matrix")
+                    model.model.A_inv = torch.eye(3, device=model.device, requires_grad=True)
+                print(f"Created tensor for A_inv")
         else:
             print(f"A_inv shape: {model.model.A_inv.shape}")
             print(f"A_inv dtype: {model.model.A_inv.dtype}")
@@ -102,6 +111,30 @@ class TestKvectorMethods(TestBase):
         if hasattr(model.model, '_a_inv_is_placeholder') and model.model._a_inv_is_placeholder:
             print("\nWARNING: Using placeholder A_inv matrix. Please regenerate state logs.")
             self.skipTest("A_inv matrix is a placeholder. Regenerate state logs with the command below.")
+        
+        # Add debug print for k-vector calculation
+        print("\nDEBUGGING _build_kvec_Brillouin calculation:")
+        # Print a sample calculation for a specific point
+        h_idx, k_idx, l_idx = 0, 1, 0  # Example point [0,1,0]
+        print(f"\nDEBUGGING calculation for point [{h_idx},{k_idx},{l_idx}]:")
+        
+        # Calculate centered k-values
+        k_dh = model._center_kvec(h_idx, model.hsampling[2])
+        k_dk = model._center_kvec(k_idx, model.ksampling[2])
+        k_dl = model._center_kvec(l_idx, model.lsampling[2])
+        print(f"k_dh, k_dk, k_dl = {k_dh}, {k_dk}, {k_dl}")
+        
+        # Create hkl tensor
+        hkl_tensor = torch.tensor([k_dh, k_dk, k_dl], device=model.device)
+        print(f"hkl_tensor: {hkl_tensor}")
+        
+        # Print A_inv tensor
+        print(f"A_inv_tensor:\n{model.model.A_inv}")
+        print(f"A_inv_tensor.T:\n{model.model.A_inv.T}")
+        
+        # Calculate k-vector
+        result = torch.matmul(model.model.A_inv.T, hkl_tensor)
+        print(f"Result of matmul: {result}")
         
         # 4. Call the method
         model._build_kvec_Brillouin()
