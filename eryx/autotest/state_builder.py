@@ -51,15 +51,19 @@ class StateBuilder:
         # Create empty instance
         obj = torch_class.__new__(torch_class)
         
-        # Set device
+        # Set device if needed
         if not hasattr(obj, 'device'):
             obj.device = self.device
         
-        # Handle class-specific initialization
-        if torch_class.__name__ == "OnePhonon":
-            self._build_one_phonon(obj, state_data)
+        # Check format version
+        format_version = state_data.get("__format_version__", 1)
+        
+        # Apply state with format-specific handling
+        if format_version >= 2:
+            # New format - cleaner handling
+            self._apply_state_v2(obj, state_data)
         else:
-            # Generic initialization for other classes
+            # Legacy format - maintain complex handling
             self._apply_state(obj, state_data)
         
         return obj
@@ -246,3 +250,30 @@ class StateBuilder:
                     pass
         
         return binary_data
+    def _apply_state_v2(self, obj: Any, state_data: Dict[str, Any]) -> None:
+        """Apply state that was serialized with ObjectSerializer."""
+        for key, value in state_data.items():
+            # Skip special fields
+            if key.startswith("__"):
+                continue
+            
+            try:
+                # Special handling for model attribute
+                if key == "model" and isinstance(value, dict):
+                    if not hasattr(obj, 'model'):
+                        obj.model = type('AtomicModelProxy', (), {})
+                    self._apply_state_v2(obj.model, value)
+                    continue
+                
+                # Convert NumPy arrays to tensors with gradients
+                if isinstance(value, np.ndarray):
+                    tensor = torch.tensor(value, device=self.device)
+                    if tensor.dtype.is_floating_point:
+                        tensor.requires_grad_(True)
+                    setattr(obj, key, tensor)
+                else:
+                    # Set attribute directly
+                    setattr(obj, key, value)
+                    
+            except Exception as e:
+                print(f"Warning: Could not set attribute {key}: {e}")

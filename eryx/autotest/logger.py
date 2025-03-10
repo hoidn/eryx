@@ -1,15 +1,14 @@
-from .serializer import Serializer
-
 import json
 import os
 import sys
 import pickle
 from typing import Any, Union, List, Dict, Optional, Set
 import re
+from eryx.serialization import ObjectSerializer
 
 class Logger:
     def __init__(self):
-        self.serializer = Serializer()
+        self.serializer = ObjectSerializer()
 
     def logCall(self, args: bytes, kwargs: bytes, log_file_path: str) -> None:
         try:
@@ -136,13 +135,9 @@ class Logger:
             # Create directory if it doesn't exist
             os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
             
-            # Serialize state data to JSON with hex encoding for binary data
-            serialized_state = {}
-            for key, value in state_data.items():
-                serialized_state[key] = value.hex() if isinstance(value, bytes) else value
-            
+            # Use ObjectSerializer to write state to file
             with open(log_file_path, 'w') as log_file:
-                json.dump(serialized_state, log_file, indent=2)
+                self.serializer.dump(state_data, log_file)
         except Exception as e:
             print(f"Error saving state log: {e}", file=sys.stderr)
     
@@ -157,24 +152,39 @@ class Logger:
             Dictionary with deserialized state data
         """
         try:
+            # Try to load using ObjectSerializer
             with open(log_file_path, 'r') as log_file:
-                serialized_state = json.load(log_file)
-            
-            # Deserialize state data
-            state_data = {}
-            for key, value in serialized_state.items():
-                if isinstance(value, str) and len(value) > 0:
+                try:
+                    return self.serializer.load(log_file)
+                except Exception as e1:
+                    # If loading fails, try legacy format
+                    log_file.seek(0)
                     try:
-                        # Try to convert from hex to bytes
-                        binary_data = bytes.fromhex(value)
-                        state_data[key] = self.serializer.deserialize(binary_data)
-                    except ValueError:
-                        # If not hex, keep as string
-                        state_data[key] = value
-                else:
-                    state_data[key] = value
-            
-            return state_data
+                        # Legacy format had hex-encoded binary data
+                        serialized_state = json.load(log_file)
+                        legacy_state = {}
+                        
+                        # Convert hex-encoded values back to objects
+                        for key, value_hex in serialized_state.items():
+                            if isinstance(value_hex, str) and len(value_hex) > 0:
+                                try:
+                                    binary_data = bytes.fromhex(value_hex)
+                                    legacy_state[key] = self.serializer.deserialize({
+                                        "__type__": "binary",
+                                        "__data__": value_hex
+                                    })
+                                except ValueError:
+                                    # If not hex, keep as string
+                                    legacy_state[key] = value_hex
+                            else:
+                                legacy_state[key] = value_hex
+                        
+                        # Mark as legacy format
+                        legacy_state["__format_version__"] = 1
+                        return legacy_state
+                    except Exception as e2:
+                        print(f"Error loading legacy state format: {e2}", file=sys.stderr)
+                        raise
         except FileNotFoundError:
             print(f"State log file not found: {log_file_path}", file=sys.stderr)
             return {}

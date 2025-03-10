@@ -172,11 +172,9 @@ class TestKvectorMethods(TestBase):
         kvec_expected = after_state.get('kvec')
         kvec_norm_expected = after_state.get('kvec_norm')
         
-        # Handle serialized values
-        if isinstance(kvec_expected, bytes):
-            kvec_expected = self.serializer.deserialize(kvec_expected)
-        if isinstance(kvec_norm_expected, bytes):
-            kvec_norm_expected = self.serializer.deserialize(kvec_norm_expected)
+        # Handle any format using ensure_tensor
+        kvec_expected = ensure_tensor(kvec_expected, device='cpu')
+        kvec_norm_expected = ensure_tensor(kvec_norm_expected, device='cpu')
         
         # DEBUGGING: Print expected values
         print("\nDEBUGGING expected values:")

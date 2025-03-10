@@ -5,37 +5,24 @@ from typing import Any, Dict, List, Optional, Type, Tuple
 
 def load_test_state(logger, module_name: str, class_name: str, method_name: str, before: bool = True) -> Dict[str, Any]:
     """
-    Load state data from the correct log file.
+    Load state from log file.
     
     Args:
-        logger: Logger instance from eryx.autotest.logger
-        module_name: Module name (e.g. 'eryx.models')
-        class_name: Class name (e.g. 'OnePhonon')
-        method_name: Method name (e.g. '_build_kvec_Brillouin')
-        before: If True, load before state, otherwise load after state
+        logger: Logger instance
+        module_name: Name of the module
+        class_name: Name of the class
+        method_name: Name of the method
+        before: If True, load before state, else after state
         
     Returns:
-        State dictionary from the log file
+        Dictionary with state data
         
-    Example:
-        state = load_test_state(self.logger, 'eryx.models', 'OnePhonon', '_build_kvec_Brillouin')
+    Raises:
+        FileNotFoundError: If state log file is not found
     """
-    state_type = 'before' if before else 'after'
-    # Try both naming conventions
-    log_paths = [
-        f"logs/{module_name}.{class_name}._state_{state_type}_{method_name}.log",
-        f"logs/{module_name}.{method_name}.{class_name}._state_{state_type}_{method_name}.log"
-    ]
+    prefix = "_state_before_" if before else "_state_after_"
+    log_path = f"logs/{module_name}.{class_name}.{prefix}{method_name}.log"
     
-    # Check if any log exists
-    for log_path in log_paths:
-        if os.path.exists(log_path):
-            return logger.loadStateLog(log_path)
-    
-    # If we get here, no log was found
-    raise FileNotFoundError(f"Log files not found: {log_paths}")
-    
-    # Load state data
     return logger.loadStateLog(log_path)
 
 def build_test_object(torch_class: Type, state_data: Dict[str, Any], device: Optional[torch.device] = None) -> Any:
@@ -180,3 +167,60 @@ def run_state_based_test(test_obj, torch_class: Type, module_name: str,
         return True, ""
     except Exception as e:
         return False, str(e)
+def ensure_tensor(value, device=None):
+    """
+    Ensure value is a PyTorch tensor with gradients.
+    
+    Args:
+        value: Value to convert (can be tensor, ndarray, or serialized)
+        device: Device to place tensor on
+        
+    Returns:
+        PyTorch tensor with proper gradients and device
+    """
+    from eryx.serialization import ObjectSerializer
+    serializer = ObjectSerializer()
+    
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            
+    if isinstance(value, torch.Tensor):
+        # Already a tensor, ensure device and gradients
+        tensor = value.to(device=device)
+        if tensor.dtype.is_floating_point and not tensor.requires_grad:
+            tensor.requires_grad_(True)
+        return tensor
+    elif isinstance(value, np.ndarray):
+        # Convert ndarray to tensor
+        tensor = torch.tensor(value, device=device)
+        if tensor.dtype.is_floating_point:
+            tensor.requires_grad_(True)
+        return tensor
+    elif isinstance(value, bytes):
+        # Try to deserialize
+        try:
+            deserialized = serializer.deserialize({
+                "__type__": "binary",
+                "__data__": value.hex()
+            })
+            if isinstance(deserialized, np.ndarray):
+                tensor = torch.tensor(deserialized, device=device)
+                if tensor.dtype.is_floating_point:
+                    tensor.requires_grad_(True)
+                return tensor
+        except Exception:
+            pass
+    elif isinstance(value, dict) and '__type__' in value:
+        # Already serialized object
+        try:
+            deserialized = serializer.deserialize(value)
+            if isinstance(deserialized, np.ndarray):
+                tensor = torch.tensor(deserialized, device=device)
+                if tensor.dtype.is_floating_point:
+                    tensor.requires_grad_(True)
+                return tensor
+        except Exception:
+            pass
+    
+    # Fallback to original value
+    return value

@@ -10,7 +10,7 @@ try:
     import torch
 except ImportError:
     torch = None
-from eryx.autotest.serializer import Serializer
+from eryx.serialization import ObjectSerializer
 
 class StateCapture:
     """
@@ -38,7 +38,7 @@ class StateCapture:
         self.max_depth = max_depth
         self.exclude_attrs = exclude_attrs or []
         self.include_private = include_private
-        self.serializer = Serializer()
+        self.serializer = ObjectSerializer()
         
         # Compile attribute pattern regexes for faster matching
         self.exclude_patterns = [re.compile(pattern) for pattern in self.exclude_attrs]
@@ -62,31 +62,27 @@ class StateCapture:
         if obj is None:
             return None
             
-        # Get object attributes
+        # Create filtered state dictionary
         state = {}
         
-        # List all attributes that are not methods
+        # Collect filtered attributes
         for attr_name in dir(obj):
-            # Skip if attribute should not be captured
             if not self._should_capture_attr(attr_name):
                 continue
             
             try:
-                # Get attribute value
                 attr_value = getattr(obj, attr_name)
-                
-                # Skip callable attributes (methods)
                 if callable(attr_value):
                     continue
                 
-                # Serialize the attribute - this will now handle unserializable objects gracefully
-                state[attr_name] = self.serializer.serialize(attr_value)
+                # Store attribute directly - serialization handled by ObjectSerializer
+                state[attr_name] = attr_value
             except Exception as e:
-                # Log error but continue capturing other attributes
                 logging.warning(f"Error capturing attribute {attr_name}: {str(e)}")
-                # Create a placeholder for the error
-                state[f"__error_{attr_name}__"] = self.serializer.serialize(str(e))
+                state[f"__error_{attr_name}__"] = str(e)
         
+        # Add format version to indicate new serialization format
+        state["__format_version__"] = 2
         return state
     
     def _should_capture_attr(self, attr_name: str) -> bool:
