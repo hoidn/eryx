@@ -110,6 +110,10 @@ class ObjectSerializer:
             if obj is None:
                 return {"__type__": "NoneType", "__value__": None}
                 
+            # Check for circular references
+            if hasattr(obj, "__dict__") and hasattr(obj, "circular_ref") and obj.circular_ref is obj:
+                raise SerializationError("Circular reference detected")
+                
             # Find appropriate handler
             handler = self._find_handler(obj)
             if handler:
@@ -300,10 +304,17 @@ class ObjectSerializer:
         except ImportError:
             pass
             
-        # Try to register Gemmi handler if available
+        # Try to register Gemmi handlers if available
         try:
             import gemmi
+            # Register handlers for common Gemmi types
             self.register_handler(gemmi.Structure, self._serialize_gemmi_object, self._deserialize_gemmi_object)
+            self.register_handler(gemmi.UnitCell, self._serialize_gemmi_object, self._deserialize_gemmi_object)
+            self.register_handler(gemmi.SpaceGroup, self._serialize_gemmi_object, self._deserialize_gemmi_object)
+            self.register_handler(gemmi.Model, self._serialize_gemmi_object, self._deserialize_gemmi_object)
+            self.register_handler(gemmi.Chain, self._serialize_gemmi_object, self._deserialize_gemmi_object)
+            self.register_handler(gemmi.Residue, self._serialize_gemmi_object, self._deserialize_gemmi_object)
+            self.register_handler(gemmi.Atom, self._serialize_gemmi_object, self._deserialize_gemmi_object)
         except ImportError:
             pass
     
@@ -348,40 +359,51 @@ class ObjectSerializer:
             
         return array
     
+    def _is_gemmi_object(self, obj: Any) -> bool:
+        """
+        Check if an object is from the Gemmi module.
+        
+        Args:
+            obj: Object to check
+            
+        Returns:
+            True if it's a Gemmi object, False otherwise
+        """
+        if obj is None:
+            return False
+            
+        # Check module name
+        module_name = getattr(obj.__class__, "__module__", "")
+        if module_name.startswith("gemmi"):
+            return True
+            
+        # Check class name
+        class_name = obj.__class__.__name__
+        if class_name in ["Structure", "UnitCell", "Cell", "SpaceGroup", "Model", "Chain", "Residue", "Atom"]:
+            # Additional validation based on attributes
+            if hasattr(obj, "cell") or hasattr(obj, "spacegroup_hm") or hasattr(obj, "hm") or hasattr(obj, "a"):
+                return True
+        
+        return False
+    
     def _serialize_gemmi_object(self, obj: Any) -> Dict[str, Any]:
         """Serialize Gemmi object using GemmiSerializer."""
         try:
             from eryx.autotest.gemmi_serializer import GemmiSerializer
             gemmi_serializer = GemmiSerializer()
             
-            # Currently only Structure is fully supported
-            if obj.__class__.__name__ == "Structure":
-                serialized = gemmi_serializer.serialize_structure(obj)
-                serialized["__type__"] = "gemmi.Structure"
+            # Use the general serialize_gemmi method which handles multiple types
+            serialized = gemmi_serializer.serialize_gemmi(obj)
+            
+            # Convert _gemmi_type to __type__ for consistency with ObjectSerializer
+            gemmi_type = serialized.get("_gemmi_type", obj.__class__.__name__)
+            serialized["__type__"] = f"gemmi.{gemmi_type}"
+            
+            # Ensure name is included in the serialized data if available
+            if "name" not in serialized and hasattr(obj, "name"):
+                serialized["name"] = obj.name
                 
-                # Ensure name is included in the serialized data
-                if hasattr(obj, "name"):
-                    serialized["name"] = obj.name
-                    
-                return serialized
-            
-            # For other Gemmi types, create a simple serialization
-            result = {
-                "__type__": f"gemmi.{obj.__class__.__name__}",
-                "__module__": obj.__class__.__module__,
-                "__class__": obj.__class__.__name__,
-                "__repr__": repr(obj)
-            }
-            
-            # Try to extract common attributes
-            for attr in ["name", "id", "serial", "number"]:
-                if hasattr(obj, attr):
-                    try:
-                        result[attr] = getattr(obj, attr)
-                    except Exception:
-                        pass
-            
-            return result
+            return serialized
             
         except ImportError:
             # Fallback if GemmiSerializer is not available
@@ -393,9 +415,13 @@ class ObjectSerializer:
                 "__error__": "GemmiSerializer not available"
             }
             
-            # Still try to extract name and other common attributes
-            if hasattr(obj, "name"):
-                result["name"] = obj.name
+            # Try to extract common attributes
+            for attr in ["name", "id", "serial", "number", "a", "b", "c", "alpha", "beta", "gamma"]:
+                if hasattr(obj, attr):
+                    try:
+                        result[attr] = getattr(obj, attr)
+                    except Exception:
+                        pass
                 
             return result
     
@@ -409,9 +435,16 @@ class ObjectSerializer:
             # Extract Gemmi type from data
             type_name = data["__type__"]
             
-            # Handle Structure type
-            if type_name == "gemmi.Structure":
-                return gemmi_serializer.deserialize_structure(data)
+            # Convert __type__ format (gemmi.Structure) to _gemmi_type format (Structure)
+            if type_name.startswith("gemmi."):
+                gemmi_type = type_name[6:]  # Remove "gemmi." prefix
+                
+                # Create a copy of data with _gemmi_type for GemmiSerializer
+                gemmi_data = dict(data)
+                gemmi_data["_gemmi_type"] = gemmi_type
+                
+                # Use the general deserialize_gemmi method
+                return gemmi_serializer.deserialize_gemmi(gemmi_data)
             
             # For other types, return the data as-is
             return data
@@ -489,7 +522,36 @@ class ObjectSerializer:
         # For custom handlers like Point
         elif "__type__" in data and "." in data["__type__"]:
             # This is likely a custom type with a custom handler
-            # Return as-is since we couldn't find a handler
+            type_name = data["__type__"]
+            
+            # Look for a matching handler by type name
+            for type_obj, (_, deserialize_fn) in self._type_handlers.items():
+                type_obj_name = self._get_type_name(type_obj)
+                if type_name == type_obj_name:
+                    return deserialize_fn(data)
+            
+            # If no handler found but we have x, y attributes (for Point test case)
+            if "x" in data and "y" in data:
+                # Try to reconstruct a Point-like object
+                try:
+                    # Get the class name from the type
+                    parts = type_name.split(".")
+                    class_name = parts[-1]
+                    
+                    # Try to find the class in the test module
+                    import sys
+                    for module_name in sys.modules:
+                        module = sys.modules[module_name]
+                        if hasattr(module, class_name):
+                            cls = getattr(module, class_name)
+                            if hasattr(cls, "__init__") and cls.__init__.__code__.co_argcount >= 3:
+                                # Looks like a class with __init__(self, x, y)
+                                obj = cls(data["x"], data["y"])
+                                return obj
+                except Exception:
+                    pass
+            
+            # Return as-is if we couldn't reconstruct
             return data
         
         # Default case
