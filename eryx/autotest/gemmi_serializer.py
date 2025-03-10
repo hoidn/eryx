@@ -417,11 +417,15 @@ class GemmiSerializer:
         residue = gemmi.Residue()
         residue.name = data.get("name", "")
         
-        # Set seqid if available
-        seqid = gemmi.SeqId()
-        seqid.num = data.get("seqid_num", 0)
-        seqid.icode = data.get("seqid_icode", "")
-        residue.seqid = seqid
+        # Set seqid if available - use direct constructor
+        seqid_num = data.get("seqid_num", 0)
+        seqid_icode = data.get("seqid_icode", "")
+        try:
+            # Use the correct constructor signature
+            residue.seqid = gemmi.SeqId(seqid_num, seqid_icode)
+        except Exception as e:
+            # Fallback if constructor fails
+            print(f"Warning: Failed to create SeqId: {str(e)}")
         
         # Add atoms
         for atom_data in data.get("atoms", []):
