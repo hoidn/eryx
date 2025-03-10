@@ -131,6 +131,36 @@ class TestStateBuilderFix(unittest.TestCase):
                        "Result should be an identity matrix for square matrices")
         
         print("✅ Test passed: _deserialize_array correctly handles dictionary with shape and dtype")
+        
+        # Test with a dictionary containing actual array data
+        test_array = np.array([[1.5, 2.5, 3.5], [4.5, 5.5, 6.5], [7.5, 8.5, 9.5]], dtype=np.float32)
+        buffer = io.BytesIO()
+        np.save(buffer, test_array)
+        
+        dict_data_with_values = {
+            '_array_type': 'numpy.ndarray',
+            '_array_data': buffer.getvalue(),
+            '_array_dtype': str(test_array.dtype),
+            '_array_shape': test_array.shape,
+            '_array_values': test_array.tolist()
+        }
+        
+        print(f"Testing _deserialize_array with array data")
+        result_with_data = builder._deserialize_array(dict_data_with_values)
+        print(f"Result type: {type(result_with_data)}")
+        if result_with_data is not None:
+            print(f"Result shape: {result_with_data.shape}, dtype: {result_with_data.dtype}")
+            print(f"Result values:\n{result_with_data}")
+            
+        self.assertIsInstance(result_with_data, np.ndarray, "Result should be a numpy array")
+        self.assertEqual(result_with_data.shape, test_array.shape, f"Result should have shape {test_array.shape}")
+        self.assertEqual(result_with_data.dtype, test_array.dtype, f"Result should have dtype {test_array.dtype}")
+        
+        # Verify the values match
+        self.assertTrue(np.allclose(result_with_data, test_array), 
+                       "Result should match the original array values")
+        
+        print("✅ Test passed: _deserialize_array correctly handles dictionary with array data")
     
     def test_is_serialized_array_method(self):
         """Test the _is_serialized_array method directly."""
@@ -182,7 +212,118 @@ class TestStateBuilderFix(unittest.TestCase):
         # as per project requirements
         
         print("✅ Test passed: Tensor creation works correctly with state-restored model")
+    
+    def test_array_serialization_deserialization(self):
+        """Test full serialization and deserialization of arrays."""
+        from eryx.autotest.serializer import Serializer
+        
+        # Create a test array with non-identity values
+        test_array = np.array([[1.5, 2.5, 3.5], [4.5, 5.5, 6.5], [7.5, 8.5, 9.5]], dtype=np.float32)
+        
+        # Create a serializer
+        serializer = Serializer()
+        
+        # Serialize the array
+        print(f"Serializing array with shape {test_array.shape} and dtype {test_array.dtype}")
+        serialized_data = serializer.serialize(test_array)
+        
+        # Verify serialized data is bytes
+        self.assertIsInstance(serialized_data, bytes, "Serialized data should be bytes")
+        
+        # Deserialize the array
+        print(f"Deserializing array data")
+        deserialized_array = serializer.deserialize(serialized_data)
+        
+        # Verify deserialized data is a numpy array with correct properties
+        self.assertIsInstance(deserialized_array, np.ndarray, "Deserialized data should be a numpy array")
+        self.assertEqual(deserialized_array.shape, test_array.shape, 
+                        f"Deserialized array should have shape {test_array.shape}")
+        self.assertEqual(deserialized_array.dtype, test_array.dtype, 
+                        f"Deserialized array should have dtype {test_array.dtype}")
+        
+        # Verify the values match
+        self.assertTrue(np.allclose(deserialized_array, test_array), 
+                       "Deserialized array should match the original array values")
+        
+        print("✅ Test passed: Array serialization and deserialization works correctly")
+        
+        # Test with a model containing the array
+        mock_model = {'A_inv': test_array}
+        
+        # Serialize the model
+        print(f"Serializing model with A_inv array")
+        serialized_model = serializer.serialize(mock_model)
+        
+        # Deserialize the model
+        print(f"Deserializing model with A_inv array")
+        deserialized_model = serializer.deserialize(serialized_model)
+        
+        # Verify the model contains the A_inv array with correct values
+        self.assertIn('A_inv', deserialized_model, "Deserialized model should contain A_inv")
+        self.assertIsInstance(deserialized_model['A_inv'], np.ndarray, 
+                            "Deserialized A_inv should be a numpy array")
+        self.assertTrue(np.allclose(deserialized_model['A_inv'], test_array), 
+                       "Deserialized A_inv should match the original array values")
+        
+        print("✅ Test passed: Model with array serialization and deserialization works correctly")
 
+
+    def test_state_capture_with_arrays(self):
+        """Test state capture with arrays to ensure full serialization."""
+        from eryx.autotest.state_capture import StateCapture
+        from eryx.autotest.logger import Logger
+        
+        # Create a test object with arrays
+        class TestObject:
+            def __init__(self):
+                self.A_inv = np.array([[1.5, 2.5, 3.5], [4.5, 5.5, 6.5], [7.5, 8.5, 9.5]], dtype=np.float32)
+                self.simple_attr = "test"
+                self.nested_obj = type('NestedObject', (), {
+                    'nested_array': np.array([1.0, 2.0, 3.0], dtype=np.float64)
+                })
+        
+        # Create a test object
+        test_obj = TestObject()
+        
+        # Create a state capture instance
+        state_capture = StateCapture(max_depth=3, include_private=False)
+        
+        # Capture the state
+        print(f"Capturing state of test object")
+        state = state_capture.capture_state(test_obj)
+        
+        # Verify state contains the expected attributes
+        self.assertIn('A_inv', state, "State should contain A_inv")
+        self.assertIn('simple_attr', state, "State should contain simple_attr")
+        self.assertIn('nested_obj', state, "State should contain nested_obj")
+        
+        # Create a logger to serialize and deserialize the state
+        logger = Logger()
+        
+        # Save the state to a temporary file
+        temp_log_path = 'logs/test_state_capture.log'
+        print(f"Saving state to {temp_log_path}")
+        logger.saveStateLog(temp_log_path, state)
+        
+        # Load the state back
+        print(f"Loading state from {temp_log_path}")
+        loaded_state = logger.loadStateLog(temp_log_path)
+        
+        # Verify loaded state contains the expected attributes
+        self.assertIn('A_inv', loaded_state, "Loaded state should contain A_inv")
+        self.assertIn('simple_attr', loaded_state, "Loaded state should contain simple_attr")
+        
+        # Verify A_inv is a numpy array with correct values
+        self.assertIsInstance(loaded_state['A_inv'], np.ndarray, 
+                            "Loaded A_inv should be a numpy array")
+        self.assertTrue(np.allclose(loaded_state['A_inv'], test_obj.A_inv), 
+                       "Loaded A_inv should match the original array values")
+        
+        # Clean up the temporary file
+        if os.path.exists(temp_log_path):
+            os.remove(temp_log_path)
+        
+        print("✅ Test passed: State capture with arrays works correctly")
 
 if __name__ == '__main__':
     unittest.main()
