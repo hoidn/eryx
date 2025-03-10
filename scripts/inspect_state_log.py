@@ -69,9 +69,17 @@ def print_tree(data: Dict[str, Any], indent: int = 0) -> None:
         indent: Current indentation level
     """
     prefix = "  " * indent
-    for key, value in sorted(data.items()):
-        if key.startswith("__") and key != "__type__":
-            continue  # Skip internal keys
+    try:
+        # Sort items, handling non-string keys
+        items = sorted(data.items(), key=lambda x: str(x[0]))
+    except Exception:
+        # Fallback if sorting fails
+        items = data.items()
+        
+    for key, value in items:
+        # Skip internal keys, but only for string keys
+        if isinstance(key, str) and key.startswith("__") and key != "__type__":
+            continue
             
         # Print key with type info
         print(f"{prefix}{key}: {format_value(value)}")
