@@ -46,7 +46,8 @@ class TestKvectorMethods(TestBase):
         from eryx.autotest.test_helpers import (
             load_test_state, 
             build_test_object,
-            verify_gradient_flow
+            verify_gradient_flow,
+            ensure_tensor
         )
         
         try:
@@ -173,6 +174,7 @@ class TestKvectorMethods(TestBase):
         kvec_norm_expected = after_state.get('kvec_norm')
         
         # Handle any format using ensure_tensor
+        from eryx.autotest.test_helpers import ensure_tensor
         kvec_expected = ensure_tensor(kvec_expected, device='cpu')
         kvec_norm_expected = ensure_tensor(kvec_norm_expected, device='cpu')
         
