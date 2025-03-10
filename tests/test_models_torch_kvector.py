@@ -78,6 +78,7 @@ class TestKvectorMethods(TestBase):
         print(f"A_inv requires_grad: {model.model.A_inv.requires_grad}")
         print(f"A_inv device: {model.model.A_inv.device}")
         print(f"A_inv first few values: {model.model.A_inv.flatten()[:5]}")
+        print(f"A_inv full matrix:\n{model.model.A_inv}")
         
         # DEBUGGING: Test _center_kvec function
         print("\nDEBUGGING _center_kvec function:")
@@ -137,6 +138,12 @@ class TestKvectorMethods(TestBase):
         print(f"expected kvec[0,0,0]: {kvec_expected[0,0,0]}")
         print(f"expected kvec[0,1,0]: {kvec_expected[0,1,0]}")
         print(f"expected kvec[1,0,0]: {kvec_expected[1,0,0]}")
+        
+        # DEBUGGING: Print sampling parameters
+        print("\nDEBUGGING sampling parameters:")
+        print(f"hsampling: {model.hsampling}")
+        print(f"ksampling: {model.ksampling}")
+        print(f"lsampling: {model.lsampling}")
         
         # DEBUGGING: Print differences
         print("\nDEBUGGING differences:")

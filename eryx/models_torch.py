@@ -377,6 +377,16 @@ class OnePhonon:
                     hkl = np.array([k_dh, k_dk, k_dl])
                     hkl_tensor = torch.tensor(hkl, device=self.device, dtype=torch.float32)
                     
+                    # Debug calculation for specific points
+                    if dh == 0 and dk == 1 and dl == 0:
+                        print(f"\nDEBUGGING calculation for point [0,1,0]:")
+                        print(f"k_dh, k_dk, k_dl = {k_dh}, {k_dk}, {k_dl}")
+                        print(f"hkl_tensor: {hkl_tensor}")
+                        print(f"A_inv_tensor:\n{A_inv_tensor}")
+                        print(f"A_inv_tensor.T:\n{A_inv_tensor.T}")
+                        result = torch.matmul(A_inv_tensor.T, hkl_tensor)
+                        print(f"Result of matmul: {result}")
+                    
                     # Use the exact same calculation as NumPy: np.inner(A_inv.T, hkl).T
                     # The NumPy implementation uses np.inner which is different from a simple matmul
                     # This is the key to matching the expected values exactly
