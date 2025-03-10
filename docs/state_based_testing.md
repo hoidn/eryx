@@ -109,6 +109,8 @@ def test_method_state_based(self):
     self.assertTrue(np.allclose(model.tensor_attr.detach().cpu().numpy(), expected_tensor))
 ```
 
+> **Example Implementation**: For a complete working example of state-based testing, see the `test_build_kvec_Brillouin_state_based()` method in `tests/test_models_torch_kvector.py`. This test demonstrates proper state loading, tensor comparison, and error handling with flexible path resolution.
+
 ## Regenerating State Logs
 
 When you make changes to the code that affect state capture, regenerate the logs:
