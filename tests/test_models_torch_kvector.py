@@ -52,12 +52,31 @@ class TestKvectorMethods(TestBase):
         
         try:
             # 1. Try to load before state
-            before_state = load_test_state(
-                self.logger, 
-                self.module_name, 
-                self.class_name, 
-                "_build_kvec_Brillouin"
-            )
+            try:
+                # Try the standard format first
+                before_state = load_test_state(
+                    self.logger, 
+                    self.module_name, 
+                    self.class_name, 
+                    "_build_kvec_Brillouin"
+                )
+            except FileNotFoundError:
+                # Try alternative format (module_name.class_name instead of module_name.OnePhonon)
+                try:
+                    before_state = load_test_state(
+                        self.logger, 
+                        f"{self.module_name}._build_kvec_Brillouin", 
+                        self.class_name, 
+                        "_build_kvec_Brillouin"
+                    )
+                except FileNotFoundError:
+                    # If still not found, try with just the method name
+                    before_state = load_test_state(
+                        self.logger, 
+                        f"{self.module_name}._build_kvec_Brillouin", 
+                        self.class_name, 
+                        ""
+                    )
         except FileNotFoundError:
             # If state logs aren't found, use a minimal state instead
             self.skipTest("State logs not found, skipping state-based test")
@@ -161,13 +180,34 @@ class TestKvectorMethods(TestBase):
         print(f"kvec[1,0,0]: {model.kvec[1,0,0]}")
         
         # 7. Load after state and compare
-        after_state = load_test_state(
-            self.logger, 
-            self.module_name, 
-            self.class_name, 
-            "_build_kvec_Brillouin", 
-            before=False
-        )
+        try:
+            # Try the standard format first
+            after_state = load_test_state(
+                self.logger, 
+                self.module_name, 
+                self.class_name, 
+                "_build_kvec_Brillouin", 
+                before=False
+            )
+        except FileNotFoundError:
+            # Try alternative format (module_name.class_name instead of module_name.OnePhonon)
+            try:
+                after_state = load_test_state(
+                    self.logger, 
+                    f"{self.module_name}._build_kvec_Brillouin", 
+                    self.class_name, 
+                    "_build_kvec_Brillouin",
+                    before=False
+                )
+            except FileNotFoundError:
+                # If still not found, try with just the method name
+                after_state = load_test_state(
+                    self.logger, 
+                    f"{self.module_name}._build_kvec_Brillouin", 
+                    self.class_name, 
+                    "",
+                    before=False
+                )
         
         # 8. Compare only the tensors that should have changed
         kvec_expected = after_state.get('kvec')
