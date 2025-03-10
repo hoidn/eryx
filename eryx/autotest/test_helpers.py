@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Type, Tuple
 
 def load_test_state(logger, module_name: str, class_name: str, method_name: str, before: bool = True) -> Dict[str, Any]:
     """
-    Load state from log file.
+    Load state from log file with flexible path handling.
     
     Args:
         logger: Logger instance
@@ -18,12 +18,58 @@ def load_test_state(logger, module_name: str, class_name: str, method_name: str,
         Dictionary with state data
         
     Raises:
-        FileNotFoundError: If state log file is not found
+        FileNotFoundError: If state log file is not found in any format
     """
-    prefix = "_state_before_" if before else "_state_after_"
-    log_path = f"logs/{module_name}.{class_name}.{prefix}{method_name}.log"
+    import os
+    import glob
+    import logging
     
-    return logger.loadStateLog(log_path)
+    prefix = "_state_before_" if before else "_state_after_"
+    
+    # Try several possible path formats
+    possible_paths = [
+        # Format 1: module.class.state_before_method
+        f"logs/{module_name}.{class_name}.{prefix}{method_name}.log",
+        
+        # Format 2: module.method.class.state_before_method
+        f"logs/{module_name}.{method_name}.{class_name}.{prefix}{method_name}.log",
+        
+        # Format 3: module.method.class.state_before_
+        f"logs/{module_name}.{method_name}.{class_name}.{prefix}_.log",
+        
+        # Format 4: module.class.state_before_
+        f"logs/{module_name}.{class_name}.{prefix}_.log"
+    ]
+    
+    # Log the paths we're trying
+    logging.debug(f"Trying to load state log from the following paths:")
+    for i, path in enumerate(possible_paths):
+        logging.debug(f"  [{i+1}] {path}")
+    
+    # Try each path
+    errors = []
+    for path in possible_paths:
+        try:
+            # Check if file exists before trying to load
+            if os.path.exists(path):
+                logging.debug(f"Found log file: {path}")
+                return logger.loadStateLog(path)
+            else:
+                errors.append(f"File not found: {path}")
+        except Exception as e:
+            errors.append(f"Error loading {path}: {str(e)}")
+    
+    # If we get here, none of the paths worked
+    # Find any matching log files for better error message
+    matching_logs = glob.glob(f"logs/*{class_name}*{method_name}*.log")
+    
+    error_msg = (
+        f"Could not load state log for {module_name}.{class_name}.{method_name}\n"
+        f"Tried paths: {possible_paths}\n"
+        f"Available matching logs: {matching_logs}"
+    )
+    
+    raise FileNotFoundError(error_msg)
 
 def build_test_object(torch_class: Type, state_data: Dict[str, Any], device: Optional[torch.device] = None) -> Any:
     """

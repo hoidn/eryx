@@ -38,6 +38,8 @@ class StateCapture:
         self.max_depth = max_depth
         self.exclude_attrs = exclude_attrs or []
         self.include_private = include_private
+        
+        # Use the improved ObjectSerializer
         self.serializer = ObjectSerializer()
         
         # Compile attribute pattern regexes for faster matching

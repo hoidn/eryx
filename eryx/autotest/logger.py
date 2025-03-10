@@ -178,77 +178,26 @@ class Logger:
     
     def saveStateLog(self, log_file_path: str, state_data: Dict[str, Any]) -> None:
         """
-        Save object state to a log file.
+        Save object state to a log file with improved serialization.
         
         Args:
             log_file_path: Path to save the state log
             state_data: Dictionary with serialized state data
         """
         try:
-            import os
-            import json
-            import numpy as np
-            import base64
-            import io
-            
             # Create directory if it doesn't exist
             os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
             
-            # Define custom encoder for NumPy arrays
-            class NumpyArrayEncoder(json.JSONEncoder):
-                def default(self, obj):
-                    if isinstance(obj, np.ndarray):
-                        # Use the serializer for NumPy arrays
-                        from eryx.serialization import ObjectSerializer
-                        serializer = ObjectSerializer()
-                        return serializer._serialize_ndarray(obj)
-                    return super().default(obj)
-            
-            # Process state data to handle problematic values
-            processed_state = {}
-            for key, value in state_data.items():
-                try:
-                    # Try to serialize each value individually
-                    processed_state[key] = value
-                except Exception as e:
-                    # If serialization fails, store error information
-                    processed_state[f"__error_{key}__"] = str(e)
-                    # Try to store a string representation as fallback
-                    try:
-                        processed_state[f"__str_{key}__"] = str(value)
-                    except Exception:
-                        pass
-            
-            # Write to file with proper encoding
+            # Use the serializer's dump method directly
             with open(log_file_path, 'w') as log_file:
-                json.dump(processed_state, log_file, cls=NumpyArrayEncoder, indent=2)
+                self.serializer.dump(state_data, log_file)
                 
         except Exception as e:
-            # Try a more robust approach if the first attempt fails
-            try:
-                # Create a sanitized copy of the state data
-                sanitized_state = {}
-                for key, value in state_data.items():
-                    try:
-                        # Test if the value can be serialized with str conversion
-                        json.dumps({key: value}, default=str)
-                        sanitized_state[key] = value
-                    except (TypeError, OverflowError):
-                        # Convert problematic values to strings
-                        try:
-                            sanitized_state[key] = str(value)
-                        except Exception:
-                            sanitized_state[f"__error_{key}__"] = "Unserializable value"
-                
-                # Write sanitized state to file
-                with open(log_file_path, 'w') as log_file:
-                    json.dump(sanitized_state, log_file, default=str, indent=2)
-            except Exception as e2:
-                print(f"Error saving state log (fallback also failed): {e2}", file=sys.stderr)
+            print(f"Error saving state log: {e}", file=sys.stderr)
     
     def loadStateLog(self, log_file_path: str) -> Dict[str, Any]:
         """
-        Load object state from a log file.
+        Load object state from a log file with improved deserialization.
         
         Args:
             log_file_path: Path to the state log file
@@ -257,59 +206,23 @@ class Logger:
             Dictionary with deserialized state data
         """
         try:
-            import json
-            import base64
-            import numpy as np
-            import io
-            
-            # Define a custom JSON decoder that handles numpy arrays
-            class NumpyArrayDecoder(json.JSONDecoder):
-                def __init__(self, *args, **kwargs):
-                    json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
-                    
-                def object_hook(self, obj):
-                    if isinstance(obj, dict) and obj.get("__type__") == "numpy.ndarray":
-                        # Handle base64 encoded binary data
-                        if "__binary__" in obj:
-                            try:
-                                binary_data = base64.b64decode(obj["__binary__"])
-                                buffer = io.BytesIO(binary_data)
-                                return np.load(buffer)
-                            except Exception as e:
-                                print(f"Warning: Failed to decode array from binary: {e}", file=sys.stderr)
-                        
-                        # Handle hex encoded data (backward compatibility)
-                        if "__data__" in obj:
-                            try:
-                                binary_data = bytes.fromhex(obj["__data__"])
-                                buffer = io.BytesIO(binary_data)
-                                return np.load(buffer)
-                            except Exception as e:
-                                print(f"Warning: Failed to decode array from hex: {e}", file=sys.stderr)
-                    
-                    return obj
-            
-            # Load file content
+            # Use the serializer's load method directly
             with open(log_file_path, 'r') as log_file:
-                try:
-                    # First try with NumPy-aware decoder
-                    return json.load(log_file, cls=NumpyArrayDecoder)
-                except Exception as e:
-                    # Fall back to regular JSON or ObjectSerializer
-                    log_file.seek(0)
-                    try:
-                        return self.serializer.load(log_file)
-                    except Exception:
-                        # Last resort: plain JSON
-                        log_file.seek(0)
-                        return json.load(log_file)
-                        
+                return self.serializer.load(log_file)
+                
         except FileNotFoundError:
             print(f"State log file not found: {log_file_path}", file=sys.stderr)
             raise
         except Exception as e:
             print(f"Error loading state log: {e}", file=sys.stderr)
-            return {}
+            # Try loading as plain JSON as fallback
+            try:
+                import json
+                with open(log_file_path, 'r') as log_file:
+                    print(f"Loaded state log as plain JSON from {log_file_path}")
+                    return json.load(log_file)
+            except Exception:
+                return {}
     
     def searchStateLogDirectory(self, log_path_prefix: str) -> List[str]:
         """

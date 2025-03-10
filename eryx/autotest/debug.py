@@ -273,7 +273,8 @@ if config.getDebugFlag():
                 log_file_path = function_mapping.get_log_file_path(func)
                 os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
                 
-                # Capture state before method execution
+                # Create consistent state log paths - IMPORTANT CHANGE
+                # Use format: {module_path}.{class_name}._state_{before/after}_{function_name}.log
                 state_capturer = None
                 if capture_state and is_method:
                     before_state_path = os.path.join(
@@ -282,7 +283,7 @@ if config.getDebugFlag():
                     )
                     
                     try:
-                        # Initialize state capturer
+                        # Initialize state capturer with enhanced serializer
                         state_capturer = StateCapture(
                             max_depth=max_depth,
                             exclude_attrs=exclude_attrs
