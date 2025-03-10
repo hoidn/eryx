@@ -256,19 +256,28 @@ Most tasks should use Level 1 or 2, reserving Level 3 for critical or complex co
    - Default to excluding private attributes
    - Only capture relevant attributes to keep logs manageable
 
-3. **State Restoration Rules**
-   - Initialize PyTorch objects with full state before executing test method
+3. **State Serialization**
+   - Use ObjectSerializer for consistent serialization across components
+   - Ensure proper handling of complex objects (tensors, arrays, custom classes)
+   - Maintain type information for accurate reconstruction
+   - Handle special cases like NumPy arrays, PyTorch tensors, and Gemmi objects
+
+4. **State Restoration Rules**
+   - Use StateBuilder to initialize PyTorch objects with proper structure
    - Convert NumPy arrays to PyTorch tensors with appropriate gradient settings
+   - Use ensure_tensor() to handle different tensor formats consistently
    - Handle device placement consistently during state restoration
 
-4. **State Comparison Rules**
-   - Compare states with appropriate numerical tolerances
-   - Ignore attributes explicitly marked for exclusion
+5. **State Comparison Rules**
+   - Compare states with appropriate numerical tolerances (typically rtol=1e-5, atol=1e-8)
+   - Use np.allclose() for tensor comparisons after detaching and converting to CPU
    - Report detailed differences when state comparison fails
    - Note: Gradient flow is not required for state-restored instances
 
-5. **Verification Process**
+6. **Verification Process**
    - Use verify_logs.py to check log completeness
+   - Use inspect_state_log.py to examine log contents
    - Ensure before/after state pairs exist for all methods
    - Verify all required attributes are present in logs
+   - Regenerate logs after significant code changes
    - Do not test gradient flow for state-restored test objects

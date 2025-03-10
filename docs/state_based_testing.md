@@ -49,6 +49,27 @@ Running code with decorated methods produces:
 2. Before state logs: `logs/eryx.module.Class._state_before_method.log`
 3. After state logs: `logs/eryx.module.Class._state_after_method.log`
 
+## Serialization Framework
+
+The state-based testing framework uses `ObjectSerializer` for robust serialization of complex objects:
+
+- **Consistent Format**: All state logs use a consistent JSON-based format
+- **Complex Object Support**: Handles NumPy arrays, PyTorch tensors, Gemmi objects, and custom classes
+- **Type Preservation**: Maintains type information for proper reconstruction
+- **Gradient Support**: Preserves gradient requirements for tensors
+
+### Inspecting State Logs
+
+Use the `inspect_state_log.py` script to examine log contents:
+
+```bash
+# View log in tree format
+python scripts/inspect_state_log.py logs/eryx.module.Class._state_method.log
+
+# View in JSON format
+python scripts/inspect_state_log.py logs/eryx.module.Class._state_method.log --format json
+```
+
 ## Verifying Logs
 
 Use the `verify_logs.py` script to check log completeness:
@@ -71,19 +92,33 @@ In test files, use this pattern:
 ```python
 def test_method_state_based(self):
     # 1. Load before state
-    before_state = logger.loadStateLog("logs/eryx.module.Class._state_before_method.log")
+    before_state = load_test_state(self.logger, module_name, class_name, method_name)
     
-    # 2. Initialize object with state
-    obj = torch_testing.initializeFromState(Class, before_state)
+    # 2. Build test object with StateBuilder
+    model = build_test_object(TorchClass, before_state, device=self.device)
     
     # 3. Call method under test
-    obj.method()
+    model.method()
     
-    # 4. Load expected after state
-    expected_after = logger.loadStateLog("logs/eryx.module.Class._state_after_method.log")
+    # 4. Verify results (attributes, tensor properties, etc.)
+    self.assertTrue(hasattr(model, 'expected_attribute'))
     
-    # 5. Compare states
-    self.assertTrue(torch_testing.compareStates(expected_after, obj.__dict__))
+    # 5. Load after state and compare if needed
+    after_state = load_test_state(self.logger, module_name, class_name, method_name, before=False)
+    expected_tensor = ensure_tensor(after_state.get('tensor_attr'), device='cpu')
+    self.assertTrue(np.allclose(model.tensor_attr.detach().cpu().numpy(), expected_tensor))
+```
+
+## Regenerating State Logs
+
+When you make changes to the code that affect state capture, regenerate the logs:
+
+```bash
+# Generate logs for all components
+python scripts/generate_state_logs.py --component all
+
+# Generate logs for specific components
+python scripts/generate_state_logs.py --component onePhonon
 ```
 
 ## Best Practices
@@ -92,9 +127,12 @@ def test_method_state_based(self):
 2. **Test Important State**: Check method-specific attributes in verification
 3. **Match Ground Truth**: Ensure PyTorch implementation matches the NumPy version's state changes
 4. **Document State Dependencies**: Note which attributes methods read from and modify
+5. **Handle Complex Objects**: Use `ensure_tensor()` to convert state values to tensors
+6. **Verify Logs**: Always run `verify_logs.py` after regenerating logs
+7. **Inspect Problematic Logs**: Use `inspect_state_log.py` to debug issues
 # State-Based Testing with StateBuilder
 
-This document describes the new approach to state-based testing using the StateBuilder pattern.
+This document describes the approach to state-based testing using the StateBuilder pattern and ObjectSerializer.
 
 ## Overview
 
@@ -103,9 +141,18 @@ State-based testing involves:
 2. Using that state to reconstruct test objects
 3. Verifying method behavior by comparing with expected results
 
-The new approach simplifies this process by ensuring test objects have the correct structure, with attributes in their expected locations, while leveraging existing adapter classes for type-specific conversions.
+The approach ensures test objects have the correct structure, with attributes in their expected locations, while leveraging the robust ObjectSerializer for consistent serialization.
 
 ## Key Components
+
+### ObjectSerializer
+
+`ObjectSerializer` is the foundation for state serialization:
+
+- Handles complex Python objects including NumPy arrays, PyTorch tensors, and custom classes
+- Preserves type information for accurate reconstruction
+- Supports special handling for domain-specific objects like Gemmi structures
+- Provides consistent serialization format across all components
 
 ### StateBuilder
 
@@ -132,7 +179,7 @@ from eryx.autotest.test_helpers import (
     load_test_state,
     build_test_object,
     verify_gradient_flow,
-    verify_tensor_matches
+    ensure_tensor
 )
 
 # Load state and build object in one step
@@ -146,6 +193,9 @@ model._build_kvec_Brillouin()
 loss = torch.sum(model.kvec)
 loss.backward()
 assert verify_gradient_flow(model.kvec, model.model.A_inv)
+
+# Convert state values to tensors
+expected_tensor = ensure_tensor(after_state.get('tensor_attr'), device='cpu')
 ```
 
 ## Standard Test Pattern
@@ -176,7 +226,12 @@ def test_method_name(self):
     
     # 6. Compare with expected state (if needed)
     after_state = load_test_state(self.logger, module_name, class_name, method_name, before=False)
-    # Use verify_tensor_matches or torch_testing.compareStates
+    expected_tensor = ensure_tensor(after_state.get('tensor_attr'), device='cpu')
+    self.assertTrue(np.allclose(
+        model.tensor_attr.detach().cpu().numpy(), 
+        expected_tensor,
+        rtol=1e-5, atol=1e-8
+    ))
 ```
 
 ## Handling Common Patterns
@@ -224,70 +279,48 @@ self.assertTrue(hasattr(model, 'kvec'))
 # ... more checks
 ```
 
-### Testing Covariance Matrix
+## Inspecting and Debugging State Logs
 
-```python
-# Follow standard pattern
-# Focus on checking covariance matrix properties
-self.assertTrue(hasattr(model, 'covar'))
-self.assertEqual(model.covar.shape, expected_shape)
-# Verify complex tensor handling works correctly
-```
+When working with state logs:
 
-## Debugging Tips
-
-When state-based tests fail:
-
-1. **Check Log Files**: Verify state logs exist and contain expected attributes
+1. **Inspect Log Contents**: Use the inspection tool to examine log structure
+   ```bash
+   python scripts/inspect_state_log.py logs/eryx.models.OnePhonon._state_before__build_kvec_Brillouin.log
    ```
+
+2. **Verify Log Completeness**: Check that logs contain required attributes
+   ```bash
    python scripts/verify_logs.py --required-attrs "model,A_inv"
    ```
 
-2. **Examine State Structure**: Print key attributes to see what's available
+3. **Debug Tensor Conversion**: Use `ensure_tensor()` to handle different tensor formats
    ```python
-   print(f"State keys: {state_data.keys()}")
-   if 'model' in state_data:
-       print(f"Model keys: {state_data['model'].keys()}")
+   # Convert any tensor-like object to a proper tensor
+   tensor = ensure_tensor(state_value, device=self.device)
    ```
 
-3. **Verify Attribute Locations**: Check that attributes are in expected places
+4. **Print Diagnostic Information**: Add debug prints to understand state structure
    ```python
-   # Should be true:
-   assert hasattr(model, 'model') and hasattr(model.model, 'A_inv') 
-   # Should be false:
-   assert not hasattr(model, 'A_inv')  # A_inv should not be at top level
+   print(f"State keys: {before_state.keys()}")
+   if 'model' in before_state:
+       print(f"Model keys: {before_state['model'].keys()}")
    ```
 
-4. **Debug Tensor Creation**: Check tensor properties
-   ```python
-   # After method call:
-   print(f"A_inv shape: {model.model.A_inv.shape}")
-   print(f"A_inv requires_grad: {model.model.A_inv.requires_grad}")
-   print(f"kvec shape: {model.kvec.shape}")
-   print(f"kvec requires_grad: {model.kvec.requires_grad}")
-   ```
+## Generating and Managing State Logs
 
-   Note: Gradient flow is not required for state-restored instances in tests.
-
-## Generating New State Logs
-
-To generate state logs:
+### Generating State Logs
 
 ```bash
-# Generate logs for OnePhonon
-python scripts/generate_state_logs.py --component onePhonon
+# Generate logs for all components
+python scripts/generate_state_logs.py --component all
 
 # Generate logs for specific components
+python scripts/generate_state_logs.py --component onePhonon
 python scripts/generate_state_logs.py --component mapUtils
 python scripts/generate_state_logs.py --component scatter
-
-# Generate all logs
-python scripts/generate_state_logs.py --component all
 ```
 
-## Verifying State Logs
-
-To verify state logs:
+### Verifying State Logs
 
 ```bash
 # Check all logs
@@ -299,3 +332,13 @@ python scripts/verify_logs.py --required-attrs "model,A_inv,kvec,kvec_norm"
 # Save detailed results to file
 python scripts/verify_logs.py --output verification_results.json
 ```
+
+## Best Practices
+
+1. **Always Regenerate Logs** after significant code changes
+2. **Verify Logs** before running tests to ensure they contain required data
+3. **Use Helper Functions** like `ensure_tensor()` for consistent handling
+4. **Set Appropriate Tolerances** for numerical comparisons (typically 1e-5 for rtol)
+5. **Add Debug Prints** in tests to diagnose failures
+6. **Check Attribute Locations** to ensure proper object structure
+7. **Inspect Problematic Logs** using the inspection tool
