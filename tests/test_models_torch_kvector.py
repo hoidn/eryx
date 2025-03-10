@@ -165,8 +165,8 @@ class TestKvectorMethods(TestBase):
         k_dl = model._center_kvec(l_idx, model.lsampling[2])
         print(f"k_dh, k_dk, k_dl = {k_dh}, {k_dk}, {k_dl}")
         
-        # Create hkl tensor
-        hkl_tensor = torch.tensor([k_dh, k_dk, k_dl], device=model.device)
+        # Create hkl tensor with matching dtype
+        hkl_tensor = torch.tensor([k_dh, k_dk, k_dl], device=model.device, dtype=model.model.A_inv.dtype)
         print(f"hkl_tensor: {hkl_tensor}")
         
         # Print A_inv tensor
