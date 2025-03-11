@@ -7,21 +7,31 @@ This script loads the diffuse intensity file and displays a 2D slice
 you can choose to display a central slice along one dimension.
 
 Usage:
-    python visualize_diffuse.py [torch|np]
+    python visualize_diffuse.py [--dataset {torch,np}]
     
-    The optional parameter selects which dataset to visualize:
-    - torch: uses "torch_diffuse_intensity.npy" (default)
-    - np: uses "np_diffuse_intensity.npy"
+    Optional arguments:
+    --dataset {torch,np}  Select which dataset to visualize:
+                          - torch: uses "torch_diffuse_intensity.npy" (default)
+                          - np: uses "np_diffuse_intensity.npy"
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-import sys
+import argparse
 
-def main():
-    # Determine which dataset to use based on command line argument
-    if len(sys.argv) > 1 and sys.argv[1].lower() == 'np':
+def main(dataset='torch'):
+    """
+    Visualize diffuse intensity data.
+    
+    Args:
+        dataset (str): Which dataset to use ('torch' or 'np')
+    
+    Returns:
+        numpy.ndarray: The loaded intensity data
+    """
+    # Determine which dataset file to use
+    if dataset.lower() == 'np':
         npy_file = "np_diffuse_intensity.npy"
     else:
         npy_file = "torch_diffuse_intensity.npy"
@@ -30,7 +40,7 @@ def main():
     
     if not os.path.exists(npy_file):
         print(f"File not found: {npy_file}")
-        return
+        return None
 
     # Load the diffuse intensity data
     intensity = np.load(npy_file)
@@ -100,5 +110,20 @@ def main():
     return intensity
 
 if __name__ == '__main__':
-    main()
+    # Set up command line argument parsing
+    parser = argparse.ArgumentParser(
+        description='Visualize diffuse intensity data from run_debug.py'
+    )
+    parser.add_argument(
+        '--dataset', 
+        choices=['torch', 'np'],
+        default='torch',
+        help='Select which dataset to visualize (default: torch)'
+    )
+    
+    # Parse arguments
+    args = parser.parse_args()
+    
+    # Call main with the selected dataset
+    main(dataset=args.dataset)
 
