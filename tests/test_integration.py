@@ -1,7 +1,6 @@
 import unittest
 import numpy as np
 import torch
-import os
 import tempfile
 import shutil
 from pathlib import Path
@@ -244,7 +243,7 @@ class TestOnePhononIntegration(unittest.TestCase):
                 # Test key crystal methods return tensors
                 # Test get_unitcell_origin returns a tensor
                 unit_cell = [0, 0, 0]
-                origin = model.crystal['get_unitcell_origin'](unit_cell)
+                origin = model.crystal.get_unitcell_origin(unit_cell)
                 self.assertIsInstance(origin, torch.Tensor)
                 self.assertEqual(origin.device, self.device)
                 
@@ -267,7 +266,7 @@ class TestOnePhononIntegration(unittest.TestCase):
             
             # Test get_unitcell_origin returns a tensor
             unit_cell = [0, 0, 0]
-            origin = model.crystal['get_unitcell_origin'](unit_cell)
+            origin = model.crystal.get_unitcell_origin(unit_cell)
             self.assertIsInstance(origin, torch.Tensor)
             self.assertEqual(origin.device, self.device)
             
