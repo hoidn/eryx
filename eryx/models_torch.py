@@ -766,7 +766,7 @@ class OnePhonon:
                     # Use the PyTorch implementation from pdb_torch
                     Kinv = gnm_torch.compute_Kinv(hessian, kvec=kvec, reshape=False)
                     for j_cell in range(self.n_cell):
-                        r_cell = self.crystal['get_unitcell_origin'](self.crystal['id_to_hkl'](j_cell))
+                        r_cell = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
                         phase = torch.sum(kvec * r_cell)
                         real_part, imag_part = ComplexTensorOps.complex_exp(phase)
                         eikr = torch.complex(real_part, imag_part)
