@@ -83,7 +83,19 @@ class GaussianNetworkModel:
         for j_cell in range(self.n_cell):
             if j_cell == self.id_cell_ref:
                 continue
-            r_cell = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
+            
+            # Handle both dictionary-style and object-style crystal access
+            if isinstance(self.crystal, dict):
+                # Legacy dictionary-style access
+                if 'get_unitcell_origin' in self.crystal and 'id_to_hkl' in self.crystal:
+                    r_cell = self.crystal['get_unitcell_origin'](self.crystal['id_to_hkl'](j_cell))
+                else:
+                    # Fallback to zeros if methods not found
+                    r_cell = torch.zeros(3, device=self.device)
+            else:
+                # New object-style access
+                r_cell = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
+                
             phase = torch.sum(kvec * r_cell)
             eikr = torch.complex(torch.cos(phase), torch.sin(phase))
             for i_asu in range(self.n_asu):

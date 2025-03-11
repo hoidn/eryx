@@ -592,7 +592,12 @@ class OnePhonon:
         gnm_torch.n_atoms_per_asu = self.n_atoms_per_asu
         gnm_torch.n_cell = self.n_cell
         gnm_torch.id_cell_ref = self.id_cell_ref
-        gnm_torch.crystal = self.crystal
+        
+        # Ensure crystal is properly set
+        if hasattr(self, 'crystal'):
+            gnm_torch.crystal = self.crystal
+        else:
+            print("Warning: No crystal object found in OnePhonon model")
         
         # Convert gamma from NumPy GNM to PyTorch tensor
         if hasattr(self.gnm, 'gamma'):
@@ -648,7 +653,12 @@ class OnePhonon:
         gnm_torch.n_cell = self.n_cell
         gnm_torch.id_cell_ref = self.id_cell_ref
         gnm_torch.device = self.device
-        gnm_torch.crystal = self.crystal
+        
+        # Ensure crystal is properly set
+        if hasattr(self, 'crystal'):
+            gnm_torch.crystal = self.crystal
+        else:
+            print("Warning: No crystal object found in OnePhonon model")
         
         # Convert gamma from NumPy GNM to PyTorch tensor if needed
         if hasattr(self.gnm, 'gamma'):
