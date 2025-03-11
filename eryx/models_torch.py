@@ -202,18 +202,27 @@ class OnePhonon:
                 
                 # Process each atom
                 for i_atom in range(self.n_atoms_per_asu):
-                    # Set identity part (translations)
-                    self.Amat[i_asu, i_atom*3:(i_atom+1)*3, 0:3] = Adiag
+                    # Reset Atmp for each atom (to match NumPy implementation)
+                    Atmp = torch.zeros((3, 3), device=self.device, dtype=torch.float64)
                     
-                    # Update skew-symmetric matrix for rotations
+                    # Update skew-symmetric matrix for rotations first
                     if i_atom < xyz.shape[0]:
-                        # Reset Atmp for each atom (to match NumPy implementation)
-                        Atmp = torch.zeros((3, 3), device=self.device, dtype=torch.float64)
                         Atmp[0, 1] = xyz[i_atom, 2]  
                         Atmp[0, 2] = -xyz[i_atom, 1]
                         Atmp[1, 2] = xyz[i_atom, 0]
                         Atmp = Atmp - Atmp.transpose(0, 1)
-                        self.Amat[i_asu, i_atom*3:(i_atom+1)*3, 3:6] = Atmp
+                    
+                    # Set identity part (translations) and then the rotation part
+                    self.Amat[i_asu, i_atom*3:(i_atom+1)*3, 0:3] = Adiag
+                    self.Amat[i_asu, i_atom*3:(i_atom+1)*3, 3:6] = Atmp
+            
+            # Add debug prints to compare with NumPy implementation
+            if self.n_asu > 0 and self.n_atoms_per_asu > 0:
+                print(f"\nDEBUG _build_A: First ASU, first atom Amat block:")
+                print(self.Amat[0, 0:3, :].detach().cpu().numpy())
+                if self.n_atoms_per_asu > 1:
+                    print(f"\nDEBUG _build_A: First ASU, second atom Amat block:")
+                    print(self.Amat[0, 3:6, :].detach().cpu().numpy())
             
             # Convert back to float32 for consistency with the rest of the model
             # while preserving the higher-precision computation
