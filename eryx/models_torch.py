@@ -680,6 +680,7 @@ class OnePhonon:
                     Dmat = torch.matmul(Linv_complex, torch.matmul(Kmat_2d, Linv_complex.T))
                     v, w, _ = torch.linalg.svd(Dmat, full_matrices=False)
                     w = torch.sqrt(w)
+                    # Set threshold for small values (keep original NaN conversion)
                     w = torch.where(w < 1e-6,
                                     torch.tensor(float('nan'), dtype=w.dtype, device=w.device),
                                     w)
@@ -691,6 +692,12 @@ class OnePhonon:
                     v = torch.flip(v, [1])
                     # Create new tensors instead of modifying in-place
                     winv_value = 1.0 / (w ** 2)
+                    
+                    # Replace extreme values with NaN instead of clamping
+                    # This preserves gradients better than hard clamping
+                    winv_value = torch.where(winv_value > 1e6,
+                                            torch.tensor(float('nan'), dtype=winv_value.dtype, device=winv_value.device),
+                                            winv_value)
                     v_value = torch.matmul(Linv_complex.T, v)
                     
                     # Use tensor indexing without in-place modification
