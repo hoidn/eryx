@@ -218,6 +218,9 @@ class StateBuilder:
         from eryx.serialization import ObjectSerializer
         serializer = ObjectSerializer()
         
+        # Import GaussianNetworkModel from pdb_torch if needed
+        from eryx.pdb_torch import GaussianNetworkModel as GaussianNetworkModelTorch
+        
         for key, value in state_data.items():
             # Skip special fields
             if key.startswith("__"):
@@ -229,6 +232,31 @@ class StateBuilder:
                     if not hasattr(obj, 'model'):
                         obj.model = type('AtomicModelProxy', (), {})
                     self._apply_state_v2(obj.model, value)
+                    continue
+                
+                # Special handling for gnm attribute - convert to GaussianNetworkModelTorch instance
+                if key == "gnm" and isinstance(value, dict):
+                    gnm = GaussianNetworkModelTorch()
+                    gnm.device = self.device
+                    
+                    # Set basic attributes
+                    for gnm_key, gnm_value in value.items():
+                        if gnm_key in ['n_asu', 'n_atoms_per_asu', 'n_cell', 'id_cell_ref']:
+                            setattr(gnm, gnm_key, gnm_value)
+                        elif gnm_key == 'gamma' and isinstance(gnm_value, dict) and gnm_value.get("__type__") == "numpy.ndarray":
+                            # Convert gamma array to tensor
+                            gamma_array = serializer._deserialize_ndarray(gnm_value)
+                            gamma_tensor = torch.tensor(gamma_array, device=self.device)
+                            gnm.gamma = gamma_tensor
+                        elif gnm_key == 'gamma' and isinstance(gnm_value, np.ndarray):
+                            # Convert gamma array to tensor
+                            gnm.gamma = torch.tensor(gnm_value, device=self.device)
+                        elif gnm_key == 'asu_neighbors':
+                            gnm.asu_neighbors = gnm_value
+                        elif gnm_key == 'crystal':
+                            gnm.crystal = gnm_value
+                    
+                    setattr(obj, key, gnm)
                     continue
                 
                 # Handle serialized numpy arrays
