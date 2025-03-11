@@ -679,6 +679,9 @@ class ObjectSerializer:
             # Register handler for GaussianNetworkModel if available
             if has_gnm:
                 self.register_handler(GaussianNetworkModel, serialize_with_dill, deserialize_with_dill)
+                
+                # Also register the class name as a string for more robust matching
+                self.register_handler("GaussianNetworkModel", serialize_with_dill, deserialize_with_dill)
             
             # Could add more complex objects here that benefit from dill serialization
             
@@ -935,8 +938,17 @@ class ObjectSerializer:
         
         # Then check isinstance match
         for type_obj, handler in self._type_handlers.items():
-            if isinstance(obj, type_obj):
-                return handler
+            # Skip string type names (used for deserialization only)
+            if isinstance(type_obj, str):
+                continue
+                
+            # Check if obj is an instance of type_obj
+            try:
+                if isinstance(obj, type_obj):
+                    return handler
+            except TypeError:
+                # Skip if type_obj is not a valid type for isinstance check
+                continue
         
         # No handler found
         return None
