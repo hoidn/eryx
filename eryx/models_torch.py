@@ -82,6 +82,22 @@ class OnePhonon:
         # Create an AtomicModel instance from the NP implementation.
         self.model = AtomicModel(pdb_path, expand_p1)
         
+        # Store a reference to the original model for accessing original data
+        self.original_model = self.model
+        
+        # Cache original weights if available
+        if hasattr(self.model, 'elements'):
+            try:
+                weights = []
+                for structure in self.model.elements:
+                    for element in structure:
+                        weights.append(float(element.weight))
+                if weights:
+                    self.model._original_weights = weights
+                    print(f"Cached {len(weights)} original weights from model")
+            except Exception as e:
+                print(f"Warning: Could not cache original weights: {e}")
+        
         # Build the grid of hkl indices using the NP generate_grid.
         from eryx.map_utils import generate_grid, get_resolution_mask
         hkl_grid, self.map_shape = generate_grid(self.model.A_inv, 
@@ -310,25 +326,58 @@ class OnePhonon:
         # Use float64 for better precision
         dtype = torch.float64
         
-        # Create mass array - simple approach using default values
+        # Create mass array - default to ones as fallback
         mass_array = torch.ones(self.n_asu * self.n_atoms_per_asu, dtype=dtype, device=self.device)
         
         # Try to get weights from model if available
         if hasattr(self.model, 'elements'):
             try:
                 weights = []
-                for structure in self.model.elements:
-                    for element in structure:
-                        weights.append(float(element.weight))
+                # Check if elements is already a list/tensor of weights
+                if isinstance(self.model.elements, (list, torch.Tensor, np.ndarray)):
+                    if len(self.model.elements) > 0:
+                        if isinstance(self.model.elements[0], (float, int, np.number)):
+                            # Direct list of weights
+                            weights = [float(w) for w in self.model.elements]
+                        else:
+                            # Nested structure with elements that have weight attributes
+                            for structure in self.model.elements:
+                                for element in structure:
+                                    if hasattr(element, 'weight'):
+                                        weights.append(float(element.weight))
+                                    elif isinstance(element, dict) and 'weight' in element:
+                                        weights.append(float(element['weight']))
+                                    elif isinstance(element, (float, int, np.number)):
+                                        weights.append(float(element))
+                
+                if not weights and hasattr(self.model, '_original_weights'):
+                    weights = self.model._original_weights
+                    print(f"Using cached original weights, count: {len(weights)}")
+                
                 if weights:
+                    print(f"Using extracted weights: min={min(weights)}, max={max(weights)}, count={len(weights)}")
                     mass_array = torch.tensor(weights, dtype=dtype, device=self.device)
                     # Ensure we have enough weights
                     if mass_array.shape[0] < self.n_asu * self.n_atoms_per_asu:
                         padding = torch.ones(self.n_asu * self.n_atoms_per_asu - mass_array.shape[0], 
                                            dtype=dtype, device=self.device)
                         mass_array = torch.cat([mass_array, padding])
-            except:
-                pass  # Silently fall back to default weights
+                else:
+                    print("Warning: Could not extract weights from model.elements, using default weights")
+            except Exception as e:
+                print(f"Error extracting weights: {e}")
+                # Try to access the original NumPy model's weights if available
+                if hasattr(self, 'original_model') and hasattr(self.original_model, 'elements'):
+                    try:
+                        weights = []
+                        for structure in self.original_model.elements:
+                            for element in structure:
+                                weights.append(float(element.weight))
+                        if weights:
+                            print(f"Using weights from original model: count={len(weights)}")
+                            mass_array = torch.tensor(weights, dtype=dtype, device=self.device)
+                    except Exception as e2:
+                        print(f"Error extracting weights from original model: {e2}")
         
         # Create block diagonal matrix
         eye3 = torch.eye(3, device=self.device, dtype=dtype)

@@ -239,6 +239,12 @@ def ensure_tensor(value, device=None):
         if tensor.dtype.is_floating_point:
             tensor.requires_grad_(True)
         return tensor
+    elif isinstance(value, list) and all(isinstance(x, (int, float, np.number)) for x in value):
+        # Convert list of numbers to tensor
+        tensor = torch.tensor(value, device=device)
+        if tensor.dtype.is_floating_point:
+            tensor.requires_grad_(True)
+        return tensor
     
     # Fallback to original value
     return value
