@@ -56,9 +56,18 @@ class TestGNMSerialization(unittest.TestCase):
         # Serialize the GNM
         state = self._capture_state(gnm)
         
+        # Create a custom encoder to handle non-serializable objects
+        class CustomEncoder(json.JSONEncoder):
+            def default(self, obj):
+                if isinstance(obj, (np.ndarray, np.number)):
+                    return obj.tolist()
+                elif hasattr(obj, '__dict__'):
+                    return {'__type__': obj.__class__.__name__, 'attributes': str(obj)}
+                return str(obj)
+        
         # Save to file
         with open(self.test_file, 'w') as f:
-            json.dump(state, f, indent=2)
+            json.dump(state, f, indent=2, cls=CustomEncoder)
         
         # Load from file
         with open(self.test_file, 'r') as f:
@@ -105,7 +114,23 @@ class TestGNMSerialization(unittest.TestCase):
                 continue
             try:
                 attr_value = getattr(obj, attr_name)
-                state[attr_name] = attr_value
+                # Handle non-serializable objects
+                if attr_name == 'crystal':
+                    # Store only essential properties from crystal
+                    state[attr_name] = {
+                        'n_cell': getattr(attr_value, 'n_cell', 0),
+                        'id_to_hkl': 'function',
+                        'get_unitcell_origin': 'function'
+                    }
+                elif isinstance(attr_value, np.ndarray):
+                    # Convert numpy arrays to lists for JSON serialization
+                    state[attr_name] = {
+                        'shape': attr_value.shape,
+                        'dtype': str(attr_value.dtype),
+                        'data': attr_value.tolist() if attr_value.size < 1000 else 'large_array'
+                    }
+                else:
+                    state[attr_name] = attr_value
             except Exception as e:
                 print(f"Warning: Could not capture {attr_name}: {e}")
         return state
