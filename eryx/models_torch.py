@@ -197,13 +197,17 @@ class OnePhonon:
                 # Center coordinates properly
                 xyz = xyz - xyz.mean(dim=0, keepdim=True)
                 
+                # Initialize Atmp once per asymmetric unit (outside the atom loop)
+                Atmp = torch.zeros((3, 3), device=self.device, dtype=torch.float64)
+                
                 # Process each atom
                 for i_atom in range(self.n_atoms_per_asu):
                     # Set identity part (translations)
                     self.Amat[i_asu, i_atom*3:(i_atom+1)*3, 0:3] = Adiag
                     
-                    # Create skew-symmetric matrix for rotations
+                    # Update skew-symmetric matrix for rotations
                     if i_atom < xyz.shape[0]:
+                        # Reset Atmp for each atom (to match NumPy implementation)
                         Atmp = torch.zeros((3, 3), device=self.device, dtype=torch.float64)
                         Atmp[0, 1] = xyz[i_atom, 2]  
                         Atmp[0, 2] = -xyz[i_atom, 1]
@@ -249,15 +253,29 @@ class OnePhonon:
             eye = torch.eye(Mmat.shape[0], device=self.device, dtype=Mmat.dtype)
             Mmat_reg = Mmat + eps * eye
             
-            # Simple try-except with single fallback
+            # Enhanced try-except with better fallback
             try:
+                # Try standard Cholesky decomposition first
                 L = torch.linalg.cholesky(Mmat_reg)
                 self.Linv = torch.linalg.inv(L)
-            except RuntimeError:
-                # Fallback to SVD approach
-                U, S, V = torch.linalg.svd(Mmat_reg, full_matrices=False)
-                S = torch.clamp(S, min=1e-10)
-                self.Linv = U @ torch.diag(1.0 / torch.sqrt(S)) @ V
+            except RuntimeError as e:
+                # Print diagnostic info
+                print(f"Cholesky decomposition failed: {e}")
+                print(f"Matrix condition number: {torch.linalg.cond(Mmat_reg).item()}")
+                
+                # Add stronger regularization and try again
+                stronger_eps = 1e-4
+                Mmat_reg = Mmat + stronger_eps * eye
+                try:
+                    L = torch.linalg.cholesky(Mmat_reg)
+                    self.Linv = torch.linalg.inv(L)
+                    print("Succeeded with stronger regularization")
+                except RuntimeError:
+                    # Final fallback to SVD approach
+                    print("Falling back to SVD decomposition")
+                    U, S, V = torch.linalg.svd(Mmat_reg, full_matrices=False)
+                    S = torch.clamp(S, min=1e-8)
+                    self.Linv = U @ torch.diag(1.0 / torch.sqrt(S)) @ V
             
             # Convert back to float32 for consistency
             self.Linv = self.Linv.to(dtype=torch.float32)
