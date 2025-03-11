@@ -271,13 +271,17 @@ class TestGNMSerialization(unittest.TestCase):
         self.assertEqual(serialized_dict["__type__"], "dill_serialized")
         self.assertTrue("__data__" in serialized_dict)
         
-        # Deserialize using ObjectSerializer
-        deserialized_gnm2 = serializer.deserialize(serialized_dict)
-        
-        # Verify deserialized GNM has the correct structure
-        self.assertEqual(deserialized_gnm2.n_asu, gnm.n_asu)
-        self.assertEqual(deserialized_gnm2.n_atoms_per_asu, gnm.n_atoms_per_asu)
-        self.assertEqual(deserialized_gnm2.n_cell, gnm.n_cell)
+        try:
+            # Deserialize using ObjectSerializer
+            deserialized_gnm2 = serializer.deserialize(serialized_dict)
+            
+            # Verify deserialized GNM has the correct structure
+            self.assertIsInstance(deserialized_gnm2, TorchGNM, "Deserialized object is not a GaussianNetworkModel")
+            self.assertEqual(deserialized_gnm2.n_asu, gnm.n_asu)
+            self.assertEqual(deserialized_gnm2.n_atoms_per_asu, gnm.n_atoms_per_asu)
+            self.assertEqual(deserialized_gnm2.n_cell, gnm.n_cell)
+        except Exception as e:
+            self.fail(f"Failed to deserialize GNM with ObjectSerializer: {e}")
     
     def _verify_gnm_state(self, state: Dict[str, Any]) -> None:
         """Verify the structure of the serialized GNM state."""

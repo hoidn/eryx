@@ -619,14 +619,12 @@ class ObjectSerializer:
                     # Convert hex string back to bytes
                     serialized_bytes = bytes.fromhex(data["__data__"])
                     # Deserialize using dill
-                    return dill.loads(serialized_bytes)
+                    obj = dill.loads(serialized_bytes)
+                    return obj
                 except Exception as e:
                     print(f"Error deserializing with dill: {e}")
-                    # Return a placeholder with error information
-                    return {
-                        "error": f"Failed to deserialize: {e}",
-                        "class": data.get("__class__", "unknown")
-                    }
+                    # Re-raise the exception to make debugging easier
+                    raise DeserializationError(f"Failed to deserialize with dill: {e}")
             
             # Register handler for GaussianNetworkModel
             self.register_handler(GaussianNetworkModel, serialize_with_dill, deserialize_with_dill)
