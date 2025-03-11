@@ -266,6 +266,14 @@ This document is organized into phases with concrete tasks and should be read al
 - [x] Add best practices for state capture and testing
 - [x] Document log naming conventions and verification tools
 
+### 3.6 Improve Serialization for Complex Objects
+> Location: eryx/autotest/gemmi_serializer.py
+
+- [x] Fix Gemmi element serialization to extract proper symbols
+- [x] Improve element inference to avoid hard-coded values
+- [x] Add comprehensive error handling for serialization edge cases
+- [x] Document serialization approach for Gemmi objects
+
 ## Phase 4: Test Implementation (2 weeks)
 > Reference: See "Component-to-Test Mapping" table in phased_plan.md
 

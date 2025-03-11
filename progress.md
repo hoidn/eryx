@@ -7,11 +7,11 @@ This document tracks the implementation progress of the PyTorch port for the dif
 | Phase | Description | Status | Completion |
 |-------|-------------|--------|------------|
 | Phase 1 | Core Utilities | In Progress | 77% |
-| Phase 2 | Adapter Components | In Progress | 100% |
+| Phase 2 | Adapter Components | Complete | 100% |
 | Phase 3 | Core Functions | Complete | 100% |
 | Phase 4 | OnePhonon Model | In Progress | 82% |
-| Phase 5 | Integration | In Progress | 30% |
-| **Overall** | **All Phases** | **In Progress** | **90%** |
+| Phase 5 | Integration | In Progress | 35% |
+| **Overall** | **All Phases** | **In Progress** | **92%** |
 
 ## Ground Truth Data
 
@@ -193,3 +193,7 @@ No performance metrics available yet. This section will be updated once the impl
 | 2025-03-06 | Integration tests now pass, verifying end-to-end functionality |
 | 2025-03-06 | Corrected adapter implementation for Crystal class attribute access |
 | 2025-03-06 | Updated integration status to reflect ongoing work in Phase 5 |
+| 2025-03-10 | Fixed Gemmi element serialization bug in GemmiSerializer |
+| 2025-03-10 | Added documentation for Gemmi element serialization bug fix |
+| 2025-03-10 | Improved element inference in GemmiSerializer to avoid hard-coded values |
+| 2025-03-10 | Updated Phase 5 completion to 35%, overall to 92% |

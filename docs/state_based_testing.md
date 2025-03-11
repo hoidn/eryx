@@ -132,6 +132,7 @@ python scripts/generate_state_logs.py --component onePhonon
 5. **Handle Complex Objects**: Use `ensure_tensor()` to convert state values to tensors
 6. **Verify Logs**: Always run `verify_logs.py` after regenerating logs
 7. **Inspect Problematic Logs**: Use `inspect_state_log.py` to debug issues
+8. **Proper Element Serialization**: Ensure element symbols are properly extracted from Gemmi objects
 # State-Based Testing with StateBuilder
 
 This document describes the approach to state-based testing using the StateBuilder pattern and ObjectSerializer.
