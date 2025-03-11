@@ -500,6 +500,10 @@ class GemmiSerializer:
             else:
                 # Fallback
                 atom.element = gemmi.Element("")
+        # Explicitly set element from name if available
+        elif "name" in data and data["name"] in ["C", "N", "O", "S", "P", "H"]:
+            # Common element symbols that might be inferred from atom name
+            atom.element = gemmi.Element(data["name"][0])
         
         # Set position
         pos = data.get("pos", [0, 0, 0])
@@ -524,10 +528,18 @@ class GemmiSerializer:
             Dictionary with serialized element data
         """
         try:
+            # Extract the actual symbol from the element
+            # The str(element) returns something like '<gemmi.Element: C>'
+            symbol = str(element)
+            # Extract just the symbol part using regex
+            import re
+            match = re.search(r'<gemmi\.Element: ([A-Za-z0-9]+)>', symbol)
+            clean_symbol = match.group(1) if match else ""
+            
             return {
                 "_gemmi_type": "Element",
                 "name": getattr(element, "name", ""),
-                "symbol": str(element),
+                "symbol": clean_symbol,
                 "weight": getattr(element, "weight", 0.0),
                 "atomic_number": getattr(element, "atomic_number", 0)
             }
@@ -553,7 +565,13 @@ class GemmiSerializer:
             import gemmi
             # Try different fields in priority order
             if "symbol" in data:
-                return gemmi.Element(data["symbol"])
+                # Clean up the symbol if it's still in the <gemmi.Element: X> format
+                symbol = data["symbol"]
+                import re
+                match = re.search(r'<gemmi\.Element: ([A-Za-z0-9]+)>', symbol)
+                if match:
+                    symbol = match.group(1)
+                return gemmi.Element(symbol)
             elif "name" in data and data["name"]:
                 return gemmi.Element(data["name"])
             else:
