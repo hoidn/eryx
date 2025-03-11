@@ -55,8 +55,16 @@ class StateBuilder:
         if not hasattr(obj, 'device'):
             obj.device = self.device
         
-        # Apply state
-        self._apply_state_v2(obj, state_data)
+        # Apply state based on class type
+        class_name = torch_class.__name__
+        
+        if class_name == 'OnePhonon':
+            self._build_one_phonon(obj, state_data)
+        elif class_name == 'GaussianNetworkModel':
+            self._build_gaussian_network_model(obj, state_data)
+        else:
+            # Default state application
+            self._apply_state_v2(obj, state_data)
         
         return obj
     
@@ -96,6 +104,74 @@ class StateBuilder:
                 obj.model.A_inv = torch.eye(3, device=self.device, requires_grad=True)
         elif isinstance(obj.model.A_inv, torch.Tensor) and not obj.model.A_inv.requires_grad:
             obj.model.A_inv = obj.model.A_inv.clone().detach().requires_grad_(True)
+    
+    def _build_gaussian_network_model(self, obj: Any, state_data: Dict[str, Any]) -> None:
+        """
+        Build GaussianNetworkModel with correct structure.
+        
+        Args:
+            obj: GaussianNetworkModel instance to initialize
+            state_data: State dictionary with attribute values
+        """
+        # Set device if not already set
+        if not hasattr(obj, 'device'):
+            obj.device = self.device
+        
+        # Apply all state attributes
+        self._apply_state_v2(obj, state_data)
+        
+        # Create crystal dictionary if it doesn't exist
+        if not hasattr(obj, 'crystal') or obj.crystal is None:
+            obj.crystal = {}
+        
+        # Ensure crystal is a dictionary (might be deserialized as another type)
+        if not isinstance(obj.crystal, dict):
+            print(f"Warning: crystal is not a dictionary, got {type(obj.crystal)}. Creating empty dictionary.")
+            obj.crystal = {}
+        
+        # Add required methods to crystal dictionary
+        if 'id_to_hkl' not in obj.crystal:
+            obj.crystal['id_to_hkl'] = lambda cell_id: [cell_id, 0, 0]
+        
+        if 'get_unitcell_origin' not in obj.crystal:
+            obj.crystal['get_unitcell_origin'] = lambda unit_cell: torch.tensor(
+                [float(unit_cell[0]) if isinstance(unit_cell, (list, tuple)) else 0.0, 
+                 0.0, 0.0], device=obj.device, requires_grad=True)
+        
+        # Ensure gamma tensor exists with proper gradient support
+        if hasattr(obj, 'gamma'):
+            if isinstance(obj.gamma, np.ndarray):
+                obj.gamma = torch.tensor(obj.gamma, device=obj.device)
+                if obj.gamma.dtype.is_floating_point:
+                    obj.gamma.requires_grad_(True)
+            elif isinstance(obj.gamma, dict) and 'shape' in obj.gamma and 'dtype' in obj.gamma:
+                # Handle serialized array metadata
+                shape = obj.gamma['shape']
+                try:
+                    # Try to create tensor with correct shape
+                    obj.gamma = torch.zeros(shape, device=obj.device, requires_grad=True)
+                except Exception as e:
+                    print(f"Warning: Could not create gamma tensor with shape {shape}: {e}")
+                    # Create a default gamma tensor
+                    if hasattr(obj, 'n_cell') and hasattr(obj, 'n_asu'):
+                        obj.gamma = torch.ones((obj.n_cell, obj.n_asu, obj.n_asu), 
+                                              device=obj.device, requires_grad=True)
+                    else:
+                        obj.gamma = torch.ones((1, 1, 1), device=obj.device, requires_grad=True)
+            elif isinstance(obj.gamma, torch.Tensor) and not obj.gamma.requires_grad:
+                obj.gamma = obj.gamma.clone().detach().requires_grad_(True)
+        
+        # Ensure asu_neighbors exists
+        if not hasattr(obj, 'asu_neighbors') or obj.asu_neighbors is None:
+            # Create empty asu_neighbors structure
+            if hasattr(obj, 'n_asu') and hasattr(obj, 'n_cell'):
+                obj.asu_neighbors = [[[[[] for _ in range(obj.n_atoms_per_asu if hasattr(obj, 'n_atoms_per_asu') else 1)] 
+                                     for _ in range(obj.n_asu)] 
+                                    for _ in range(obj.n_cell)] 
+                                   for _ in range(obj.n_asu)]
+            else:
+                print("Warning: Cannot create asu_neighbors, missing n_asu or n_cell")
+                obj.asu_neighbors = [[[[]]]]
     
     def _apply_state(self, obj: Any, state_data: Dict[str, Any]) -> None:
         """

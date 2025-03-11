@@ -105,6 +105,31 @@ class TestGNMSerialization(unittest.TestCase):
             print(f"Hessian shape: {hessian.shape}")
         except Exception as e:
             self.fail(f"compute_hessian failed: {e}")
+            
+        # Test compute_K method
+        try:
+            # Create a test k-vector
+            kvec = torch.ones(3, device=self.device, requires_grad=True)
+            
+            # Compute K matrix
+            K = torch_gnm.compute_K(hessian, kvec)
+            
+            # Verify K matrix
+            self.assertIsInstance(K, torch.Tensor)
+            self.assertEqual(K.dtype, torch.complex64)
+            expected_shape = (torch_gnm.n_asu, torch_gnm.n_atoms_per_asu, 
+                             torch_gnm.n_asu, torch_gnm.n_atoms_per_asu)
+            self.assertEqual(K.shape, expected_shape)
+            print(f"K matrix shape: {K.shape}")
+            
+            # Test gradient flow
+            loss = torch.abs(K).sum()
+            loss.backward()
+            self.assertIsNotNone(kvec.grad)
+            self.assertFalse(torch.allclose(kvec.grad, torch.zeros_like(kvec.grad)),
+                           "No gradient flow to kvec in compute_K")
+        except Exception as e:
+            self.fail(f"compute_K failed: {e}")
     
     def _capture_state(self, obj: Any) -> Dict[str, Any]:
         """Capture the state of an object."""
@@ -134,6 +159,49 @@ class TestGNMSerialization(unittest.TestCase):
             except Exception as e:
                 print(f"Warning: Could not capture {attr_name}: {e}")
         return state
+    
+    def test_state_builder_gnm_handler(self):
+        """Test the GNM-specific handler in StateBuilder."""
+        # Create a minimal state dictionary
+        minimal_state = {
+            'n_asu': 2,
+            'n_atoms_per_asu': 3,
+            'n_cell': 3,
+            'id_cell_ref': 0,
+            'enm_cutoff': 4.0,
+            'gamma_intra': 1.0,
+            'gamma_inter': 1.0
+        }
+        
+        # Create a StateBuilder
+        builder = StateBuilder(device=self.device)
+        
+        # Build a GNM from minimal state
+        gnm = builder.build(TorchGNM, minimal_state)
+        
+        # Verify the GNM has the correct structure
+        self.assertEqual(gnm.n_asu, 2)
+        self.assertEqual(gnm.n_atoms_per_asu, 3)
+        self.assertEqual(gnm.n_cell, 3)
+        self.assertEqual(gnm.id_cell_ref, 0)
+        
+        # Verify crystal dictionary was created
+        self.assertIsInstance(gnm.crystal, dict)
+        self.assertTrue(callable(gnm.crystal.get('id_to_hkl')))
+        self.assertTrue(callable(gnm.crystal.get('get_unitcell_origin')))
+        
+        # Test the methods in crystal dictionary
+        hkl = gnm.crystal['id_to_hkl'](1)
+        self.assertEqual(hkl, [1, 0, 0])
+        
+        origin = gnm.crystal['get_unitcell_origin']([1, 0, 0])
+        self.assertIsInstance(origin, torch.Tensor)
+        self.assertEqual(origin.shape, (3,))
+        self.assertTrue(origin.requires_grad)
+        
+        # Verify asu_neighbors was created
+        self.assertTrue(hasattr(gnm, 'asu_neighbors'))
+        self.assertIsInstance(gnm.asu_neighbors, list)
     
     def _verify_gnm_state(self, state: Dict[str, Any]) -> None:
         """Verify the structure of the serialized GNM state."""
