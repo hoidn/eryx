@@ -828,7 +828,7 @@ class OnePhonon:
                     for i_asu in range(self.n_asu):
                         F[:, i_asu, :] = structure_factors(
                             self.q_grid[valid_indices],
-                            torch.tensor(self.model.get_asu_xyz(i_asu), dtype=torch.float32, device=self.device),
+                            torch.tensor(self.crystal.get_asu_xyz(i_asu), dtype=torch.float32, device=self.device),
                             torch.tensor(self.model.ff_a[i_asu], dtype=torch.float32, device=self.device),
                             torch.tensor(self.model.ff_b[i_asu], dtype=torch.float32, device=self.device),
                             torch.tensor(self.model.ff_c[i_asu], dtype=torch.float32, device=self.device),
