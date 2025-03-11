@@ -104,6 +104,20 @@ class StateBuilder:
                 obj.model.A_inv = torch.eye(3, device=self.device, requires_grad=True)
         elif isinstance(obj.model.A_inv, torch.Tensor) and not obj.model.A_inv.requires_grad:
             obj.model.A_inv = obj.model.A_inv.clone().detach().requires_grad_(True)
+            
+        # Handle GNM if it exists
+        if hasattr(obj, 'gnm'):
+            if isinstance(obj.gnm, dict):
+                # Convert dictionary to GaussianNetworkModel object
+                from eryx.pdb_torch import GaussianNetworkModel
+                gnm = GaussianNetworkModel()
+                gnm.device = self.device
+                
+                # Apply state to the GNM object
+                self._build_gaussian_network_model(gnm, obj.gnm)
+                
+                # Replace the dictionary with the actual object
+                obj.gnm = gnm
     
     def _build_gaussian_network_model(self, obj: Any, state_data: Dict[str, Any]) -> None:
         """
