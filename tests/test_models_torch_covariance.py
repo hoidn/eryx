@@ -287,26 +287,39 @@ class TestCovarianceMethods(TestBase):
                 function_log_path = f"logs/{self.module_name}.compute_hessian.log"
                 print(f"\nTrying to load function log: {function_log_path}")
                 
-                function_log = self.logger.loadLog(function_log_path)
-                if function_log and 'return_value' in function_log:
-                    hessian_expected = function_log['return_value']
-                    print("Found return_value in function log")
-                else:
-                    print(f"Function log keys: {list(function_log.keys()) if function_log else 'No function log found'}")
+                function_log_entries = self.logger.loadLog(function_log_path)
+                
+                # Function logs are a list of entries, find the one with the result
+                hessian_expected = None
+                if function_log_entries:
+                    for entry in function_log_entries:
+                        if "result" in entry:
+                            hessian_expected = entry["result"]
+                            print("Found result in function log")
+                            break
+                
+                if hessian_expected is None:
+                    print(f"Function log entries: {len(function_log_entries) if function_log_entries else 'No function log found'}")
                     # Try alternative log paths
                     alt_log_path = f"logs/{self.module_name}.{self.class_name}.compute_hessian.log"
                     print(f"Trying alternative log path: {alt_log_path}")
                     if os.path.exists(alt_log_path):
-                        function_log = self.logger.loadLog(alt_log_path)
-                        if function_log and 'return_value' in function_log:
-                            hessian_expected = function_log['return_value']
-                            print("Found return_value in alternative function log")
-                        else:
-                            print(f"Alternative function log keys: {list(function_log.keys()) if function_log else 'No alternative function log found'}")
-                    
+                        function_log_entries = self.logger.loadLog(alt_log_path)
+                        if function_log_entries:
+                            for entry in function_log_entries:
+                                if "result" in entry:
+                                    hessian_expected = entry["result"]
+                                    print("Found result in alternative function log")
+                                    break
+                
+                # If still not found, check if hessian is in the after state
+                if hessian_expected is None and 'hessian' in after_state:
+                    hessian_expected = after_state['hessian']
+                    print("Found hessian in after state")
+                
                 # If still not found, skip
-                if 'hessian_expected' not in locals():
-                    self.skipTest("Expected hessian not found in function logs")
+                if hessian_expected is None:
+                    self.skipTest("Expected hessian not found in function logs or after state")
                     return
             except Exception as e:
                 print(f"Error loading function log: {e}")
