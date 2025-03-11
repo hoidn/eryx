@@ -2,21 +2,31 @@
 """
 Visualize the diffuse intensity output from run_debug.py.
 
-This script loads the "np_diffuse_intensity.npy" file and displays a 2D slice
+This script loads the diffuse intensity file and displays a 2D slice
 (using matplotlib). If the output is 3D (e.g. shape (dim_h, dim_k, dim_l)),
 you can choose to display a central slice along one dimension.
 
 Usage:
-    python visualize_diffuse.py
+    python visualize_diffuse.py [torch|np]
+    
+    The optional parameter selects which dataset to visualize:
+    - torch: uses "torch_diffuse_intensity.npy" (default)
+    - np: uses "np_diffuse_intensity.npy"
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import sys
 
 def main():
-    # Path to the output diffuse intensity file (produced by run_debug.py)
-    npy_file = "torch_diffuse_intensity.npy"
+    # Determine which dataset to use based on command line argument
+    if len(sys.argv) > 1 and sys.argv[1].lower() == 'np':
+        npy_file = "np_diffuse_intensity.npy"
+    else:
+        npy_file = "torch_diffuse_intensity.npy"
+    
+    print(f"Using dataset: {npy_file}")
     
     if not os.path.exists(npy_file):
         print(f"File not found: {npy_file}")
@@ -41,21 +51,51 @@ def main():
         # Take the central slice along the first dimension
         slice_index = intensity.shape[0] // 2
         intensity_slice = intensity[slice_index, :, :]
-        plt.figure(figsize=(8, 6))
-        plt.imshow(intensity_slice, cmap='viridis', origin='lower')
-        plt.title(f"Diffuse Intensity (Slice {slice_index} of {intensity.shape[0]})")
-        plt.xlabel("Axis 2")
-        plt.ylabel("Axis 3")
-        plt.colorbar(label="Intensity")
+        
+        # Create a figure with two subplots
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+        
+        # Plot the intensity slice
+        im = ax1.imshow(intensity_slice, cmap='viridis', origin='lower')
+        ax1.set_title(f"Diffuse Intensity (Slice {slice_index} of {intensity.shape[0]})")
+        ax1.set_xlabel("Axis 2")
+        ax1.set_ylabel("Axis 3")
+        plt.colorbar(im, ax=ax1, label="Intensity")
+        
+        # Plot the histogram with log scale on y-axis
+        # Filter out extreme values for better visualization
+        filtered_data = intensity[intensity < 1e11].ravel()
+        ax2.hist(filtered_data, bins=100)
+        ax2.set_title("Intensity Histogram")
+        ax2.set_xlabel("Intensity Value")
+        ax2.set_ylabel("Frequency")
+        ax2.set_yscale('log')
+        ax2.grid(True)
+        
+        plt.tight_layout()
         plt.show()
     else:
         # If not 3D, try to plot it directly
-        plt.figure(figsize=(8, 6))
-        plt.imshow(intensity, cmap='viridis')
-        plt.title("Diffuse Intensity")
-        plt.xlabel("X")
-        plt.ylabel("Y")
-        plt.colorbar(label="Intensity")
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+        
+        # Plot the intensity
+        im = ax1.imshow(intensity, cmap='viridis')
+        ax1.set_title("Diffuse Intensity")
+        ax1.set_xlabel("X")
+        ax1.set_ylabel("Y")
+        plt.colorbar(im, ax=ax1, label="Intensity")
+        
+        # Plot the histogram with log scale on y-axis
+        # Filter out extreme values for better visualization
+        filtered_data = intensity[intensity < 1e11].ravel()
+        ax2.hist(filtered_data, bins=100)
+        ax2.set_title("Intensity Histogram")
+        ax2.set_xlabel("Intensity Value")
+        ax2.set_ylabel("Frequency")
+        ax2.set_yscale('log')
+        ax2.grid(True)
+        
+        plt.tight_layout()
         plt.show()
     return intensity
 
