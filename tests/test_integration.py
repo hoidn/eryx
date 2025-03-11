@@ -145,8 +145,10 @@ class TestOnePhononIntegration(unittest.TestCase):
         # Forward pass
         Id_torch = torch_model.apply_disorder(use_data_adp=True)
         
-        # Create a simple loss function
-        loss = torch.nansum(Id_torch)
+        # Create a masked loss that properly handles NaNs
+        mask = ~torch.isnan(Id_torch)
+        valid_intensity = torch.where(mask, Id_torch, torch.zeros_like(Id_torch))
+        loss = torch.sum(valid_intensity)  # Sum of valid intensities
         
         # Backward pass
         loss.backward()
@@ -281,7 +283,9 @@ class TestOnePhononIntegration(unittest.TestCase):
             self.assertIsInstance(Id, torch.Tensor)
             
             # Verify tensor has gradients enabled
-            loss = torch.sum(torch.where(torch.isnan(Id), torch.tensor(0.0, device=self.device), Id))
+            mask = ~torch.isnan(Id)
+            valid_intensity = torch.where(mask, Id, torch.zeros_like(Id))
+            loss = torch.sum(valid_intensity)
             loss.backward()
 
 if __name__ == '__main__':

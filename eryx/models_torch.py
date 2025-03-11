@@ -639,6 +639,10 @@ class OnePhonon:
     def compute_gnm_phonons(self):
         """
         Compute phonon modes for each k-vector in the first Brillouin zone.
+        
+        This implementation uses a modified SVD approach that ensures stable gradient flow
+        through the eigenvalues while avoiding problematic backpropagation through
+        complex singular vectors.
         """
         hessian = self.compute_hessian()
         h_dim = int(self.hsampling[2])
@@ -678,26 +682,35 @@ class OnePhonon:
                                              self.n_asu * self.n_dof_per_asu))
                     Linv_complex = self.Linv.to(dtype=torch.complex64)
                     Dmat = torch.matmul(Linv_complex, torch.matmul(Kmat_2d, Linv_complex.T))
-                    v, w, _ = torch.linalg.svd(Dmat, full_matrices=False)
-                    w = torch.sqrt(w)
-                    # Set threshold for small values (keep original NaN conversion)
-                    w = torch.where(w < 1e-6,
-                                    torch.tensor(float('nan'), dtype=w.dtype, device=w.device),
-                                    w)
-                    nan_count = torch.isnan(w).sum().item()
-                    if nan_count > 0:
-                        import logging
-                        logging.debug(f"compute_gnm_phonons: {nan_count} NaN values in eigenvalues")
-                    w = torch.flip(w, [0])
-                    v = torch.flip(v, [1])
-                    # Create new tensors instead of modifying in-place
-                    winv_value = 1.0 / (w ** 2)
                     
-                    # Replace extreme values with NaN instead of clamping
-                    # This preserves gradients better than hard clamping
+                    # Extract eigenvalues and eigenvectors without tracking phase gradients
+                    with torch.no_grad():
+                        v, w, _ = torch.linalg.svd(Dmat, full_matrices=False)
+                        w = torch.sqrt(w)
+                        w = torch.where(w < 1e-6,
+                                       torch.tensor(float('nan'), dtype=w.dtype, device=w.device),
+                                       w)
+                        w = torch.flip(w, [0])
+                        v = torch.flip(v, [1])
+                    
+                    # Recompute eigenvalues in a differentiable way
+                    eigenvalues = []
+                    for i in range(v.shape[1]):
+                        v_i = v[:, i:i+1]
+                        # Compute λ_i = v_i† D v_i (maintains gradient flow through magnitudes)
+                        lambda_i = torch.matmul(torch.matmul(v_i.conj().T, Dmat), v_i).real
+                        eigenvalues.append(lambda_i[0, 0])
+                    
+                    eig_values = torch.stack(eigenvalues)
+                    
+                    # Compute inverses with stability controls
+                    winv_value = 1.0 / (torch.sqrt(torch.abs(eig_values)) ** 2 + 1e-8)
+                    
+                    # Set extremely large values to NaN for consistency with NumPy
                     winv_value = torch.where(winv_value > 1e6,
                                             torch.tensor(float('nan'), dtype=winv_value.dtype, device=winv_value.device),
                                             winv_value)
+                    
                     v_value = torch.matmul(Linv_complex.T, v)
                     
                     # Use tensor indexing without in-place modification
