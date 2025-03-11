@@ -176,57 +176,44 @@ class OnePhonon:
         displacements to individual atomic displacements.
         """
         if self.group_by == 'asu':
-            # Initialize Amat with zeros
+            # Initialize Amat with zeros, using float64 for better precision
             self.Amat = torch.zeros((self.n_asu, self.n_dof_per_asu_actual, self.n_dof_per_asu), 
-                                   device=self.device, dtype=torch.float32)
+                                   device=self.device, dtype=torch.float64)
             
-            # Create identity and temporary matrices
-            identity = torch.eye(3, device=self.device)
-            Atmp = torch.zeros((3, 3), device=self.device)
-            Adiag = torch.eye(3, device=self.device)
+            # Create identity matrix for translations
+            Adiag = torch.eye(3, device=self.device, dtype=torch.float64)
             
             for i_asu in range(self.n_asu):
-                # Get coordinates for this ASU
-                try:
-                    if hasattr(self, 'crystal') and hasattr(self.crystal, 'get_asu_xyz'):
-                        xyz_np = self.crystal['get_asu_xyz'](i_asu)
-                    elif hasattr(self, 'model') and hasattr(self.model, 'xyz'):
-                        xyz_np = self.model.xyz[i_asu]
+                # Get coordinates from model directly - simplest reliable approach
+                if hasattr(self.model, 'xyz'):
+                    if isinstance(self.model.xyz, torch.Tensor):
+                        xyz = self.model.xyz[i_asu].to(dtype=torch.float64)
                     else:
-                        xyz_np = torch.zeros((self.n_atoms_per_asu, 3), device=self.device)
-                        
-                    # Convert to tensor if needed
-                    if isinstance(xyz_np, np.ndarray):
-                        xyz = torch.tensor(xyz_np, dtype=torch.float32, device=self.device)
-                    else:
-                        xyz = xyz_np
-                        
-                    # Center coordinates
-                    xyz = xyz - torch.mean(xyz, dim=0)
+                        xyz = torch.tensor(self.model.xyz[i_asu], dtype=torch.float64, device=self.device)
+                else:
+                    # Fallback to zeros if no coordinates available
+                    xyz = torch.zeros((self.n_atoms_per_asu, 3), device=self.device, dtype=torch.float64)
+                
+                # Center coordinates properly
+                xyz = xyz - xyz.mean(dim=0, keepdim=True)
+                
+                # Process each atom
+                for i_atom in range(self.n_atoms_per_asu):
+                    # Set identity part (translations)
+                    self.Amat[i_asu, i_atom*3:(i_atom+1)*3, 0:3] = Adiag
                     
-                    # Process each atom
-                    for i_atom in range(self.n_atoms_per_asu):
-                        # Set identity part (translations)
-                        self.Amat[i_asu, i_atom*3:(i_atom+1)*3, 0:3] = Adiag
-                        
-                        # Reset temporary matrix
-                        Atmp = torch.zeros((3, 3), device=self.device)
-                        
-                        # Set skew-symmetric matrix elements (rotations)
-                        if i_atom < xyz.shape[0]:  # Check if atom exists in coordinates
-                            Atmp[0, 1] = xyz[i_atom, 2]  # z
-                            Atmp[0, 2] = -xyz[i_atom, 1]  # -y
-                            Atmp[1, 2] = xyz[i_atom, 0]  # x
-                            
-                            # Make skew-symmetric
-                            Atmp = Atmp - Atmp.transpose(0, 1)
-                            
-                            # Set rotation part
-                            self.Amat[i_asu, i_atom*3:(i_atom+1)*3, 3:6] = Atmp
-                            
-                except Exception as e:
-                    print(f"Error in _build_A for ASU {i_asu}: {e}")
-                    # Leave as zeros for this ASU
+                    # Create skew-symmetric matrix for rotations
+                    if i_atom < xyz.shape[0]:
+                        Atmp = torch.zeros((3, 3), device=self.device, dtype=torch.float64)
+                        Atmp[0, 1] = xyz[i_atom, 2]  
+                        Atmp[0, 2] = -xyz[i_atom, 1]
+                        Atmp[1, 2] = xyz[i_atom, 0]
+                        Atmp = Atmp - Atmp.transpose(0, 1)
+                        self.Amat[i_asu, i_atom*3:(i_atom+1)*3, 3:6] = Atmp
+            
+            # Convert back to float32 for consistency with the rest of the model
+            # while preserving the higher-precision computation
+            self.Amat = self.Amat.to(dtype=torch.float32)
             
             # Set requires_grad after construction
             self.Amat.requires_grad_(True)
@@ -238,107 +225,138 @@ class OnePhonon:
         """
         Build the mass matrix M and compute its inverse (via Cholesky).
         """
+        # Build all-atom mass matrix (already uses float64 after update)
         M_allatoms = self._build_M_allatoms()
+        
         if self.group_by is None:
+            # Simple case for all atoms
             M_allatoms = M_allatoms.reshape((self.n_asu * self.n_dof_per_asu_actual,
-                                              self.n_asu * self.n_dof_per_asu_actual))
-            eps = 1e-10
-            self.Linv = 1.0 / torch.sqrt(M_allatoms + eps)
+                                            self.n_asu * self.n_dof_per_asu_actual))
+            # Add regularization for numerical stability
+            eps = 1e-8
+            M_reg = M_allatoms + eps
+            self.Linv = 1.0 / torch.sqrt(M_reg)
+            
+            # Convert back to float32 for consistency
+            self.Linv = self.Linv.to(dtype=torch.float32)
         else:
+            # Project the all-atom mass matrix for rigid body case
             Mmat = self._project_M(M_allatoms)
             Mmat = Mmat.reshape((self.n_asu * self.n_dof_per_asu, self.n_asu * self.n_dof_per_asu))
-            eps = 1e-10
-            eye = torch.eye(Mmat.shape[0], device=self.device)
-            Mmat = Mmat + eps * eye
-            L = torch.linalg.cholesky(Mmat)
-            self.Linv = torch.linalg.inv(L)
+            
+            # Robust regularization - single value that works
+            eps = 1e-6
+            eye = torch.eye(Mmat.shape[0], device=self.device, dtype=Mmat.dtype)
+            Mmat_reg = Mmat + eps * eye
+            
+            # Simple try-except with single fallback
+            try:
+                L = torch.linalg.cholesky(Mmat_reg)
+                self.Linv = torch.linalg.inv(L)
+            except RuntimeError:
+                # Fallback to SVD approach
+                U, S, V = torch.linalg.svd(Mmat_reg, full_matrices=False)
+                S = torch.clamp(S, min=1e-10)
+                self.Linv = U @ torch.diag(1.0 / torch.sqrt(S)) @ V
+            
+            # Convert back to float32 for consistency
+            self.Linv = self.Linv.to(dtype=torch.float32)
+            self.Linv.requires_grad_(True)
     
     #@debug
     def _build_M_allatoms(self) -> torch.Tensor:
         """
         Build the all-atom mass matrix M_0.
+        
+        Returns:
+            torch.Tensor of shape (n_asu, n_dof_per_asu_actual, n_asu, n_dof_per_asu_actual)
         """
-        try:
-            # Create a default mass array of ones
-            if hasattr(self, 'model') and hasattr(self.model, 'elements'):
-                # Extract weights from model elements
+        # Use float64 for better precision
+        dtype = torch.float64
+        
+        # Create mass array - simple approach using default values
+        mass_array = torch.ones(self.n_asu * self.n_atoms_per_asu, dtype=dtype, device=self.device)
+        
+        # Try to get weights from model if available
+        if hasattr(self.model, 'elements'):
+            try:
                 weights = []
                 for structure in self.model.elements:
                     for element in structure:
-                        weights.append(element.weight)
-                
+                        weights.append(float(element.weight))
                 if weights:
-                    mass_array = torch.tensor(weights, dtype=torch.float32, device=self.device)
-                else:
-                    mass_array = torch.ones(self.n_asu * self.n_atoms_per_asu, dtype=torch.float32, device=self.device)
-            else:
-                # Fallback to ones
-                mass_array = torch.ones(self.n_asu * self.n_atoms_per_asu, dtype=torch.float32, device=self.device)
-            
-            # Ensure mass_array has enough elements
-            if mass_array.shape[0] < self.n_asu * self.n_atoms_per_asu:
-                # Pad with ones if needed
-                padding = torch.ones(self.n_asu * self.n_atoms_per_asu - mass_array.shape[0], 
-                                    dtype=torch.float32, device=self.device)
-                mass_array = torch.cat([mass_array, padding])
-            
-            # Create block diagonal matrix
-            eye3 = torch.eye(3, device=self.device)
-            blocks = []
-            
-            for i in range(self.n_asu * self.n_atoms_per_asu):
-                # Create 3x3 block for each atom
-                blocks.append(mass_array[i] * eye3)
-            
-            # Create block diagonal matrix
+                    mass_array = torch.tensor(weights, dtype=dtype, device=self.device)
+                    # Ensure we have enough weights
+                    if mass_array.shape[0] < self.n_asu * self.n_atoms_per_asu:
+                        padding = torch.ones(self.n_asu * self.n_atoms_per_asu - mass_array.shape[0], 
+                                           dtype=dtype, device=self.device)
+                        mass_array = torch.cat([mass_array, padding])
+            except:
+                pass  # Silently fall back to default weights
+        
+        # Create block diagonal matrix
+        eye3 = torch.eye(3, device=self.device, dtype=dtype)
+        blocks = []
+        for i in range(self.n_asu * self.n_atoms_per_asu):
+            blocks.append(mass_array[i] * eye3)
+        
+        try:
+            # Use torch.block_diag if available (PyTorch 1.8+)
             M_block_diag = torch.block_diag(*blocks)
-            
-            # Reshape to 4D tensor
-            M_allatoms = M_block_diag.reshape(self.n_asu, self.n_dof_per_asu_actual,
-                                             self.n_asu, self.n_dof_per_asu_actual)
-            
-            # Set requires_grad
-            M_allatoms.requires_grad_(True)
-            
-            return M_allatoms
-            
-        except Exception as e:
-            print(f"Error in _build_M_allatoms: {e}")
-            # Return a fallback mass matrix with ones
-            return torch.ones((self.n_asu, self.n_dof_per_asu_actual,
-                              self.n_asu, self.n_dof_per_asu_actual),
-                             device=self.device, requires_grad=True)
+        except (AttributeError, RuntimeError):
+            # Fallback for older PyTorch versions
+            total_dim = self.n_asu * self.n_atoms_per_asu * 3
+            M_block_diag = torch.zeros((total_dim, total_dim), device=self.device, dtype=dtype)
+            for i in range(self.n_asu * self.n_atoms_per_asu):
+                start_idx = i * 3
+                M_block_diag[start_idx:start_idx+3, start_idx:start_idx+3] = mass_array[i] * eye3
+        
+        # Reshape to 4D tensor
+        M_allatoms = M_block_diag.reshape(self.n_asu, self.n_dof_per_asu_actual,
+                                        self.n_asu, self.n_dof_per_asu_actual)
+        
+        # Set requires_grad
+        M_allatoms.requires_grad_(True)
+        
+        return M_allatoms
     
     ##@debug
     def _project_M(self, M_allatoms: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
         """
-        Project the all-atom mass matrix M_0 using the A matrix.
-        """
-        # Use the PDBToTensor adapter to ensure we have tensors
-        from eryx.adapters import PDBToTensor
-        adapter = PDBToTensor(device=self.device)
+        Project all-atom mass matrix M_0 using the A matrix: M = A.T M_0 A
         
-        Mmat = torch.zeros((self.n_asu, self.n_dof_per_asu, self.n_asu, self.n_dof_per_asu), device=self.device)
+        Args:
+            M_allatoms: Mass matrix of shape (n_asu, n_dof_per_asu_actual, n_asu, n_dof_per_asu_actual)
+            
+        Returns:
+            Mmat: Projected mass matrix of shape (n_asu, n_dof_per_asu, n_asu, n_dof_per_asu)
+        """
+        # Use the same precision as M_allatoms for consistency
+        if isinstance(M_allatoms, torch.Tensor):
+            dtype = M_allatoms.dtype
+        else:
+            dtype = torch.float64
+        
+        # Ensure M_allatoms is a tensor
+        if not isinstance(M_allatoms, torch.Tensor):
+            M_allatoms = torch.tensor(M_allatoms, device=self.device, dtype=dtype)
+        
+        # Initialize output tensor
+        Mmat = torch.zeros((self.n_asu, self.n_dof_per_asu,
+                           self.n_asu, self.n_dof_per_asu),
+                          device=self.device, dtype=dtype)
+        
+        # Ensure Amat is in the same precision
+        Amat = self.Amat.to(dtype=dtype)
+        
+        # Project mass matrix
         for i_asu in range(self.n_asu):
             for j_asu in range(self.n_asu):
-                # Ensure M_allatoms is a tensor
-                if isinstance(M_allatoms, np.ndarray):
-                    M_block = adapter.array_to_tensor(M_allatoms[i_asu, :, j_asu, :])
-                else:
-                    M_block = M_allatoms[i_asu, :, j_asu, :]
-                
-                # Ensure Amat is a tensor
-                if not isinstance(self.Amat, torch.Tensor):
-                    self.Amat = adapter.array_to_tensor(self.Amat)
-                
-                # Ensure all operands are on the same device and dtype
-                M_block = M_block.to(device=self.device, dtype=torch.float32)
-                Amat_i = self.Amat[i_asu].to(device=self.device, dtype=torch.float32)
-                Amat_j = self.Amat[j_asu].to(device=self.device, dtype=torch.float32)
-                
-                Mmat[i_asu, :, j_asu, :] = torch.matmul(Amat_i.T,
-                                                        torch.matmul(M_block,
-                                                                    Amat_j))
+                Mmat[i_asu, :, j_asu, :] = torch.matmul(
+                    Amat[i_asu].T,
+                    torch.matmul(M_allatoms[i_asu, :, j_asu, :], Amat[j_asu])
+                )
+        
         return Mmat
     
     #@debug

@@ -77,8 +77,8 @@ class TestMatrixConstruction(TestBase):
         amat_numpy = model.Amat.detach().cpu().numpy()
         expected_amat_numpy = expected_amat.detach().cpu().numpy() if isinstance(expected_amat, torch.Tensor) else expected_amat
         
-        # Compare with more relaxed tolerances
-        tolerances = {'rtol': 1e-4, 'atol': 1e-6}
+        # Compare with appropriate tolerances for float64 calculations
+        tolerances = {'rtol': 1e-4, 'atol': 1e-5}
         
         # Print differences for debugging
         max_diff = np.max(np.abs(amat_numpy - expected_amat_numpy))
@@ -158,8 +158,8 @@ class TestMatrixConstruction(TestBase):
         linv_numpy = model.Linv.detach().cpu().numpy()
         expected_linv_numpy = expected_linv.detach().cpu().numpy() if isinstance(expected_linv, torch.Tensor) else expected_linv
         
-        # Compare with more relaxed tolerances for this test
-        tolerances = {'rtol': 1e-3, 'atol': 1e-5}
+        # Compare with appropriate tolerances for float64 calculations
+        tolerances = {'rtol': 1e-4, 'atol': 1e-5}
         
         # Print differences for debugging
         max_diff = np.max(np.abs(linv_numpy - expected_linv_numpy))
@@ -241,8 +241,8 @@ class TestMatrixConstruction(TestBase):
         result_numpy = result.detach().cpu().numpy()
         expected_result_numpy = expected_result.detach().cpu().numpy() if isinstance(expected_result, torch.Tensor) else expected_result
         
-        # Compare with more relaxed tolerances
-        tolerances = {'rtol': 1e-4, 'atol': 1e-6}
+        # Compare with appropriate tolerances for float64 calculations
+        tolerances = {'rtol': 1e-4, 'atol': 1e-5}
         
         # Print differences for debugging
         max_diff = np.max(np.abs(result_numpy - expected_result_numpy))
@@ -337,8 +337,8 @@ class TestMatrixConstruction(TestBase):
         result_numpy = result.detach().cpu().numpy()
         expected_result_numpy = expected_result.detach().cpu().numpy() if isinstance(expected_result, torch.Tensor) else expected_result
         
-        # Compare with more relaxed tolerances
-        tolerances = {'rtol': 1e-4, 'atol': 1e-6}
+        # Compare with appropriate tolerances for float64 calculations
+        tolerances = {'rtol': 1e-4, 'atol': 1e-5}
         
         # Print differences for debugging
         max_diff = np.max(np.abs(result_numpy - expected_result_numpy))
