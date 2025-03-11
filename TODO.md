@@ -239,6 +239,9 @@ This document is organized into phases with concrete tasks and should be read al
 - [ ] Validate gradient flow throughout the entire system
 - [ ] Create final report on implementation status
 
+### 6 Cleanup
+- [ ] Add some hierarchy to the tests/ dir to make it easier to navigate
+
 ## Completion Criteria
 
 This implementation plan is complete when:
