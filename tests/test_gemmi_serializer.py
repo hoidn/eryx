@@ -129,6 +129,29 @@ class TestGemmiSerializer(unittest.TestCase):
         self.assertAlmostEqual(atom_rest.b_iso, 20.0)
         self.assertEqual(atom_rest.element.name, "C")
 
+    def test_serialize_element(self):
+        # Create a Gemmi Element for Nitrogen.
+        element = gemmi.Element("N")
+        serializer = GemmiSerializer()
+        serialized = serializer.serialize_gemmi(element)
+        
+        # Print serialized output for debugging.
+        print("Serialized element:", serialized)
+        
+        # Check that the serialized dictionary contains a 'symbol' key.
+        self.assertIn("symbol", serialized, "Serialized element should have a 'symbol' key.")
+        symbol = serialized["symbol"]
+        self.assertEqual(symbol, "N", f"Expected symbol 'N', got '{symbol}'")
+        
+        # Check for a weight-related key.
+        weight = serialized.get("weight", None)
+        atomic_weight = serialized.get("atomic_weight", None)
+        
+        # For a valid element, at least one of these should be nonzero/non-None.
+        self.assertTrue(
+            (weight is not None and weight != 0.0) or (atomic_weight is not None and atomic_weight != 0.0),
+            "Expected nonzero weight or atomic_weight for element N."
+        )
 
 if __name__ == '__main__':
     unittest.main()

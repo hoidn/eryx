@@ -1,7 +1,6 @@
 """
 State capture functionality for testing object state before and after method execution.
 """
-import inspect
 import re
 import logging
 from typing import Any, Dict, List, Optional, Pattern, Set, Union
