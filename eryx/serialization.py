@@ -333,6 +333,9 @@ class ObjectSerializer:
             self.register_handler(gemmi.Element, self._serialize_gemmi_element, self._deserialize_gemmi_element)
         except ImportError:
             pass
+            
+        # Try to register dill handlers for complex objects
+        self._register_dill_handlers()
     
     def _serialize_basic(self, obj: Union[int, float, str, bool]) -> Dict[str, Any]:
         """Serialize basic Python types."""
@@ -585,6 +588,53 @@ class ObjectSerializer:
         except ImportError:
             # Return a placeholder if Gemmi is not available
             return data
+    
+    def _register_dill_handlers(self) -> None:
+        """Register handlers that use dill for complex objects like GaussianNetworkModel."""
+        try:
+            import dill
+            from eryx.pdb_torch import GaussianNetworkModel
+            
+            # Define serialization function using dill
+            def serialize_with_dill(obj):
+                try:
+                    serialized_bytes = dill.dumps(obj)
+                    # Convert to hex string for JSON compatibility
+                    return {
+                        "__type__": "dill_serialized",
+                        "__class__": obj.__class__.__name__,
+                        "__module__": obj.__class__.__module__,
+                        "__data__": serialized_bytes.hex()
+                    }
+                except Exception as e:
+                    return {
+                        "__type__": "dill_serialization_error",
+                        "__class__": obj.__class__.__name__,
+                        "__error__": str(e)
+                    }
+            
+            # Define deserialization function using dill
+            def deserialize_with_dill(data):
+                try:
+                    # Convert hex string back to bytes
+                    serialized_bytes = bytes.fromhex(data["__data__"])
+                    # Deserialize using dill
+                    return dill.loads(serialized_bytes)
+                except Exception as e:
+                    print(f"Error deserializing with dill: {e}")
+                    # Return a placeholder with error information
+                    return {
+                        "error": f"Failed to deserialize: {e}",
+                        "class": data.get("__class__", "unknown")
+                    }
+            
+            # Register handler for GaussianNetworkModel
+            self.register_handler(GaussianNetworkModel, serialize_with_dill, deserialize_with_dill)
+            
+            # Could add more complex objects here that benefit from dill serialization
+            
+        except ImportError:
+            print("Warning: dill not available, some complex objects may not serialize correctly")
     
     def _deserialize_gemmi_object(self, data: Dict[str, Any]) -> Any:
         """Deserialize Gemmi object using GemmiSerializer."""

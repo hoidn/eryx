@@ -48,6 +48,29 @@ class StateBuilder:
         Returns:
             Initialized instance of torch_class with proper attribute structure
         """
+        # Check if this is a dill-serialized object
+        if isinstance(state_data, dict) and state_data.get("__type__") == "dill_serialized":
+            try:
+                import dill
+                if "__data__" in state_data:
+                    # Try to deserialize directly with dill
+                    serialized_bytes = bytes.fromhex(state_data["__data__"])
+                    obj = dill.loads(serialized_bytes)
+                    
+                    # If the deserialized object is of the correct type, return it
+                    if isinstance(obj, torch_class):
+                        # Ensure device is set correctly
+                        if hasattr(obj, 'device'):
+                            obj.device = self.device
+                        return obj
+                    else:
+                        print(f"Warning: Deserialized object is of type {type(obj).__name__}, "
+                              f"expected {torch_class.__name__}. Falling back to manual construction.")
+            except ImportError:
+                print("Warning: dill not available, falling back to manual construction")
+            except Exception as e:
+                print(f"Warning: Failed to deserialize with dill: {e}")
+        
         # Create empty instance
         obj = torch_class.__new__(torch_class)
         
@@ -127,6 +150,40 @@ class StateBuilder:
             obj: GaussianNetworkModel instance to initialize
             state_data: State dictionary with attribute values
         """
+        # Try to use dill for GaussianNetworkModel if available
+        try:
+            import dill
+            
+            # Check if this is a dill-serialized GNM
+            if isinstance(state_data, dict) and state_data.get("__type__") == "dill_serialized":
+                if "__data__" in state_data:
+                    try:
+                        # Deserialize using dill
+                        serialized_bytes = bytes.fromhex(state_data["__data__"])
+                        gnm = dill.loads(serialized_bytes)
+                        
+                        # Copy attributes from deserialized object to our instance
+                        for attr_name in dir(gnm):
+                            if not attr_name.startswith('_') and not callable(getattr(gnm, attr_name)):
+                                setattr(obj, attr_name, getattr(gnm, attr_name))
+                        
+                        # Ensure device is set correctly
+                        if hasattr(obj, 'device') and obj.device != self.device:
+                            obj.device = self.device
+                            
+                            # Move tensors to the correct device
+                            if hasattr(obj, 'gamma') and isinstance(obj.gamma, torch.Tensor):
+                                obj.gamma = obj.gamma.to(self.device)
+                        
+                        # Successfully used dill, return early
+                        return
+                    except Exception as e:
+                        print(f"Warning: Failed to deserialize GNM with dill: {e}")
+                        # Fall back to manual construction
+        except ImportError:
+            # Dill not available, use manual construction
+            pass
+        
         # Set device if not already set
         if not hasattr(obj, 'device'):
             obj.device = self.device

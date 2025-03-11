@@ -204,6 +204,81 @@ class TestGNMSerialization(unittest.TestCase):
         self.assertTrue(hasattr(gnm, 'asu_neighbors'))
         self.assertIsInstance(gnm.asu_neighbors, list)
     
+    def test_dill_serialization(self):
+        """Test serialization and deserialization of GNM using dill."""
+        try:
+            import dill
+        except ImportError:
+            self.skipTest("dill not available")
+            
+        # Create a minimal GNM instance
+        gnm = TorchGNM()
+        gnm.device = self.device
+        gnm.n_asu = 2
+        gnm.n_atoms_per_asu = 3
+        gnm.n_cell = 3
+        gnm.id_cell_ref = 0
+        gnm.enm_cutoff = 4.0
+        gnm.gamma_intra = 1.0
+        gnm.gamma_inter = 1.0
+        
+        # Create gamma tensor
+        gnm.gamma = torch.ones((gnm.n_cell, gnm.n_asu, gnm.n_asu), 
+                              device=self.device, requires_grad=True)
+        
+        # Create crystal dictionary with required methods
+        gnm.crystal = {
+            'id_to_hkl': lambda cell_id: [cell_id, 0, 0],
+            'get_unitcell_origin': lambda unit_cell: torch.tensor(
+                [float(unit_cell[0]) if isinstance(unit_cell, (list, tuple)) else 0.0, 
+                 0.0, 0.0], device=self.device, requires_grad=True)
+        }
+        
+        # Create asu_neighbors
+        gnm.asu_neighbors = [[[[[] for _ in range(gnm.n_atoms_per_asu)] 
+                             for _ in range(gnm.n_asu)] 
+                            for _ in range(gnm.n_cell)] 
+                           for _ in range(gnm.n_asu)]
+        
+        # Direct dill serialization
+        serialized_bytes = dill.dumps(gnm)
+        deserialized_gnm = dill.loads(serialized_bytes)
+        
+        # Verify deserialized GNM has the correct structure
+        self.assertEqual(deserialized_gnm.n_asu, gnm.n_asu)
+        self.assertEqual(deserialized_gnm.n_atoms_per_asu, gnm.n_atoms_per_asu)
+        self.assertEqual(deserialized_gnm.n_cell, gnm.n_cell)
+        self.assertEqual(deserialized_gnm.id_cell_ref, gnm.id_cell_ref)
+        
+        # Verify gamma tensor
+        self.assertTrue(hasattr(deserialized_gnm, 'gamma'))
+        self.assertTrue(torch.allclose(deserialized_gnm.gamma, gnm.gamma))
+        
+        # Verify crystal functions
+        self.assertTrue(callable(deserialized_gnm.crystal['id_to_hkl']))
+        self.assertTrue(callable(deserialized_gnm.crystal['get_unitcell_origin']))
+        
+        # Test the functions
+        hkl = deserialized_gnm.crystal['id_to_hkl'](1)
+        self.assertEqual(hkl, [1, 0, 0])
+        
+        # Test with ObjectSerializer
+        from eryx.serialization import ObjectSerializer
+        serializer = ObjectSerializer()
+        
+        # Serialize using ObjectSerializer
+        serialized_dict = serializer.serialize(gnm)
+        self.assertEqual(serialized_dict["__type__"], "dill_serialized")
+        self.assertTrue("__data__" in serialized_dict)
+        
+        # Deserialize using ObjectSerializer
+        deserialized_gnm2 = serializer.deserialize(serialized_dict)
+        
+        # Verify deserialized GNM has the correct structure
+        self.assertEqual(deserialized_gnm2.n_asu, gnm.n_asu)
+        self.assertEqual(deserialized_gnm2.n_atoms_per_asu, gnm.n_atoms_per_asu)
+        self.assertEqual(deserialized_gnm2.n_cell, gnm.n_cell)
+    
     def _verify_gnm_state(self, state: Dict[str, Any]) -> None:
         """Verify the structure of the serialized GNM state."""
         # Check required attributes

@@ -70,6 +70,7 @@ The state-based testing framework uses `ObjectSerializer` for robust serializati
 - **Complex Object Support**: Handles NumPy arrays, PyTorch tensors, Gemmi objects, and custom classes
 - **Type Preservation**: Maintains type information for proper reconstruction
 - **Gradient Support**: Preserves gradient requirements for tensors
+- **Dill Integration**: Uses dill for serializing complex objects with functions and lambdas
 
 ### Inspecting State Logs
 
@@ -146,6 +147,7 @@ python scripts/generate_state_logs.py --component onePhonon
 6. **Verify Logs**: Always run `verify_logs.py` after regenerating logs
 7. **Inspect Problematic Logs**: Use `inspect_state_log.py` to debug issues
 8. **Proper Element Serialization**: Ensure element symbols are properly extracted from Gemmi objects
+9. **Use Dill for Complex Objects**: For objects with functions or lambdas like GaussianNetworkModel, use dill serialization
 # State-Based Testing with StateBuilder
 
 This document describes the approach to state-based testing using the StateBuilder pattern and ObjectSerializer.
@@ -285,6 +287,33 @@ self.assertTrue(model.Amat.requires_grad)
 loss = torch.sum(model.Amat)
 loss.backward()
 # Check relevant input tensor gradients
+```
+
+### Testing GaussianNetworkModel
+
+For testing GaussianNetworkModel with dill serialization:
+
+```python
+# 1. Load state with dill support
+before_state = load_test_state(self.logger, 'eryx.pdb', 'GaussianNetworkModel', 'compute_hessian')
+model = build_test_object(GaussianNetworkModel, before_state)
+
+# 2. Call method
+hessian = model.compute_hessian()
+
+# 3. Verify result properties
+self.assertIsInstance(hessian, torch.Tensor)
+self.assertEqual(hessian.dtype, torch.complex64)
+self.assertEqual(hessian.shape, expected_shape)
+
+# 4. Compare with expected output
+after_state = load_test_state(self.logger, 'eryx.pdb', 'GaussianNetworkModel', 'compute_hessian', before=False)
+expected_hessian = ensure_tensor(after_state.get('hessian'), device='cpu')
+self.assertTrue(np.allclose(
+    hessian.detach().cpu().numpy(),
+    expected_hessian.detach().cpu().numpy(),
+    rtol=1e-5, atol=1e-8
+))
 ```
 
 ### Testing K-vector Methods
