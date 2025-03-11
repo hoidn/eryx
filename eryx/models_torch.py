@@ -689,8 +689,15 @@ class OnePhonon:
                         logging.debug(f"compute_gnm_phonons: {nan_count} NaN values in eigenvalues")
                     w = torch.flip(w, [0])
                     v = torch.flip(v, [1])
-                    self.Winv[dh, dk, dl] = 1.0 / (w ** 2)
-                    self.V[dh, dk, dl] = torch.matmul(Linv_complex.T, v)
+                    # Create new tensors instead of modifying in-place
+                    winv_value = 1.0 / (w ** 2)
+                    v_value = torch.matmul(Linv_complex.T, v)
+                    
+                    # Use tensor indexing without in-place modification
+                    self.Winv = self.Winv.clone()
+                    self.V = self.V.clone()
+                    self.Winv[dh, dk, dl] = winv_value
+                    self.V[dh, dk, dl] = v_value
     
     #@debug
     def compute_gnm_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
