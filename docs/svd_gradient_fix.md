@@ -23,7 +23,7 @@ with torch.no_grad():
     # Process eigenvalues and eigenvectors...
 ```
 
-2. **Recompute Eigenvalues Differentiably**: We then recompute the eigenvalues in a differentiable way using the eigenvector-eigenvalue relationship. This is necessary because the SVD operation with `torch.no_grad()` detaches the singular values from the computation graph:
+2. **Recompute Eigenvalues Differentiably**: We then recompute the eigenvalues in a differentiable way using the eigenvector-eigenvalue relationship:
 
 ```python
 eigenvalues = []
@@ -42,6 +42,27 @@ for i in range(v.shape[1]):
 winv_value = 1.0 / (torch.sqrt(torch.abs(eig_values)) ** 2 + 1e-8)
 ```
 
+## Why We Can't Use Singular Values Directly
+
+For a Hermitian matrix like our dynamical matrix `Dmat`, the singular values from SVD are related to eigenvalues. However, we can't simply use:
+
+```python
+with torch.no_grad():
+    v, w, _ = torch.linalg.svd(Dmat)
+    # Then use w directly
+```
+
+This would completely detach `w` from the computation graph, and no gradients would flow back to `Dmat` or model parameters. By recomputing the eigenvalues using the relationship λ = v†Dv, we create a path for gradients to flow from the eigenvalues back to `Dmat` and then to model parameters.
+
+## The Complete Gradient Path
+
+The full gradient path is:
+1. `loss` → `Id_torch` (diffuse intensity)
+2. `Id_torch` → `weighted_intensity` → `real_winv` (from eigenvalues)
+3. `real_winv` → `eigenvalues` (our recomputed values)
+4. `eigenvalues` → `lambda_i` → `Dmat` (through the v†Dv calculation)
+5. `Dmat` → `Kmat` → `hessian` → `gamma_tensor` → `gamma_intra/gamma_inter` (model parameters)
+
 ## Why This Works
 
 This solution works because:
@@ -50,6 +71,7 @@ This solution works because:
 2. **Gradient Flow Preservation**: We maintain gradient flow through the physically meaningful quantities
 3. **Mathematical Correctness**: The eigenvalue-eigenvector relationship λv = Av is preserved
 4. **Numerical Stability**: Added epsilon terms prevent division by zero
+5. **Best of Both Worlds**: We get the correct eigenvectors from SVD while maintaining gradient flow to model parameters
 
 ## Implementation
 
