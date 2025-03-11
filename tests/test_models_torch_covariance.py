@@ -276,26 +276,42 @@ class TestCovarianceMethods(TestBase):
                 self.skipTest(f"Error loading after state log: {e}")
                 return
             
-            # Get expected tensor from after state
-            hessian_expected = after_state.get('return_value')
+            # Print after state keys for debugging
+            print("\nDEBUGGING after state keys:")
+            print(f"Available keys: {list(after_state.keys())}")
             
-            # Check if expected tensor exists
-            if hessian_expected is None:
-                # Try alternative keys that might contain the hessian
-                print("\nDEBUGGING after state keys:")
-                print(f"Available keys: {list(after_state.keys())}")
+            # For the hessian, we need to check the function log instead of the state log
+            # since it's a return value
+            try:
+                # Load the function log which contains the return value
+                function_log_path = f"logs/{self.module_name}.compute_hessian.log"
+                print(f"\nTrying to load function log: {function_log_path}")
                 
-                # Try common alternative keys
-                for key in ['hessian', '_return_value', 'result']:
-                    if key in after_state:
-                        print(f"Found alternative key: {key}")
-                        hessian_expected = after_state[key]
-                        break
-                
+                function_log = self.logger.loadLog(function_log_path)
+                if function_log and 'return_value' in function_log:
+                    hessian_expected = function_log['return_value']
+                    print("Found return_value in function log")
+                else:
+                    print(f"Function log keys: {list(function_log.keys()) if function_log else 'No function log found'}")
+                    # Try alternative log paths
+                    alt_log_path = f"logs/{self.module_name}.{self.class_name}.compute_hessian.log"
+                    print(f"Trying alternative log path: {alt_log_path}")
+                    if os.path.exists(alt_log_path):
+                        function_log = self.logger.loadLog(alt_log_path)
+                        if function_log and 'return_value' in function_log:
+                            hessian_expected = function_log['return_value']
+                            print("Found return_value in alternative function log")
+                        else:
+                            print(f"Alternative function log keys: {list(function_log.keys()) if function_log else 'No alternative function log found'}")
+                    
                 # If still not found, skip
-                if hessian_expected is None:
-                    self.skipTest("Expected hessian not found in after state log")
+                if 'hessian_expected' not in locals():
+                    self.skipTest("Expected hessian not found in function logs")
                     return
+            except Exception as e:
+                print(f"Error loading function log: {e}")
+                self.skipTest(f"Error loading function log: {e}")
+                return
                 
             # Ensure tensor is in the right format for comparison
             hessian_expected = ensure_tensor(hessian_expected, device='cpu')
