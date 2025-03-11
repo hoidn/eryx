@@ -250,7 +250,7 @@ class TestOnePhononIntegration(unittest.TestCase):
                 self.assertEqual(origin.device, self.device)
                 
                 # Test get_asu_xyz returns a tensor
-                xyz = model.crystal['get_asu_xyz'](0, unit_cell)
+                xyz = model.crystal.get_asu_xyz(0, unit_cell)
                 self.assertIsInstance(xyz, torch.Tensor)
                 self.assertEqual(xyz.device, self.device)
                 
@@ -273,7 +273,7 @@ class TestOnePhononIntegration(unittest.TestCase):
             self.assertEqual(origin.device, self.device)
             
             # Test get_asu_xyz returns a tensor
-            xyz = model.crystal['get_asu_xyz'](0, unit_cell)
+            xyz = model.crystal.get_asu_xyz(0, unit_cell)
             self.assertIsInstance(xyz, torch.Tensor)
             self.assertEqual(xyz.device, self.device)
             
