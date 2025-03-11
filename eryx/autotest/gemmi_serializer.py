@@ -34,7 +34,8 @@ class GemmiSerializer:
             "Model": self.serialize_model,
             "Chain": self.serialize_chain,
             "Residue": self.serialize_residue,
-            "Atom": self.serialize_atom
+            "Atom": self.serialize_atom,
+            "Element": self.serialize_element
         }
         
         # Map of Gemmi type names to deserialization functions
@@ -46,7 +47,8 @@ class GemmiSerializer:
             "Model": self.deserialize_model,
             "Chain": self.deserialize_chain,
             "Residue": self.deserialize_residue,
-            "Atom": self.deserialize_atom
+            "Atom": self.deserialize_atom,
+            "Element": self.deserialize_element
         }
     def serialize_gemmi(self, obj) -> dict:
         """
@@ -447,18 +449,31 @@ class GemmiSerializer:
         Returns:
             Dictionary with serialized atom data
         """
-        return {
+        result = {
             "_gemmi_type": "Atom",
             "name": getattr(atom, "name", ""),
-            "element": getattr(atom, "element", {}).name if hasattr(atom, "element") else "",
-            "x": getattr(atom, "pos", [0, 0, 0])[0],
-            "y": getattr(atom, "pos", [0, 0, 0])[1],
-            "z": getattr(atom, "pos", [0, 0, 0])[2],
+            "pos": [
+                getattr(atom, "pos", [0, 0, 0])[0],
+                getattr(atom, "pos", [0, 0, 0])[1],
+                getattr(atom, "pos", [0, 0, 0])[2]
+            ],
             "b_iso": getattr(atom, "b_iso", 0.0),
             "occ": getattr(atom, "occ", 1.0),
             "charge": getattr(atom, "charge", 0),
             "serial": getattr(atom, "serial", 0)
         }
+        
+        # Enhanced element handling
+        if hasattr(atom, "element"):
+            try:
+                # Use the element serializer for consistency
+                result["element"] = self.serialize_element(atom.element)
+            except Exception as e:
+                # Fallback to simple string representation
+                result["element"] = str(atom.element)
+                result["_element_error"] = str(e)
+        
+        return result
     
     def deserialize_atom(self, data: dict):
         """
@@ -474,15 +489,21 @@ class GemmiSerializer:
         atom.name = data.get("name", "")
         
         # Set element if available
-        element_name = data.get("element", "")
-        if element_name:
-            atom.element = gemmi.Element(element_name)
+        if "element" in data:
+            element_data = data["element"]
+            if isinstance(element_data, dict) and "_gemmi_type" in element_data:
+                # Use the element deserializer
+                atom.element = self.deserialize_element(element_data)
+            elif isinstance(element_data, str):
+                # Handle string representation
+                atom.element = gemmi.Element(element_data)
+            else:
+                # Fallback
+                atom.element = gemmi.Element("")
         
         # Set position
-        x = data.get("x", 0.0)
-        y = data.get("y", 0.0)
-        z = data.get("z", 0.0)
-        atom.pos = gemmi.Position(x, y, z)
+        pos = data.get("pos", [0, 0, 0])
+        atom.pos = gemmi.Position(pos[0], pos[1], pos[2])
         
         # Set other properties
         atom.b_iso = data.get("b_iso", 0.0)
@@ -491,6 +512,56 @@ class GemmiSerializer:
         atom.serial = data.get("serial", 0)
         
         return atom
+        
+    def serialize_element(self, element) -> dict:
+        """
+        Serialize a gemmi.Element to a dictionary.
+        
+        Args:
+            element: gemmi.Element object
+            
+        Returns:
+            Dictionary with serialized element data
+        """
+        try:
+            return {
+                "_gemmi_type": "Element",
+                "name": getattr(element, "name", ""),
+                "symbol": str(element),
+                "weight": getattr(element, "weight", 0.0),
+                "atomic_number": getattr(element, "atomic_number", 0)
+            }
+        except Exception as e:
+            # Comprehensive fallback with error information
+            return {
+                "_gemmi_type": "Element",
+                "symbol": str(element),
+                "_error": str(e)
+            }
+    
+    def deserialize_element(self, data: dict):
+        """
+        Deserialize a dictionary to a gemmi.Element.
+        
+        Args:
+            data: Dictionary with serialized element data
+            
+        Returns:
+            gemmi.Element object or data dictionary if deserialization fails
+        """
+        try:
+            import gemmi
+            # Try different fields in priority order
+            if "symbol" in data:
+                return gemmi.Element(data["symbol"])
+            elif "name" in data and data["name"]:
+                return gemmi.Element(data["name"])
+            else:
+                return gemmi.Element("")
+        except Exception as e:
+            print(f"Warning: Failed to deserialize Element: {e}")
+            # Return the data as fallback
+            return data
     
     def serialize_generic_gemmi(self, obj) -> dict:
         """

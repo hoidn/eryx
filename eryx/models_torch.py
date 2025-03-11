@@ -85,18 +85,12 @@ class OnePhonon:
         # Store a reference to the original model for accessing original data
         self.original_model = self.model
         
-        # Cache original weights if available
-        if hasattr(self.model, 'elements'):
-            try:
-                weights = []
-                for structure in self.model.elements:
-                    for element in structure:
-                        weights.append(float(element.weight))
-                if weights:
-                    self.model._original_weights = weights
-                    print(f"Cached {len(weights)} original weights from model")
-            except Exception as e:
-                print(f"Warning: Could not cache original weights: {e}")
+        # Use PDBToTensor adapter to extract element weights
+        from eryx.adapters import PDBToTensor
+        pdb_adapter = PDBToTensor(device=self.device)
+        element_weights = pdb_adapter.extract_element_weights(self.model)
+        self.model.element_weights = element_weights
+        print(f"Extracted {len(element_weights)} element weights using PDBToTensor adapter")
         
         # Build the grid of hkl indices using the NP generate_grid.
         from eryx.map_utils import generate_grid, get_resolution_mask
@@ -329,148 +323,82 @@ class OnePhonon:
         # Create mass array - default to ones as fallback
         mass_array = torch.ones(self.n_asu * self.n_atoms_per_asu, dtype=dtype, device=self.device)
         
-        # Try to get atomic weights directly from PDB file if available
-        if hasattr(self, 'original_model') and hasattr(self.original_model, '_gemmi_structure'):
+        # Try to extract weights using prioritized strategies
+        weights = []
+        
+        # Strategy 1: Use element_weights if available from PDBToTensor adapter
+        if hasattr(self.model, 'element_weights') and isinstance(self.model.element_weights, torch.Tensor):
             try:
+                print("Using element_weights from model")
+                weights = self.model.element_weights.detach().cpu().tolist()
+            except Exception as e:
+                print(f"Error using element_weights: {e}")
+        
+        # Strategy 2: Try to get atomic weights directly from the original model
+        if not weights and hasattr(self, 'original_model') and hasattr(self.original_model, '_gemmi_structure'):
+            try:
+                print("Extracting weights from original gemmi structure")
                 import gemmi
-                weights = []
                 structure = self.original_model._gemmi_structure
                 for model in structure:
                     for chain in model:
                         for residue in chain:
                             for atom in residue:
-                                # Get element from gemmi and look up standard atomic weight
                                 element = atom.element
-                                if element:
-                                    # Use gemmi's built-in atomic weights
-                                    weight = gemmi.Element(element.name).weight
-                                    weights.append(float(weight))
+                                if element and hasattr(element, 'weight'):
+                                    weights.append(float(element.weight))
                                 else:
-                                    # Try to determine element from atom name
-                                    atom_name = atom.name.strip()
-                                    if atom_name:
-                                        # Extract first 1-2 characters as potential element symbol
-                                        if atom_name[0].isalpha():
-                                            if len(atom_name) > 1 and atom_name[1].isalpha():
-                                                elem_symbol = atom_name[:2].capitalize()
-                                            else:
-                                                elem_symbol = atom_name[0].upper()
-                                                
-                                            try:
-                                                # Try to get weight from element symbol
-                                                weight = gemmi.Element(elem_symbol).weight
-                                                weights.append(float(weight))
-                                                continue
-                                            except:
-                                                pass
-                                    
                                     # Default to carbon weight if element is unknown
                                     weights.append(12.0)
-                
-                if weights:
-                    print(f"Using weights from gemmi: min={min(weights)}, max={max(weights)}, count={len(weights)}")
-                    # Use these weights if we have enough
-                    if len(weights) >= self.n_asu * self.n_atoms_per_asu:
-                        mass_array = torch.tensor(weights[:self.n_asu * self.n_atoms_per_asu], 
-                                                dtype=dtype, device=self.device)
-                    else:
-                        print(f"Not enough weights from gemmi: {len(weights)} < {self.n_asu * self.n_atoms_per_asu}")
             except Exception as e:
-                print(f"Error getting weights from gemmi: {e}")
+                print(f"Error getting weights from gemmi structure: {e}")
         
-        # Define standard atomic weights for common elements
-        standard_weights = {
-            'H': 1.008, 'C': 12.011, 'N': 14.007, 'O': 15.999, 'P': 30.974,
-            'S': 32.065, 'CA': 40.078, 'MG': 24.305, 'ZN': 65.38, 'FE': 55.845,
-            'NA': 22.990, 'K': 39.098, 'CL': 35.453, 'F': 18.998
-        }
-        
-        # Try to get element symbols if available
-        if hasattr(self.model, 'element_symbols'):
+        # Strategy 3: Try to extract from model.elements if available
+        if not weights and hasattr(self.model, 'elements'):
             try:
-                weights = []
-                for symbol in self.model.element_symbols:
-                    symbol = symbol.upper()
-                    if symbol in standard_weights:
-                        weights.append(standard_weights[symbol])
-                    else:
-                        # Default to carbon weight if element is unknown
-                        weights.append(12.0)
-                
-                if weights:
-                    print(f"Using weights from element symbols: min={min(weights)}, max={max(weights)}, count={len(weights)}")
-                    if len(weights) >= self.n_asu * self.n_atoms_per_asu:
-                        mass_array = torch.tensor(weights[:self.n_asu * self.n_atoms_per_asu], 
-                                                dtype=dtype, device=self.device)
-                    else:
-                        print(f"Not enough weights from element symbols: {len(weights)} < {self.n_asu * self.n_atoms_per_asu}")
-            except Exception as e:
-                print(f"Error getting weights from element symbols: {e}")
-        
-        # Try to get weights from model if available
-        if hasattr(self.model, 'elements'):
-            try:
-                weights = []
-                # Check if elements is already a list/tensor of weights
-                if isinstance(self.model.elements, (list, torch.Tensor, np.ndarray)):
-                    if len(self.model.elements) > 0:
-                        if isinstance(self.model.elements[0], (float, int, np.number)):
-                            # Direct list of weights
-                            weights = [float(w) for w in self.model.elements]
-                        else:
-                            # Nested structure with elements that have weight attributes
-                            for structure in self.model.elements:
-                                for element in structure:
-                                    if hasattr(element, 'weight'):
-                                        weights.append(float(element.weight))
-                                    elif isinstance(element, dict) and 'weight' in element:
-                                        weights.append(float(element['weight']))
-                                    elif isinstance(element, (float, int, np.number)):
-                                        weights.append(float(element))
-                
-                if not weights and hasattr(self.model, '_original_weights'):
-                    weights = self.model._original_weights
-                    print(f"Using cached original weights, count: {len(weights)}")
-                
-                if weights:
-                    # Check if all weights are zero, which indicates a problem
-                    if all(w == 0.0 for w in weights):
-                        print(f"WARNING: All extracted weights are zero! Using default atomic weights instead.")
-                        # Use standard atomic weights as fallback
-                        default_weights = [12.0] * len(weights)  # Carbon weight as default
-                        mass_array = torch.tensor(default_weights, dtype=dtype, device=self.device)
-                    else:
-                        print(f"Using extracted weights: min={min(weights)}, max={max(weights)}, count={len(weights)}")
-                        mass_array = torch.tensor(weights, dtype=dtype, device=self.device)
-                    
-                    # Ensure we have enough weights
-                    if mass_array.shape[0] < self.n_asu * self.n_atoms_per_asu:
-                        padding = torch.ones(self.n_asu * self.n_atoms_per_asu - mass_array.shape[0], 
-                                           dtype=dtype, device=self.device)
-                        mass_array = torch.cat([mass_array, padding])
-                else:
-                    print("Warning: Could not extract weights from model.elements, using default weights")
-            except Exception as e:
-                print(f"Error extracting weights: {e}")
-                # Try to access the original NumPy model's weights if available
-                if hasattr(self, 'original_model') and hasattr(self.original_model, 'elements'):
-                    try:
-                        weights = []
-                        for structure in self.original_model.elements:
+                print("Extracting weights from model.elements")
+                # Handle various formats of elements data
+                if isinstance(self.model.elements, list) and len(self.model.elements) > 0:
+                    # List of lists (original format)
+                    if isinstance(self.model.elements[0], list):
+                        for structure in self.model.elements:
                             for element in structure:
-                                weights.append(float(element.weight))
-                        if weights:
-                            # Check if all weights are zero
-                            if all(w == 0.0 for w in weights):
-                                print(f"WARNING: All weights from original model are zero!")
-                                # Use standard atomic weights as fallback
-                                default_weights = [12.0] * len(weights)  # Carbon weight as default
-                                mass_array = torch.tensor(default_weights, dtype=dtype, device=self.device)
-                            else:
-                                print(f"Using weights from original model: min={min(weights)}, max={max(weights)}, count={len(weights)}")
-                                mass_array = torch.tensor(weights, dtype=dtype, device=self.device)
-                    except Exception as e2:
-                        print(f"Error extracting weights from original model: {e2}")
+                                if hasattr(element, 'weight'):
+                                    weights.append(float(element.weight))
+                                elif isinstance(element, dict) and 'weight' in element:
+                                    weights.append(float(element['weight']))
+                                elif isinstance(element, (float, int, np.number)):
+                                    weights.append(float(element))
+                    # Direct list of elements or weights
+                    elif all(hasattr(e, 'weight') for e in self.model.elements if hasattr(e, '__dict__')):
+                        weights = [float(e.weight) for e in self.model.elements]
+                    elif all(isinstance(e, (float, int, np.number)) for e in self.model.elements):
+                        weights = [float(e) for e in self.model.elements]
+            except Exception as e:
+                print(f"Error extracting weights from model.elements: {e}")
+        
+        # Strategy 4: Use cached original weights
+        if not weights and hasattr(self.model, '_original_weights'):
+            print(f"Using cached original weights")
+            weights = self.model._original_weights
+        
+        # If we have weights, use them
+        if weights:
+            # Check if all weights are zero, which indicates a problem
+            if all(w == 0.0 for w in weights):
+                print(f"WARNING: All extracted weights are zero! Using default atomic weights instead.")
+                # Use standard atomic weights as fallback
+                weights = [12.0] * len(weights)  # Carbon weight as default
+            
+            if len(weights) < self.n_asu * self.n_atoms_per_asu:
+                print(f"Warning: Not enough weights ({len(weights)}) for all atoms ({self.n_asu * self.n_atoms_per_asu}). Using default weight for remaining atoms.")
+                # Pad with carbon weights
+                weights.extend([12.0] * (self.n_asu * self.n_atoms_per_asu - len(weights)))
+            
+            print(f"Using weights: min={min(weights)}, max={max(weights)}, count={len(weights)}")
+            mass_array = torch.tensor(weights[:self.n_asu * self.n_atoms_per_asu], dtype=dtype, device=self.device)
+        else:
+            print("No weights found. Using default weights (ones).")
         
         # Create block diagonal matrix
         eye3 = torch.eye(3, device=self.device, dtype=dtype)

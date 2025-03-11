@@ -54,6 +54,86 @@ class PDBToTensor:
         """
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
+    def extract_element_weights(self, model: Any) -> torch.Tensor:
+        """
+        Extract atomic weights from model element information.
+        
+        Args:
+            model: AtomicModel instance or any object with element information
+            
+        Returns:
+            Tensor of element weights
+            
+        This method implements a robust multi-strategy approach to extract
+        element weights from various sources, with proper fallbacks.
+        """
+        weights = []
+        
+        # Strategy 1: Try gemmi_structure if available
+        if hasattr(model, '_gemmi_structure'):
+            try:
+                structure = model._gemmi_structure
+                for model_obj in structure:
+                    for chain in model_obj:
+                        for residue in chain:
+                            for atom in residue:
+                                element = atom.element
+                                if element and hasattr(element, 'weight'):
+                                    weights.append(float(element.weight))
+                                else:
+                                    # Default to carbon weight
+                                    weights.append(12.0)
+                if weights:
+                    return torch.tensor(weights, device=self.device, dtype=torch.float32)
+            except Exception as e:
+                print(f"Error extracting weights from gemmi structure: {e}")
+        
+        # Strategy 2: Try model.elements if available
+        if hasattr(model, 'elements'):
+            try:
+                if isinstance(model.elements, list) and len(model.elements) > 0:
+                    # Handle nested list structure
+                    if isinstance(model.elements[0], list):
+                        for structure in model.elements:
+                            for element in structure:
+                                if hasattr(element, 'weight'):
+                                    weights.append(float(element.weight))
+                                elif isinstance(element, dict) and 'weight' in element:
+                                    weights.append(float(element['weight']))
+                                elif isinstance(element, (int, float)):
+                                    weights.append(float(element))
+                                else:
+                                    # Default weight
+                                    weights.append(12.0)
+                    # Direct list of elements
+                    elif all(hasattr(e, 'weight') for e in model.elements if hasattr(e, '__dict__')):
+                        weights = [float(e.weight) for e in model.elements]
+                    # List of numeric values
+                    elif all(isinstance(e, (int, float)) for e in model.elements):
+                        weights = [float(e) for e in model.elements]
+                
+                if weights:
+                    return torch.tensor(weights, device=self.device, dtype=torch.float32)
+            except Exception as e:
+                print(f"Error extracting weights from elements attribute: {e}")
+        
+        # Strategy 3: Try cached original weights
+        if hasattr(model, '_original_weights'):
+            try:
+                weights = model._original_weights
+                if weights:
+                    return torch.tensor(weights, device=self.device, dtype=torch.float32)
+            except Exception as e:
+                print(f"Error extracting weights from _original_weights: {e}")
+        
+        # Fallback: return carbon weights
+        if hasattr(model, 'xyz'):
+            n_atoms = model.xyz.shape[0] * model.xyz.shape[1] if model.xyz.ndim > 2 else model.xyz.shape[0]
+            return torch.ones(n_atoms, device=self.device, dtype=torch.float32) * 12.0
+        
+        # Ultimate fallback
+        return torch.ones(1, device=self.device, dtype=torch.float32) * 12.0
+        
     def convert_atomic_model(self, model: Any) -> Dict[str, Any]:
         """
         Convert an AtomicModel to PyTorch tensors.
@@ -77,6 +157,9 @@ class PDBToTensor:
         # Handle Gemmi structure specially
         if hasattr(model, 'structure'):
             result['structure_dict'] = self.convert_gemmi_to_tensor_dict(model.structure)
+        
+        # Extract and add element weights explicitly
+        result['element_weights'] = self.extract_element_weights(model)
         
         # Convert key array attributes to tensors
         tensor_attributes = {

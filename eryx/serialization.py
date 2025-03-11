@@ -315,6 +315,13 @@ class ObjectSerializer:
         # Try to register Gemmi handlers if available
         try:
             import gemmi
+            # Initialize GemmiSerializer for better Gemmi object handling
+            try:
+                from eryx.autotest.gemmi_serializer import GemmiSerializer
+                self.gemmi_serializer = GemmiSerializer()
+            except ImportError:
+                pass
+                
             # Register handlers for common Gemmi types
             self.register_handler(gemmi.Structure, self._serialize_gemmi_object, self._deserialize_gemmi_object)
             self.register_handler(gemmi.UnitCell, self._serialize_gemmi_object, self._deserialize_gemmi_object)
@@ -528,14 +535,25 @@ class ObjectSerializer:
     def _serialize_gemmi_element(self, obj: Any) -> Dict[str, Any]:
         """Serialize Gemmi Element."""
         try:
-            # Element objects have a name attribute that is a string representation
+            # Use GemmiSerializer if available
+            if hasattr(self, 'gemmi_serializer'):
+                serialized = self.gemmi_serializer.serialize_element(obj)
+                # Convert _gemmi_type to __type__ for consistency with ObjectSerializer
+                serialized["__type__"] = "gemmi.Element"
+                if "_gemmi_type" in serialized:
+                    del serialized["_gemmi_type"]
+                return serialized
+            
+            # Fallback implementation if GemmiSerializer is not available
             return {
                 "__type__": "gemmi.Element",
-                "__name__": obj.name,
-                "__symbol__": str(obj)
+                "__name__": getattr(obj, "name", ""),
+                "__symbol__": str(obj),
+                "__weight__": getattr(obj, "weight", 0.0),
+                "__atomic_number__": getattr(obj, "atomic_number", 0)
             }
         except Exception:
-            # Fallback if attributes are not accessible
+            # Simplified fallback if attributes are not accessible
             return {
                 "__type__": "gemmi.Element",
                 "__symbol__": str(obj)
@@ -544,9 +562,26 @@ class ObjectSerializer:
     def _deserialize_gemmi_element(self, data: Dict[str, Any]) -> Any:
         """Deserialize Gemmi Element."""
         try:
+            # Use GemmiSerializer if available
+            if hasattr(self, 'gemmi_serializer'):
+                # Convert __type__ format to _gemmi_type format for GemmiSerializer
+                gemmi_data = dict(data)
+                gemmi_data["_gemmi_type"] = "Element"
+                return self.gemmi_serializer.deserialize_element(gemmi_data)
+            
+            # Fallback implementation if GemmiSerializer is not available
             import gemmi
-            symbol = data.get("__symbol__", "")
-            return gemmi.Element(symbol)
+            # Try all possible fields for maximum compatibility
+            if "__symbol__" in data:
+                return gemmi.Element(data["__symbol__"])
+            elif "symbol" in data:
+                return gemmi.Element(data["symbol"])
+            elif "__name__" in data and data["__name__"]:
+                return gemmi.Element(data["__name__"])
+            elif "name" in data and data["name"]:
+                return gemmi.Element(data["name"])
+            else:
+                return gemmi.Element("")
         except ImportError:
             # Return a placeholder if Gemmi is not available
             return data
