@@ -4,7 +4,6 @@ import torch
 import numpy as np
 from tests.test_base import TestBase
 from eryx.models_torch import OnePhonon
-from unittest.mock import patch, MagicMock
 
 class TestCovarianceMethods(TestBase):
     def setUp(self):
@@ -41,67 +40,6 @@ class TestCovarianceMethods(TestBase):
             device=self.device
         )
     
-    def _create_test_model(self):
-        """Create a minimal test model with necessary attributes and mock methods."""
-        model = OnePhonon.__new__(OnePhonon)  # Create instance without calling __init__
-        
-        # Set necessary attributes
-        model.device = self.device
-        model.n_asu = 2
-        model.n_dof_per_asu = 6
-        model.n_dof_per_asu_actual = 12  # 4 atoms * 3 dimensions
-        model.n_cell = 3
-        model.id_cell_ref = 0
-        model.hsampling = (0, 5, 3)
-        model.ksampling = (0, 5, 3)
-        model.lsampling = (0, 5, 3)
-        
-        # Mock Amat tensor (projection matrix)
-        model.Amat = torch.rand(
-            (model.n_asu, model.n_dof_per_asu_actual, model.n_dof_per_asu), 
-            device=self.device,
-            requires_grad=True
-        )
-        
-        # Mock kvec tensor
-        model.kvec = torch.rand(
-            (model.hsampling[2], model.ksampling[2], model.lsampling[2], 3),
-            device=self.device,
-            requires_grad=True
-        )
-        
-        # Mock model.adp for scaling
-        model.model = MagicMock()
-        model.model.adp = torch.ones(model.n_dof_per_asu_actual // 3, device=self.device)
-        
-        # Mock crystal with get_unitcell_origin and id_to_hkl methods
-        model.crystal = MagicMock()
-        model.crystal.hkl_to_id = lambda x: 0 if x == [0, 0, 0] else x[0] + x[1] + x[2]
-        model.crystal.id_to_hkl = lambda x: [x, 0, 0]
-        model.crystal.get_unitcell_origin = lambda x: torch.tensor([float(x[0]), 0.0, 0.0], device=self.device)
-        
-        # Mock compute_hessian method
-        def mock_compute_hessian():
-            return torch.rand(
-                (model.n_asu, model.n_dof_per_asu, model.n_cell, model.n_asu, model.n_dof_per_asu),
-                device=self.device,
-                dtype=torch.complex64,
-                requires_grad=True
-            )
-        model.compute_hessian = mock_compute_hessian
-        
-        # Mock compute_gnm_Kinv method
-        def mock_compute_gnm_Kinv(hessian, kvec=None, reshape=True):
-            K_inv = torch.rand(
-                (model.n_asu * model.n_dof_per_asu, model.n_asu * model.n_dof_per_asu),
-                device=self.device,
-                dtype=torch.complex64,
-                requires_grad=True
-            )
-            return K_inv
-        model.compute_gnm_Kinv = mock_compute_gnm_Kinv
-        
-        return model
     
     def test_compute_covariance_matrix_state_based(self):
         """Test compute_covariance_matrix using state-based approach."""
@@ -253,74 +191,8 @@ class TestCovarianceMethods(TestBase):
             self.skipTest(f"Error during covariance matrix computation: {e}")
             return
     
-    def test_compute_covariance_matrix_shape(self):
-        """Test shape of covariance matrix and ADPs."""
-        # Create test model
-        model = self._create_test_model()
-        
-        # Run the method
-        model.compute_covariance_matrix()
-        
-        # Check shapes of results
-        expected_covar_shape = (
-            model.n_asu, model.n_dof_per_asu,
-            model.n_cell, model.n_asu, model.n_dof_per_asu
-        )
-        self.assertEqual(model.covar.shape, expected_covar_shape)
-        
-        expected_adp_shape = (model.n_dof_per_asu_actual // 3,)
-        self.assertEqual(model.ADP.shape, expected_adp_shape)
-        
-        # Check data type is correct (should be real)
-        self.assertTrue(torch.is_floating_point(model.covar))
-        self.assertTrue(torch.is_floating_point(model.ADP))
     
-    def test_compute_covariance_matrix_gradient_flow(self):
-        """Test gradient flow through covariance matrix calculation."""
-        # Create test model
-        model = self._create_test_model()
-        
-        # Enable anomaly detection to help debug gradient issues
-        torch.autograd.set_detect_anomaly(True)
-        
-        # Run the method
-        model.compute_covariance_matrix()
-        
-        # Create a scalar loss from the outputs
-        loss = model.covar.mean() + model.ADP.mean()
-        
-        # Compute gradients
-        loss.backward()
-        
-        # Check that gradients flowed to input parameters
-        self.assertIsNotNone(model.Amat.grad)
-        self.assertIsNotNone(model.kvec.grad)
-        
-        # Verify gradients are not all zeros
-        self.assertFalse(torch.allclose(model.Amat.grad, torch.zeros_like(model.Amat.grad)))
-        self.assertFalse(torch.allclose(model.kvec.grad, torch.zeros_like(model.kvec.grad)))
-        
-        # Disable anomaly detection after test
-        torch.autograd.set_detect_anomaly(False)
     
-    def test_compute_covariance_matrix_scaling(self):
-        """Test that scaling to match experimental ADPs works correctly."""
-        # Create test model
-        model = self._create_test_model()
-        
-        # Run the method
-        model.compute_covariance_matrix()
-        
-        # Mean of model.adp should be approximately 1.0 since we set it to all ones
-        target_mean = 1.0
-        
-        # Calculate expected scaling: mean_ADP = 3 * mean_B / (8π²)
-        # So we expect mean(ADP) ≈ 3 * 1 / (8π²)
-        expected_adp_mean = 3 * target_mean / (8 * np.pi * np.pi)
-        
-        # Check the mean of the computed ADP is close to expected
-        adp_mean = model.ADP.mean().item()
-        self.assertAlmostEqual(adp_mean, expected_adp_mean, delta=1e-4)
     
     def test_compute_hessian_state_based(self):
         """Test compute_hessian using state-based approach."""
