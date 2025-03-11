@@ -16,6 +16,7 @@ import torch.nn.functional as F
 from typing import List, Tuple, Dict, Optional, Union, Any
 
 from eryx.pdb import AtomicModel, Crystal, GaussianNetworkModel
+from eryx.pdb_torch import GaussianNetworkModel as GaussianNetworkModelTorch
 from eryx.autotest.debug import debug
 from eryx.adapters import PDBToTensor, TensorToNumpy
 
@@ -573,82 +574,6 @@ class OnePhonon:
                   
         return indices
     
-    #@debug
-    def compute_gnm_hessian(self) -> torch.Tensor:
-        """
-        Compute the Hessian matrix using the Gaussian Network Model.
-        
-        Returns:
-            Torch tensor of shape (n_asu, n_atoms_per_asu, n_cell, n_asu, n_atoms_per_asu)
-            with dtype torch.complex64.
-        """
-        hessian = torch.zeros((self.n_asu, self.n_atoms_per_asu,
-                               self.n_cell, self.n_asu, self.n_atoms_per_asu),
-                              dtype=torch.complex64, device=self.device)
-        hessian_diagonal = torch.zeros((self.n_asu, self.n_atoms_per_asu),
-                                       dtype=torch.complex64, device=self.device)
-        for i_asu in range(self.n_asu):
-            for i_cell in range(self.n_cell):
-                for j_asu in range(self.n_asu):
-                    for i_at in range(self.n_atoms_per_asu):
-                        # Dummy neighbor list (empty) for simplicity.
-                        iat_neighbors = []
-                        if len(iat_neighbors) > 0:
-                            gamma = self.gamma_intra if i_asu == j_asu else self.gamma_inter
-                            for j_at in iat_neighbors:
-                                hessian[i_asu, i_at, i_cell, j_asu, j_at] = -gamma.to(torch.complex64)
-                            hessian_diagonal[i_asu, i_at] -= gamma.to(torch.complex64) * len(iat_neighbors)
-        for i_asu in range(self.n_asu):
-            for i_at in range(self.n_atoms_per_asu):
-                gamma_self = self.gamma_intra.to(torch.complex64)
-                hessian[i_asu, i_at, self.id_cell_ref, i_asu, i_at] = hessian_diagonal[i_asu, i_at] - gamma_self
-        return hessian
-    
-    #@debug
-    def compute_gnm_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
-        """
-        Compute the dynamical matrix K(kvec) from the Hessian.
-        
-        Args:
-            hessian: Hessian tensor.
-            kvec: k-vector tensor of shape (3,). Defaults to zero vector.
-            
-        Returns:
-            Dynamical matrix K as a tensor.
-        """
-        if kvec is None:
-            kvec = torch.zeros(3, device=self.device)
-        Kmat = hessian[:, :, self.id_cell_ref, :, :].clone()
-        for j_cell in range(self.n_cell):
-            if j_cell == self.id_cell_ref:
-                continue
-            r_cell = self.crystal['get_unitcell_origin'](self.crystal['id_to_hkl'](j_cell))
-            phase = torch.sum(kvec * r_cell)
-            real_part, imag_part = torch.cos(phase), torch.sin(phase)
-            eikr = torch.complex(real_part, imag_part)
-            for i_asu in range(self.n_asu):
-                for j_asu in range(self.n_asu):
-                    Kmat[i_asu, :, j_asu, :] += hessian[i_asu, :, j_cell, j_asu, :] * eikr
-        return Kmat
-    
-    #@debug
-    def compute_Kinv(self, hessian: torch.Tensor, kvec: torch.Tensor = None, 
-                     reshape: bool = True) -> torch.Tensor:
-        """
-        Compute the pseudo-inverse of the dynamical matrix K(kvec).
-        """
-        if kvec is None:
-            kvec = torch.zeros(3, device=self.device)
-        Kmat = self.compute_gnm_K(hessian, kvec=kvec)
-        Kshape = Kmat.shape
-        Kmat_2d = Kmat.reshape(Kshape[0] * Kshape[1], Kshape[2] * Kshape[3])
-        eps = 1e-10
-        identity = torch.eye(Kmat_2d.shape[0], device=self.device, dtype=Kmat_2d.dtype)
-        Kmat_2d_reg = Kmat_2d + eps * identity
-        Kinv = torch.linalg.pinv(Kmat_2d_reg)
-        if reshape:
-            Kinv = Kinv.reshape((Kshape[0], Kshape[1], Kshape[2], Kshape[3]))
-        return Kinv
     
     #@debug
     def compute_hessian(self) -> torch.Tensor:
@@ -700,11 +625,20 @@ class OnePhonon:
         h_dim = int(self.hsampling[2])
         k_dim = int(self.ksampling[2])
         l_dim = int(self.lsampling[2])
+        
+        # Create a GaussianNetworkModelTorch instance for K matrix calculations
+        gnm_torch = GaussianNetworkModelTorch()
+        gnm_torch.n_asu = self.n_asu
+        gnm_torch.n_cell = self.n_cell
+        gnm_torch.id_cell_ref = self.id_cell_ref
+        gnm_torch.device = self.device
+        gnm_torch.crystal = self.crystal
+        
         for dh in range(h_dim):
             for dk in range(k_dim):
                 for dl in range(l_dim):
                     kvec = self.kvec[dh, dk, dl]
-                    Kmat = self.compute_gnm_K(hessian, kvec=kvec)
+                    Kmat = gnm_torch.compute_K(hessian, kvec=kvec)
                     Kmat_2d = Kmat.reshape((self.n_asu * self.n_dof_per_asu,
                                              self.n_asu * self.n_dof_per_asu))
                     Linv_complex = self.Linv.to(dtype=torch.complex64)
@@ -789,12 +723,23 @@ class OnePhonon:
         k_dim = int(self.ksampling[2])
         l_dim = int(self.lsampling[2])
         from eryx.torch_utils import ComplexTensorOps
+        
+        # Create a GaussianNetworkModelTorch instance for Kinv calculations
+        gnm_torch = GaussianNetworkModelTorch()
+        gnm_torch.n_asu = self.n_asu
+        gnm_torch.n_cell = self.n_cell
+        gnm_torch.id_cell_ref = self.id_cell_ref
+        gnm_torch.device = self.device
+        gnm_torch.crystal = self.crystal
+        
+        hessian = self.compute_hessian()
+        
         for dh in range(h_dim):
             for dk in range(k_dim):
                 for dl in range(l_dim):
                     kvec = self.kvec[dh, dk, dl]
-                    # Use our PyTorch implementation instead of the NumPy one
-                    Kinv = self.compute_Kinv(self.compute_hessian(), kvec=kvec, reshape=False)
+                    # Use the PyTorch implementation from pdb_torch
+                    Kinv = gnm_torch.compute_Kinv(hessian, kvec=kvec, reshape=False)
                     for j_cell in range(self.n_cell):
                         r_cell = self.crystal['get_unitcell_origin'](self.crystal['id_to_hkl'](j_cell))
                         phase = torch.sum(kvec * r_cell)
