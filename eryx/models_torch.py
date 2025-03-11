@@ -843,7 +843,13 @@ class OnePhonon:
                     if rank == -1:
                         FV = torch.matmul(F, self.V[dh, dk, dl])
                         FV_abs_squared = torch.abs(FV) ** 2
-                        real_winv = torch.real(self.Winv[dh, dk, dl])
+                        # Ensure NaN propagation in both real and imaginary parts
+                        winv = self.Winv[dh, dk, dl]
+                        real_winv = torch.real(winv)
+                        # Propagate NaNs from imaginary part to real part
+                        real_winv = torch.where(torch.isnan(torch.imag(winv)), 
+                                               torch.tensor(float('nan'), device=self.device, dtype=real_winv.dtype),
+                                               real_winv)
                         weighted_intensity = torch.matmul(FV_abs_squared, real_winv)
                         Id.index_add_(0, valid_indices, weighted_intensity)
                     else:
