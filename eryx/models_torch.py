@@ -710,9 +710,10 @@ class OnePhonon:
                     Dmat = torch.matmul(Linv_complex, torch.matmul(Kmat_2d, Linv_complex.T))
                     
                     # Extract eigenvalues and eigenvectors without tracking phase gradients
+                    # This detaches them from the computation graph to avoid gradient issues with complex phases
                     with torch.no_grad():
                         v, w, _ = torch.linalg.svd(Dmat, full_matrices=False)
-                        w = torch.sqrt(w)
+                        w = torch.sqrt(w)  # w contains singular values from SVD
                         w = torch.where(w < 1e-6,
                                        torch.tensor(float('nan'), dtype=w.dtype, device=w.device),
                                        w)
@@ -720,10 +721,12 @@ class OnePhonon:
                         v = torch.flip(v, [1])
                     
                     # Recompute eigenvalues in a differentiable way
+                    # This reattaches them to the computation graph for gradient flow
                     eigenvalues = []
                     for i in range(v.shape[1]):
                         v_i = v[:, i:i+1]
                         # Compute λ_i = v_i† D v_i (maintains gradient flow through magnitudes)
+                        # This creates a path for gradients to flow back to model parameters
                         lambda_i = torch.matmul(torch.matmul(v_i.conj().T, Dmat), v_i).real
                         eigenvalues.append(lambda_i[0, 0])
                     
@@ -737,13 +740,16 @@ class OnePhonon:
                                             torch.tensor(float('nan'), dtype=winv_value.dtype, device=winv_value.device),
                                             winv_value)
                     
+                    # Transform eigenvectors to the right basis using Linv
+                    # v is detached from computation graph, but that's OK since we only need
+                    # its values for the forward pass (not its gradients)
                     v_value = torch.matmul(Linv_complex.T, v)
                     
                     # Use tensor indexing without in-place modification
                     self.Winv = self.Winv.clone()
                     self.V = self.V.clone()
-                    self.Winv[dh, dk, dl] = winv_value
-                    self.V[dh, dk, dl] = v_value
+                    self.Winv[dh, dk, dl] = winv_value  # This contains our differentiable eigenvalues
+                    self.V[dh, dk, dl] = v_value  # This contains the eigenvectors (used in forward pass only)
     
     #@debug
     def compute_gnm_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:

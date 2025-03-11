@@ -23,13 +23,14 @@ with torch.no_grad():
     # Process eigenvalues and eigenvectors...
 ```
 
-2. **Recompute Eigenvalues Differentiably**: We then recompute the eigenvalues in a differentiable way using the eigenvector-eigenvalue relationship:
+2. **Recompute Eigenvalues Differentiably**: We then recompute the eigenvalues in a differentiable way using the eigenvector-eigenvalue relationship. This is necessary because the SVD operation with `torch.no_grad()` detaches the singular values from the computation graph:
 
 ```python
 eigenvalues = []
 for i in range(v.shape[1]):
     v_i = v[:, i:i+1]
     # Compute λ_i = v_i† D v_i (maintains gradient flow through magnitudes)
+    # This reattaches the eigenvalues to the computation graph
     lambda_i = torch.matmul(torch.matmul(v_i.conj().T, Dmat), v_i).real
     eigenvalues.append(lambda_i[0, 0])
 ```
