@@ -346,6 +346,24 @@ class OnePhonon:
                                     weight = gemmi.Element(element.name).weight
                                     weights.append(float(weight))
                                 else:
+                                    # Try to determine element from atom name
+                                    atom_name = atom.name.strip()
+                                    if atom_name:
+                                        # Extract first 1-2 characters as potential element symbol
+                                        if atom_name[0].isalpha():
+                                            if len(atom_name) > 1 and atom_name[1].isalpha():
+                                                elem_symbol = atom_name[:2].capitalize()
+                                            else:
+                                                elem_symbol = atom_name[0].upper()
+                                                
+                                            try:
+                                                # Try to get weight from element symbol
+                                                weight = gemmi.Element(elem_symbol).weight
+                                                weights.append(float(weight))
+                                                continue
+                                            except:
+                                                pass
+                                    
                                     # Default to carbon weight if element is unknown
                                     weights.append(12.0)
                 

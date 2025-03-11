@@ -16,14 +16,47 @@ class TestElementWeights(unittest.TestCase):
         try:
             structure = gemmi.read_structure(pdb_path)
             print("\nDirect Gemmi inspection:")
+            element_counts = {}
+            element_weights = {}
+            
             for model in structure:
                 for chain in model:
                     for residue in chain:
                         for atom in residue:
                             element = atom.element
                             if element:
-                                weight = gemmi.Element(element.name).weight
-                                print(f"Atom: {atom.name}, Element: {element.name}, Weight: {weight}")
+                                element_name = element.name
+                                weight = gemmi.Element(element_name).weight
+                                element_counts[element_name] = element_counts.get(element_name, 0) + 1
+                                element_weights[element_name] = weight
+                                print(f"Atom: {atom.name}, Element: {element_name}, Weight: {weight}")
+                            else:
+                                # Try to determine element from atom name
+                                atom_name = atom.name.strip()
+                                if atom_name:
+                                    # Extract first 1-2 characters as potential element symbol
+                                    if atom_name[0].isalpha():
+                                        if len(atom_name) > 1 and atom_name[1].isalpha():
+                                            elem_symbol = atom_name[:2].capitalize()
+                                        else:
+                                            elem_symbol = atom_name[0].upper()
+                                            
+                                        try:
+                                            # Try to get weight from element symbol
+                                            weight = gemmi.Element(elem_symbol).weight
+                                            element_counts[elem_symbol] = element_counts.get(elem_symbol, 0) + 1
+                                            element_weights[elem_symbol] = weight
+                                            print(f"Atom: {atom.name}, Inferred Element: {elem_symbol}, Weight: {weight}")
+                                            continue
+                                        except:
+                                            pass
+                                
+                                print(f"Atom: {atom.name}, Element: Unknown, Weight: N/A")
+            
+            print("\nElement summary:")
+            for elem, count in element_counts.items():
+                print(f"Element {elem}: Count={count}, Weight={element_weights[elem]}")
+                
         except Exception as e:
             print(f"Error inspecting PDB with gemmi: {e}")
         
