@@ -170,10 +170,33 @@ class OnePhonon:
         self._build_kvec_Brillouin()
         
         if model == 'gnm':
-            # Setup GNM from NP implementation.
-            self.gnm = GaussianNetworkModel(pdb_path, gnm_cutoff, gamma_intra, gamma_inter)
-            self.gamma_intra = torch.tensor(gamma_intra, dtype=torch.float32, device=self.device, requires_grad=True)
-            self.gamma_inter = torch.tensor(gamma_inter, dtype=torch.float32, device=self.device, requires_grad=True)
+            # Store parameters as tensors with gradients
+            if isinstance(gamma_intra, torch.Tensor):
+                self.gamma_intra = gamma_intra
+            else:
+                self.gamma_intra = torch.tensor(gamma_intra, dtype=torch.float32, device=self.device, requires_grad=True)
+                
+            if isinstance(gamma_inter, torch.Tensor):
+                self.gamma_inter = gamma_inter
+            else:
+                self.gamma_inter = torch.tensor(gamma_inter, dtype=torch.float32, device=self.device, requires_grad=True)
+            
+            # Setup GNM from NP implementation for initialization only
+            self.gnm = GaussianNetworkModel(pdb_path, gnm_cutoff, 
+                                           float(self.gamma_intra.detach().cpu().numpy()), 
+                                           float(self.gamma_inter.detach().cpu().numpy()))
+            
+            # Create a differentiable gamma tensor that matches the GNM structure
+            self.gamma_tensor = torch.zeros((self.n_cell, self.n_asu, self.n_asu), 
+                                           device=self.device, dtype=torch.float32)
+            
+            # Fill it like the original build_gamma method, but with our parameter tensors
+            for i_asu in range(self.n_asu):
+                for i_cell in range(self.n_cell):
+                    for j_asu in range(self.n_asu):
+                        self.gamma_tensor[i_cell, i_asu, j_asu] = self.gamma_inter
+                        if (i_cell == self.id_cell_ref) and (j_asu == i_asu):
+                            self.gamma_tensor[i_cell, i_asu, j_asu] = self.gamma_intra
             
             self.compute_gnm_phonons()
             self.compute_covariance_matrix()
@@ -599,14 +622,17 @@ class OnePhonon:
         else:
             print("Warning: No crystal object found in OnePhonon model")
         
-        # Convert gamma from NumPy GNM to PyTorch tensor
-        if hasattr(self.gnm, 'gamma'):
+        # Use our differentiable gamma tensor instead of the NumPy GNM gamma
+        if hasattr(self, 'gamma_tensor'):
+            gnm_torch.gamma = self.gamma_tensor
+        # Fallback to NumPy GNM gamma if needed
+        elif hasattr(self.gnm, 'gamma'):
             from eryx.adapters import PDBToTensor
             adapter = PDBToTensor(device=self.device)
             gnm_torch.gamma = adapter.array_to_tensor(self.gnm.gamma, dtype=torch.float32)
-            
-            # Copy neighbor list structure
-            gnm_torch.asu_neighbors = self.gnm.asu_neighbors
+        
+        # Copy neighbor list structure
+        gnm_torch.asu_neighbors = self.gnm.asu_neighbors
         
         # Compute Hessian using PyTorch implementation
         hessian_allatoms = gnm_torch.compute_hessian()
