@@ -251,15 +251,15 @@ class StateBuilder:
                     setattr(obj, key, tensor)
                     continue
                 
-                # Handle nested dictionaries recursively
+                # Handle dictionaries - set directly as attributes
+                # This approach is simpler and more robust, especially for dictionaries with 
+                # non-string keys (like integers in sym_ops and transformations)
+                # It preserves the original dictionary structure without attempting nested processing
                 elif isinstance(value, dict):
-                    # Check if this is a nested object state
-                    if not hasattr(obj, key) or getattr(obj, key) is None:
-                        # Create a new object
-                        setattr(obj, key, type('DynamicObject', (), {}))
-                    
-                    # Apply state recursively
-                    self._apply_state_v2(getattr(obj, key), value)
+                    # Log if dictionary has non-string keys (for debugging)
+                    if any(not isinstance(k, str) for k in value.keys()):
+                        print(f"Setting dictionary with non-string keys: {key}")
+                    setattr(obj, key, value)
                     continue
                 
                 # Handle lists that might contain nested objects
@@ -273,4 +273,7 @@ class StateBuilder:
                 setattr(obj, key, value)
                     
             except Exception as e:
-                print(f"Warning: Could not set attribute {key}: {e}")
+                if isinstance(value, dict) and any(not isinstance(k, str) for k in value.keys()):
+                    print(f"Warning: Could not set dictionary attribute {key} with non-string keys: {e}")
+                else:
+                    print(f"Warning: Could not set attribute {key}: {e}")
