@@ -221,7 +221,7 @@ class PDBToTensor:
             return current
         except Exception:
             return default
-    
+
     class TorchCrystal:
         """
         A PyTorch-compatible wrapper for Crystal objects.
@@ -247,7 +247,7 @@ class PDBToTensor:
             if hasattr(original_crystal.model, 'unit_cell_axes'):
                 self.unit_cell_axes = adapter.array_to_tensor(
                     original_crystal.model.unit_cell_axes, 
-                    requires_grad=True
+                    requires_grad=False
                 )
             else:
                 self.unit_cell_axes = None
@@ -255,7 +255,7 @@ class PDBToTensor:
             if hasattr(original_crystal.model, 'cell'):
                 self.cell = adapter.array_to_tensor(
                     original_crystal.model.cell,
-                    requires_grad=True
+                    requires_grad=False
                 )
             else:
                 self.cell = None
