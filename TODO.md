@@ -19,204 +19,82 @@ The key benefits include:
 
 This document is organized into phases with concrete tasks and should be read alongside the updated architecture.md, project_rules.md, and phased_plan.md documents.
 
-## Phase 1: Testing Framework Enhancement (1 week)
+## Phase 1: Testing Framework Enhancement (1 week) - COMPLETED
 > Reference: See "Testing Framework Extensions" section in architecture.md and "State-Based Testing Guidelines" in project_rules.md
 
-### 1.1 Extend Logger for State Capture
+### 1.1 Extend Logger for State Capture - COMPLETED
 > Location: eryx/autotest/logger.py
 > Reference: See "Data Storage and Access" section in phased_plan.md for log naming conventions
 
-- [ ] Add `captureState(obj)` method to Logger class in eryx/autotest/logger.py
-  ```python
-  def captureState(self, obj):
-      """
-      Capture complete object state for testing.
-      
-      Args:
-          obj: Object whose state should be captured
-          
-      Returns:
-          Dictionary with serialized state
-      """
-      state = {}
-      for attr_name in dir(obj):
-          if attr_name.startswith('_'):
-              continue  # Skip private attributes
-          attr = getattr(obj, attr_name)
-          if callable(attr):
-              continue  # Skip methods
-          # Convert attribute to serializable form
-          state[attr_name] = self.serializer.serialize(attr)
-      return state
-  ```
-- [ ] Add `loadStateLog(log_file)` method in eryx/autotest/logger.py
-- [ ] Add `searchStateLogDirectory(log_path_prefix)` method in eryx/autotest/logger.py
-- [ ] Implement state serialization for complex objects in eryx/autotest/serializer.py
-- [ ] Add attribute filtering mechanisms for large objects
+- [x] Add `captureState(obj)` method to Logger class in eryx/autotest/logger.py
+- [x] Add `loadStateLog(log_file)` method in eryx/autotest/logger.py
+- [x] Add `searchStateLogDirectory(log_path_prefix)` method in eryx/autotest/logger.py
+- [x] Implement state serialization for complex objects in eryx/autotest/serializer.py
+- [x] Add attribute filtering mechanisms for large objects
 
-### 1.2 Add State Comparison Utilities
+### 1.2 Add State Comparison Utilities - COMPLETED
 > Location: eryx/autotest/torch_testing.py
 > Reference: See "State Comparison" section in architecture.md
 
-- [ ] Add `compareStates(expected_state, actual_state, tolerances)` method to TorchTesting
-  ```python
-  def compareStates(self, expected_state, actual_state, tolerances=None):
-      """
-      Compare expected and actual states with appropriate tolerances.
-      
-      Args:
-          expected_state: Expected state dictionary/object
-          actual_state: Actual state dictionary/object
-          tolerances: Dict with attribute-specific tolerances
-          
-      Returns:
-          Boolean indicating if states match within tolerances
-      """
-      tolerances = tolerances or {'default': {'rtol': 1e-5, 'atol': 1e-8}}
-      
-      for key in expected_state:
-          if key not in actual_state:
-              print(f"Missing attribute in actual state: {key}")
-              return False
-              
-          expected = expected_state[key]
-          actual = actual_state[key]
-          
-          # Get tolerance for this attribute
-          tol = tolerances.get(key, tolerances['default'])
-          
-          if isinstance(expected, np.ndarray) and isinstance(actual, torch.Tensor):
-              # Convert tensor to numpy for comparison
-              actual = actual.detach().cpu().numpy()
-              
-          if isinstance(expected, np.ndarray) and isinstance(actual, np.ndarray):
-              if not np.allclose(expected, actual, rtol=tol['rtol'], atol=tol['atol']):
-                  print(f"Array mismatch for attribute: {key}")
-                  return False
-          elif expected != actual:
-              print(f"Value mismatch for attribute: {key}")
-              return False
-              
-      return True
-  ```
-- [ ] Implement specialized tensor comparison with tolerance support
-- [ ] Add detailed reporting for state differences
-- [ ] Add gradient verification for state components
+- [x] Add `compareStates(expected_state, actual_state, tolerances)` method to TorchTesting
+- [x] Implement specialized tensor comparison with tolerance support
+- [x] Add detailed reporting for state differences
+- [x] Add gradient verification for state components
 
-### 1.3 Create State Initialization Utilities
+### 1.3 Create State Initialization Utilities - COMPLETED
 > Location: eryx/autotest/torch_testing.py
 > Reference: See "State Restoration" section in architecture.md
 
-- [ ] Add `initializeFromState(torch_class, state_data, device)` method to TorchTesting
-  ```python
-  def initializeFromState(self, torch_class, state_data, device=None):
-      """
-      Initialize a PyTorch object from state data.
-      
-      Args:
-          torch_class: PyTorch class to initialize
-          state_data: State data dictionary
-          device: PyTorch device to place tensors on
-          
-      Returns:
-          Initialized PyTorch object
-      """
-      if device is None:
-          device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-          
-      # Create empty instance
-      obj = torch_class.__new__(torch_class)
-      
-      # Initialize each attribute
-      for key, value in state_data.items():
-          if isinstance(value, np.ndarray):
-              # Convert NumPy arrays to PyTorch tensors
-              tensor = torch.tensor(value, device=device)
-              if tensor.dtype.is_floating_point:
-                  tensor.requires_grad_(True)
-              setattr(obj, key, tensor)
-          else:
-              setattr(obj, key, value)
-              
-      return obj
-  ```
-- [ ] Implement NumPy to PyTorch conversion for state data
-- [ ] Add support for device placement during state initialization
-- [ ] Add gradient configuration options for state tensors
+- [x] Add `initializeFromState(torch_class, state_data, device)` method to TorchTesting
+- [x] Implement NumPy to PyTorch conversion for state data
+- [x] Add support for device placement during state initialization
+- [x] Add gradient configuration options for state tensors
 
-### 1.4 Update Testing Documentation
+### 1.4 Update Testing Documentation - COMPLETED
 > Location: eryx/autotest/README.md and docs/testing.md
 > Reference: See "Testing Approaches" section in architecture.md
 
-- [ ] Document state-based testing approach
-- [ ] Add examples of state-based test methods
-- [ ] Update testing guides with state capture/comparison approaches
+- [x] Document state-based testing approach
+- [x] Add examples of state-based test methods
+- [x] Update testing guides with state capture/comparison approaches
 
-## Phase 2: Adapter Enhancement (1 week)
+## Phase 2: Adapter Enhancement (1 week) - COMPLETED
 > Reference: See "Adapter Components" section in architecture.md and "Adapter Pattern" in project_rules.md
 
-### 2.1 Enhance PDBToTensor Adapter
+### 2.1 Enhance PDBToTensor Adapter - COMPLETED
 > Location: eryx/adapters.py
 > Prerequisites: Tasks 1.1-1.3 complete
 > Reference: See "Adapter Usage Pattern" section in architecture.md
 
-- [ ] Extend `convert_atomic_model()` to handle complete object state
-  ```python
-  def convert_atomic_model(self, model, include_methods=False):
-      """
-      Convert an AtomicModel to PyTorch tensors.
-      
-      Args:
-          model: AtomicModel instance
-          include_methods: Whether to include method results in conversion
-          
-      Returns:
-          Dictionary with PyTorch tensor versions of model attributes
-      """
-      result = {}
-      
-      # Handle array attributes
-      for attr_name in ['xyz', 'ff_a', 'ff_b', 'ff_c', 'adp', 'cell', 'A_inv']:
-          if hasattr(model, attr_name):
-              attr_value = getattr(model, attr_name)
-              if attr_value is not None:
-                  result[attr_name] = self.array_to_tensor(attr_value)
-      
-      # Handle non-array attributes
-      for attr_name in ['space_group', 'n_asu', 'n_conf']:
-          if hasattr(model, attr_name):
-              result[attr_name] = getattr(model, attr_name)
-              
-      return result
-  ```
-- [ ] Add `convert_state_dict()` method for general state conversion
-- [ ] Update `convert_crystal()` and `convert_gnm()` to support state-based testing
-- [ ] Add comprehensive tests for state conversion in tests/test_adapters.py
+- [x] Extend `convert_atomic_model()` to handle complete object state
+- [x] Add `convert_state_dict()` method for general state conversion
+- [x] Update `convert_crystal()` and `convert_gnm()` to support state-based testing
+- [x] Add comprehensive tests for state conversion in tests/test_adapters.py
 
-### 2.2 Enhance TensorToNumpy Adapter
+### 2.2 Enhance TensorToNumpy Adapter - COMPLETED
 > Location: eryx/adapters.py
 > Prerequisites: Task 2.1 complete
 
-- [ ] Add `convert_state_to_numpy()` method for returning state to NumPy
-- [ ] Implement proper gradient detachment for state components
-- [ ] Add tests for state conversion back to NumPy in tests/test_adapters.py
+- [x] Add `convert_state_to_numpy()` method for returning state to NumPy
+- [x] Implement proper gradient detachment for state components
+- [x] Add tests for state conversion back to NumPy in tests/test_adapters.py
 
-### 2.3 Add ModelAdapters State Support
+### 2.3 Add ModelAdapters State Support - COMPLETED
 > Location: eryx/adapters.py
 > Prerequisites: Tasks 2.1-2.2 complete
 > Reference: See "OnePhonon Model" section in architecture.md
 
-- [ ] Add state-based methods to ModelAdapters
-- [ ] Implement `initialize_from_state()` helper methods
-- [ ] Add state conversion utilities for OnePhonon
+- [x] Add state-based methods to ModelAdapters
+- [x] Implement `initialize_from_state()` helper methods
+- [x] Add state conversion utilities for OnePhonon
 
-### 2.4 Update Adapter Documentation
+### 2.4 Update Adapter Documentation - COMPLETED
 > Location: docs/adapters.md
 > Reference: See "Adapter Usage Guidelines" section in project_rules.md
 
-- [ ] Document adapter usage patterns
-- [ ] Add examples of state conversion with adapters
-- [ ] Update adapter interfaces documentation
+- [x] Document adapter usage patterns
+- [x] Add examples of state conversion with adapters
+- [x] Update adapter interfaces documentation
 
 ## Phase 3: Ground Truth Generation (1 week)
 > Reference: See "Ground Truth Testing Strategy" section in phased_plan.md
@@ -274,85 +152,85 @@ This document is organized into phases with concrete tasks and should be read al
 - [x] Add comprehensive error handling for serialization edge cases
 - [x] Document serialization approach for Gemmi objects
 
-## Phase 4: Test Implementation (2 weeks)
+## Phase 4: Test Implementation (2 weeks) - COMPLETED
 > Reference: See "Component-to-Test Mapping" table in phased_plan.md
 
-### 4.1 Update CP5 Tests (Matrix Construction)
+### 4.1 Update CP5 Tests (Matrix Construction) - COMPLETED
 > Location: tests/test_models_torch.py
 > Prerequisites: Phases 1-3 complete
 
-- [ ] Update test_build_A to use state-based testing pattern:
+- [x] Update test_build_A to use state-based testing pattern:
   - Use Logger.loadStateLog to load "logs/eryx.models.OnePhonon._state_before__build_A.log"
   - Use TorchTesting.initializeFromState to create model from state
   - Call model._build_A()
   - Compare resulting state with after state
   - Verify gradient flow through Amat tensor
-- [ ] Update tests for _build_M, _build_M_allatoms, and _project_M similarly
-- [ ] Verify log completeness using verify_logs.py
+- [x] Update tests for _build_M, _build_M_allatoms, and _project_M similarly
+- [x] Verify log completeness using verify_logs.py
 
-### 4.2 Update CP6 Tests (K-vector Methods)
+### 4.2 Update CP6 Tests (K-vector Methods) - COMPLETED
 > Location: tests/test_models_torch_kvector.py
 > Prerequisites: Task 4.1 complete
 
-- [ ] Update test for _build_kvec_Brillouin to use state-based pattern
-- [ ] Keep function-based tests for _center_kvec and _at_kvec_from_miller_points
-- [ ] Verify log completeness for necessary components
-- [ ] Test gradient flow through k-vector tensors
+- [x] Update test for _build_kvec_Brillouin to use state-based pattern
+- [x] Keep function-based tests for _center_kvec and _at_kvec_from_miller_points
+- [x] Verify log completeness for necessary components
+- [x] Test gradient flow through k-vector tensors
 
-### 4.3 Update CP7 Tests (Phonon Calculation)
+### 4.3 Update CP7 Tests (Phonon Calculation) - COMPLETED
 > Location: tests/test_models_torch_phonon.py
 > Prerequisites: Task 4.2 complete
 
-- [ ] Update state-based tests for compute_gnm_phonons
-- [ ] Update state-based tests for compute_hessian
-- [ ] Update state-based tests for GNM methods
-- [ ] Verify tensor shapes, dtypes, and gradient flow
-- [ ] Use verify_logs.py to check log completeness for these components
+- [x] Update state-based tests for compute_gnm_phonons
+- [x] Update state-based tests for compute_hessian
+- [x] Update state-based tests for GNM methods
+- [x] Verify tensor shapes, dtypes, and gradient flow
+- [x] Use verify_logs.py to check log completeness for these components
 
-### 4.4 Update CP8 Tests (Covariance Matrix)
+### 4.4 Update CP8 Tests (Covariance Matrix) - COMPLETED
 > Location: tests/test_models_torch_covariance.py
 > Prerequisites: Task 4.3 complete
 
-- [ ] Update state-based test for compute_covariance_matrix
-- [ ] Verify gradient flow through covariance calculations
-- [ ] Test for expected state changes from before to after
-- [ ] Check for required tensor properties (shape, dtype, etc.)
+- [x] Update state-based test for compute_covariance_matrix
+- [x] Verify gradient flow through covariance calculations
+- [x] Test for expected state changes from before to after
+- [x] Check for required tensor properties (shape, dtype, etc.)
 
-### 4.5 Update CP9 Tests (Apply Disorder)
+### 4.5 Update CP9 Tests (Apply Disorder) - COMPLETED
 > Location: tests/test_models_torch_disorder.py
 > Prerequisites: Task 4.4 complete
 
-- [ ] Update state-based test for apply_disorder
-- [ ] Verify end-to-end gradient flow
-- [ ] Test with different parameter configurations
-- [ ] Validate output tensor properties match expectations
+- [x] Update state-based test for apply_disorder
+- [x] Verify end-to-end gradient flow
+- [x] Test with different parameter configurations
+- [x] Validate output tensor properties match expectations
 
-## Phase 5: Integration and Documentation (1 week)
+## Phase 5: Integration and Documentation (1 week) - IN PROGRESS
 > Reference: See "Key Data Flows" section in architecture.md
 
-### 5.1 Update CP10 Tests (End-to-End Integration)
+### 5.1 Update CP10 Tests (End-to-End Integration) - IN PROGRESS
 > Location: tests/test_integration.py
 > Prerequisites: Phase 4 complete
 
-- [ ] Update integration tests to follow state-based testing pattern:
+- [x] Update integration tests to follow state-based testing pattern:
   - Load initial state from logs 
   - Initialize model with that state
   - Run end-to-end pipeline
   - Compare with expected state
-- [ ] Use verify_logs.py to validate all logs
+- [x] Use verify_logs.py to validate all logs
 - [ ] Test gradient flow through the entire model
 - [ ] Verify complete end-to-end pipeline works with state-based approach
 
-### 5.2 Update Project Documentation
+### 5.2 Update Project Documentation - IN PROGRESS
 > Prerequisites: Tasks 5.1 complete
 
-- [ ] Complete docs/state_based_testing.md if not already finished
+- [x] Complete docs/state_based_testing.md
 - [ ] Update architecture.md to reference state-based testing approach
 - [ ] Update phased_plan.md to reflect implemented testing approach
-- [ ] Update progress.md to reflect current implementation status
+- [x] Update progress.md to reflect current implementation status
 - [ ] Create guide for adding new state-based tests for future components
 
-### 5.3 Final Verification
+### 5.3 Final Verification - NOT STARTED
 > Prerequisites: Tasks 5.1-5.2 complete
 
 - [ ] Run verify_logs.py on all generated logs
