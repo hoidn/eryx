@@ -108,13 +108,13 @@ class StateBuilder:
         # Handle GNM if it exists
         if hasattr(obj, 'gnm'):
             if isinstance(obj.gnm, dict):
-                # Convert dictionary to GaussianNetworkModel object
-                from eryx.pdb_torch import GaussianNetworkModel
-                gnm = GaussianNetworkModel()
-                gnm.device = self.device
+                # Convert dictionary to GaussianNetworkModel object from NumPy implementation
+                # Use the original NumPy GNM to match the expected behavior in compute_gnm_phonons
+                from eryx.pdb import GaussianNetworkModel
+                gnm = GaussianNetworkModel.__new__(GaussianNetworkModel)
                 
                 # Apply state to the GNM object
-                self._build_gaussian_network_model(gnm, obj.gnm)
+                self._apply_state(gnm, obj.gnm)
                 
                 # Replace the dictionary with the actual object
                 obj.gnm = gnm
