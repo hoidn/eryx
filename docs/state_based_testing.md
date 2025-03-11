@@ -9,6 +9,19 @@ State-based testing captures object state before and after method execution, all
 - Verifying PyTorch implementations against NumPy ground truth
 - Validating internal state changes during complex operations
 
+## Implementation Status
+
+The state-based testing framework is now **fully implemented** and operational. All components of the framework are complete:
+
+- ✅ StateCapture class for capturing object state
+- ✅ Debug decorator with state capture support
+- ✅ Log generation and verification scripts
+- ✅ State-based test helpers and utilities
+- ✅ Serialization framework for complex objects
+- ✅ Test implementations for all OnePhonon methods
+
+All matrix construction methods (_build_A, _build_M, _build_M_allatoms, _project_M) have been implemented and tested using the state-based approach, as confirmed by the passing tests in `tests/test_models_torch.py`.
+
 ## Using State Capture
 
 ### Basic Usage
@@ -109,7 +122,7 @@ def test_method_state_based(self):
     self.assertTrue(np.allclose(model.tensor_attr.detach().cpu().numpy(), expected_tensor))
 ```
 
-> **Example Implementation**: For a complete working example of state-based testing, see the `test_build_kvec_Brillouin_state_based()` method in `tests/test_models_torch_kvector.py`. This test demonstrates proper state loading, tensor comparison, and error handling with flexible path resolution.
+> **Example Implementation**: For a complete working example of state-based testing, see the `test_build_A_state_based()` method in `tests/test_models_torch.py` and `test_build_kvec_Brillouin_state_based()` method in `tests/test_models_torch_kvector.py`. These tests demonstrate proper state loading, tensor comparison, and error handling with flexible path resolution.
 
 ## Regenerating State Logs
 
@@ -136,6 +149,18 @@ python scripts/generate_state_logs.py --component onePhonon
 # State-Based Testing with StateBuilder
 
 This document describes the approach to state-based testing using the StateBuilder pattern and ObjectSerializer.
+
+## Implementation Status
+
+The StateBuilder pattern and related components are now **fully implemented** and operational:
+
+- ✅ StateBuilder class for constructing test objects from state data
+- ✅ Test helper functions for loading state and building objects
+- ✅ Gradient flow verification utilities
+- ✅ Tensor conversion utilities for state data
+- ✅ Comprehensive test implementations using this pattern
+
+All matrix construction methods (_build_A, _build_M, etc.) have been successfully tested using this approach, as demonstrated by the passing tests in `tests/test_models_torch.py`.
 
 ## Overview
 
