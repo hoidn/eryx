@@ -165,6 +165,23 @@ class TestMatrixConstruction(TestBase):
         max_diff = np.max(np.abs(linv_numpy - expected_linv_numpy))
         print(f"Maximum difference: {max_diff}")
         
+        # Print more detailed diagnostics
+        if max_diff > 1.0:
+            print(f"DIAGNOSTIC: Linv shape: {linv_numpy.shape}")
+            print(f"DIAGNOSTIC: Expected Linv shape: {expected_linv_numpy.shape}")
+            print(f"DIAGNOSTIC: Linv min/max: {np.min(linv_numpy):.6f}/{np.max(linv_numpy):.6f}")
+            print(f"DIAGNOSTIC: Expected min/max: {np.min(expected_linv_numpy):.6f}/{np.max(expected_linv_numpy):.6f}")
+            
+            # Check if there's a scaling factor
+            ratio = np.median(expected_linv_numpy / linv_numpy)
+            if not np.isnan(ratio) and not np.isinf(ratio):
+                print(f"DIAGNOSTIC: Median ratio (expected/actual): {ratio:.6f}")
+                
+                # Check if scaling fixes the issue
+                scaled_linv = linv_numpy * ratio
+                scaled_diff = np.max(np.abs(scaled_linv - expected_linv_numpy))
+                print(f"DIAGNOSTIC: After scaling, max difference: {scaled_diff:.6f}")
+        
         # Verify tensors match expected values
         self.assertTrue(
             np.allclose(

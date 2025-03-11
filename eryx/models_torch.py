@@ -329,6 +329,66 @@ class OnePhonon:
         # Create mass array - default to ones as fallback
         mass_array = torch.ones(self.n_asu * self.n_atoms_per_asu, dtype=dtype, device=self.device)
         
+        # Try to get atomic weights directly from PDB file if available
+        if hasattr(self, 'original_model') and hasattr(self.original_model, '_gemmi_structure'):
+            try:
+                import gemmi
+                weights = []
+                structure = self.original_model._gemmi_structure
+                for model in structure:
+                    for chain in model:
+                        for residue in chain:
+                            for atom in residue:
+                                # Get element from gemmi and look up standard atomic weight
+                                element = atom.element
+                                if element:
+                                    # Use gemmi's built-in atomic weights
+                                    weight = gemmi.Element(element.name).weight
+                                    weights.append(float(weight))
+                                else:
+                                    # Default to carbon weight if element is unknown
+                                    weights.append(12.0)
+                
+                if weights:
+                    print(f"Using weights from gemmi: min={min(weights)}, max={max(weights)}, count={len(weights)}")
+                    # Use these weights if we have enough
+                    if len(weights) >= self.n_asu * self.n_atoms_per_asu:
+                        mass_array = torch.tensor(weights[:self.n_asu * self.n_atoms_per_asu], 
+                                                dtype=dtype, device=self.device)
+                    else:
+                        print(f"Not enough weights from gemmi: {len(weights)} < {self.n_asu * self.n_atoms_per_asu}")
+            except Exception as e:
+                print(f"Error getting weights from gemmi: {e}")
+        
+        # Define standard atomic weights for common elements
+        standard_weights = {
+            'H': 1.008, 'C': 12.011, 'N': 14.007, 'O': 15.999, 'P': 30.974,
+            'S': 32.065, 'CA': 40.078, 'MG': 24.305, 'ZN': 65.38, 'FE': 55.845,
+            'NA': 22.990, 'K': 39.098, 'CL': 35.453, 'F': 18.998
+        }
+        
+        # Try to get element symbols if available
+        if hasattr(self.model, 'element_symbols'):
+            try:
+                weights = []
+                for symbol in self.model.element_symbols:
+                    symbol = symbol.upper()
+                    if symbol in standard_weights:
+                        weights.append(standard_weights[symbol])
+                    else:
+                        # Default to carbon weight if element is unknown
+                        weights.append(12.0)
+                
+                if weights:
+                    print(f"Using weights from element symbols: min={min(weights)}, max={max(weights)}, count={len(weights)}")
+                    if len(weights) >= self.n_asu * self.n_atoms_per_asu:
+                        mass_array = torch.tensor(weights[:self.n_asu * self.n_atoms_per_asu], 
+                                                dtype=dtype, device=self.device)
+                    else:
+                        print(f"Not enough weights from element symbols: {len(weights)} < {self.n_asu * self.n_atoms_per_asu}")
+            except Exception as e:
+                print(f"Error getting weights from element symbols: {e}")
+        
         # Try to get weights from model if available
         if hasattr(self.model, 'elements'):
             try:
@@ -355,8 +415,16 @@ class OnePhonon:
                     print(f"Using cached original weights, count: {len(weights)}")
                 
                 if weights:
-                    print(f"Using extracted weights: min={min(weights)}, max={max(weights)}, count={len(weights)}")
-                    mass_array = torch.tensor(weights, dtype=dtype, device=self.device)
+                    # Check if all weights are zero, which indicates a problem
+                    if all(w == 0.0 for w in weights):
+                        print(f"WARNING: All extracted weights are zero! Using default atomic weights instead.")
+                        # Use standard atomic weights as fallback
+                        default_weights = [12.0] * len(weights)  # Carbon weight as default
+                        mass_array = torch.tensor(default_weights, dtype=dtype, device=self.device)
+                    else:
+                        print(f"Using extracted weights: min={min(weights)}, max={max(weights)}, count={len(weights)}")
+                        mass_array = torch.tensor(weights, dtype=dtype, device=self.device)
+                    
                     # Ensure we have enough weights
                     if mass_array.shape[0] < self.n_asu * self.n_atoms_per_asu:
                         padding = torch.ones(self.n_asu * self.n_atoms_per_asu - mass_array.shape[0], 
@@ -374,8 +442,15 @@ class OnePhonon:
                             for element in structure:
                                 weights.append(float(element.weight))
                         if weights:
-                            print(f"Using weights from original model: count={len(weights)}")
-                            mass_array = torch.tensor(weights, dtype=dtype, device=self.device)
+                            # Check if all weights are zero
+                            if all(w == 0.0 for w in weights):
+                                print(f"WARNING: All weights from original model are zero!")
+                                # Use standard atomic weights as fallback
+                                default_weights = [12.0] * len(weights)  # Carbon weight as default
+                                mass_array = torch.tensor(default_weights, dtype=dtype, device=self.device)
+                            else:
+                                print(f"Using weights from original model: min={min(weights)}, max={max(weights)}, count={len(weights)}")
+                                mass_array = torch.tensor(weights, dtype=dtype, device=self.device)
                     except Exception as e2:
                         print(f"Error extracting weights from original model: {e2}")
         
