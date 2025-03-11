@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os
-os.environ["DEBUG_MODE"] = "1"
+#os.environ["DEBUG_MODE"] = "1"
 import logging
 import numpy as np
 from eryx.models import OnePhonon
@@ -61,8 +61,59 @@ def run_np():
     np.save("np_diffuse_intensity.npy", Id_np)
 
 def run_torch():
-    # TODO parallel torch implementation that computes the same thing as run_np()
-    pass
+    """Run PyTorch version of the diffuse scattering simulation."""
+    try:
+        import torch
+        from eryx.models_torch import OnePhonon
+        
+        # Get the device (use CUDA if available)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        logging.info(f"Starting PyTorch branch computation on {device}")
+        
+        # Use the same parameters as in run_np
+        pdb_path = "tests/pdbs/5zck_p1.pdb"
+        onephonon_torch = OnePhonon(
+            pdb_path,
+            [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
+            expand_p1=True,
+            res_limit=0.0,
+            gnm_cutoff=4.0,
+            gamma_intra=1.0,
+            gamma_inter=1.0,
+            device=device
+        )
+        
+        # Apply disorder
+        Id_torch = onephonon_torch.apply_disorder(use_data_adp=True)
+        
+        # Log debug information
+        logging.debug(f"PyTorch: hkl_grid shape = {onephonon_torch.hkl_grid.shape}")
+        logging.debug("PyTorch: hkl_grid coordinate ranges:")
+        logging.debug(f"  Dimension 0: min = {onephonon_torch.hkl_grid[:,0].min().item()}, max = {onephonon_torch.hkl_grid[:,0].max().item()}")
+        logging.debug(f"  Dimension 1: min = {onephonon_torch.hkl_grid[:,1].min().item()}, max = {onephonon_torch.hkl_grid[:,1].max().item()}")
+        logging.debug(f"  Dimension 2: min = {onephonon_torch.hkl_grid[:,2].min().item()}, max = {onephonon_torch.hkl_grid[:,2].max().item()}")
+        logging.debug(f"PyTorch: q_grid range: min = {onephonon_torch.q_grid.min().item()}, max = {onephonon_torch.q_grid.max().item()}")
+        
+        # Save for later comparison
+        torch.save(Id_torch, "torch_diffuse_intensity.pt")
+        # Also save as NumPy array for easier comparison
+        np.save("torch_diffuse_intensity.npy", Id_torch.detach().cpu().numpy())
+        
+        return Id_torch
+        
+    except RuntimeError as e:
+        # Handle CUDA errors by falling back to CPU
+        if 'CUDA' in str(e):
+            logging.error(f"CUDA error: {e}. Attempting to run on CPU instead.")
+            # Modify the environment to force CPU usage and retry
+            os.environ["CUDA_VISIBLE_DEVICES"] = ""
+            return run_torch()  # Recursive call will use CPU now
+        else:
+            logging.error(f"Error in PyTorch computation: {e}")
+            raise
+    except Exception as e:
+        logging.error(f"Unexpected error in PyTorch computation: {e}")
+        raise
 
 if __name__ == "__main__":
     setup_logging()
