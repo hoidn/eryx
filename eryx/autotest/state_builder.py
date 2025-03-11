@@ -130,10 +130,11 @@ class StateBuilder:
             obj.crystal = {}
         
         # Add required methods to crystal dictionary
-        if 'id_to_hkl' not in obj.crystal:
+        # Check if the functions are already callable
+        if 'id_to_hkl' not in obj.crystal or not callable(obj.crystal['id_to_hkl']):
             obj.crystal['id_to_hkl'] = lambda cell_id: [cell_id, 0, 0]
         
-        if 'get_unitcell_origin' not in obj.crystal:
+        if 'get_unitcell_origin' not in obj.crystal or not callable(obj.crystal['get_unitcell_origin']):
             obj.crystal['get_unitcell_origin'] = lambda unit_cell: torch.tensor(
                 [float(unit_cell[0]) if isinstance(unit_cell, (list, tuple)) else 0.0, 
                  0.0, 0.0], device=obj.device, requires_grad=True)

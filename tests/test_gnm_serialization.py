@@ -144,8 +144,9 @@ class TestGNMSerialization(unittest.TestCase):
                     # Store only essential properties from crystal
                     state[attr_name] = {
                         'n_cell': getattr(attr_value, 'n_cell', 0),
-                        'id_to_hkl': 'function',
-                        'get_unitcell_origin': 'function'
+                        # Store function indicators that will be replaced with actual functions
+                        'id_to_hkl': '__function__',
+                        'get_unitcell_origin': '__function__'
                     }
                 elif isinstance(attr_value, np.ndarray):
                     # Convert numpy arrays to lists for JSON serialization
