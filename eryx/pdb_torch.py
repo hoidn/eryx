@@ -83,7 +83,7 @@ class GaussianNetworkModel:
         for j_cell in range(self.n_cell):
             if j_cell == self.id_cell_ref:
                 continue
-            r_cell = self.crystal['get_unitcell_origin'](self.crystal['id_to_hkl'](j_cell))
+            r_cell = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
             phase = torch.sum(kvec * r_cell)
             eikr = torch.complex(torch.cos(phase), torch.sin(phase))
             for i_asu in range(self.n_asu):

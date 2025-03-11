@@ -222,15 +222,139 @@ class PDBToTensor:
         except Exception:
             return default
     
-    def convert_crystal(self, crystal: Any) -> Dict[str, Any]:
+    class TorchCrystal:
         """
-        Convert a Crystal object to PyTorch tensors.
+        A PyTorch-compatible wrapper for Crystal objects.
+        
+        This class wraps the original Crystal object and provides PyTorch tensor
+        versions of its attributes and methods, ensuring proper gradient flow.
+        """
+        
+        def __init__(self, original_crystal, adapter, device=None):
+            """
+            Initialize the TorchCrystal wrapper.
+            
+            Args:
+                original_crystal: The original Crystal object to wrap
+                adapter: The PDBToTensor adapter for tensor conversion
+                device: PyTorch device to use (defaults to adapter's device)
+            """
+            self._original = original_crystal
+            self._adapter = adapter
+            self.device = device or adapter.device
+            
+            # Store key attributes as tensors
+            if hasattr(original_crystal.model, 'unit_cell_axes'):
+                self.unit_cell_axes = adapter.array_to_tensor(
+                    original_crystal.model.unit_cell_axes, 
+                    requires_grad=True
+                )
+            else:
+                self.unit_cell_axes = None
+                
+            if hasattr(original_crystal.model, 'cell'):
+                self.cell = adapter.array_to_tensor(
+                    original_crystal.model.cell,
+                    requires_grad=True
+                )
+            else:
+                self.cell = None
+                
+            # Store scalar attributes directly
+            self.n_cell = getattr(original_crystal, 'n_cell', 1)
+            self.n_asu = getattr(original_crystal.model, 'n_asu', 1)
+            
+            # Calculate n_atoms_per_asu if possible
+            if hasattr(original_crystal, 'get_asu_xyz'):
+                try:
+                    self.n_atoms_per_asu = original_crystal.get_asu_xyz().shape[0]
+                except Exception:
+                    self.n_atoms_per_asu = 0
+            else:
+                self.n_atoms_per_asu = 0
+        
+        def hkl_to_id(self, hkl=None):
+            """
+            Convert hkl indices to cell ID.
+            
+            Args:
+                hkl: List of h, k, l indices
+                
+            Returns:
+                Cell ID as an integer
+            """
+            if hasattr(self._original, 'hkl_to_id'):
+                return self._original.hkl_to_id(hkl)
+            return 0
+            
+        def id_to_hkl(self, cell_id=0):
+            """
+            Convert cell ID to hkl indices.
+            
+            Args:
+                cell_id: Cell ID as an integer
+                
+            Returns:
+                List of h, k, l indices
+            """
+            if hasattr(self._original, 'id_to_hkl'):
+                return self._original.id_to_hkl(cell_id)
+            return [0, 0, 0]
+            
+        def get_asu_xyz(self, asu_id=0, unit_cell=None):
+            """
+            Get atomic coordinates for a specific asymmetric unit in a specific unit cell.
+            
+            Args:
+                asu_id: Asymmetric unit index
+                unit_cell: Index of the unit cell along the 3 dimensions
+                
+            Returns:
+                PyTorch tensor of atomic coordinates
+            """
+            if hasattr(self._original, 'get_asu_xyz'):
+                xyz = self._original.get_asu_xyz(asu_id, unit_cell)
+                return self._adapter.array_to_tensor(xyz, requires_grad=True)
+            return torch.zeros((1, 3), device=self.device, requires_grad=True)
+            
+        def get_unitcell_origin(self, unit_cell=None):
+            """
+            Get the origin coordinates of a unit cell.
+            
+            Args:
+                unit_cell: Index of the unit cell along the 3 dimensions
+                
+            Returns:
+                PyTorch tensor of origin coordinates
+            """
+            if hasattr(self._original, 'get_unitcell_origin'):
+                origin = self._original.get_unitcell_origin(unit_cell)
+                return self._adapter.array_to_tensor(origin, requires_grad=True)
+            return torch.zeros(3, device=self.device, requires_grad=True)
+            
+        def supercell_extent(self, nx=0, ny=0, nz=0):
+            """
+            Set the supercell extent.
+            
+            Args:
+                nx, ny, nz: Extent in each dimension
+                
+            Returns:
+                Result from the original crystal's method
+            """
+            if hasattr(self._original, 'supercell_extent'):
+                return self._original.supercell_extent(nx, ny, nz)
+            return None
+    
+    def convert_crystal(self, crystal: Any) -> 'TorchCrystal':
+        """
+        Convert a Crystal object to a TorchCrystal wrapper.
         
         Args:
             crystal: Crystal instance from eryx.pdb
             
         Returns:
-            Dictionary containing PyTorch tensor versions of the crystal attributes
+            TorchCrystal wrapper with PyTorch tensor versions of the crystal attributes
         """
         if crystal is None:
             raise ValueError("Cannot convert None crystal")
@@ -238,37 +362,8 @@ class PDBToTensor:
         if not hasattr(crystal, 'model'):
             raise ValueError("Crystal object must have a 'model' attribute. Check object structure.")
         
-        # Store the original crystal for method access
-        result = {
-            '_original': crystal
-        }
-        
-        # Convert key properties
-        if hasattr(crystal.model, 'unit_cell_axes'):
-            result['unit_cell_axes'] = self.array_to_tensor(crystal.model.unit_cell_axes, requires_grad=True)
-        
-        # Key scalar attributes
-        result['n_cell'] = crystal.n_cell if hasattr(crystal, 'n_cell') else 1
-        result['n_asu'] = crystal.model.n_asu if hasattr(crystal.model, 'n_asu') else 1
-        result['n_atoms_per_asu'] = crystal.get_asu_xyz().shape[0] if hasattr(crystal, 'get_asu_xyz') else 0
-        
-        # Wrap method access with tensor conversion
-        result['hkl_to_id'] = lambda hkl=None: crystal.hkl_to_id(hkl) if hasattr(crystal, 'hkl_to_id') else 0
-        result['id_to_hkl'] = lambda cell_id=0: crystal.id_to_hkl(cell_id) if hasattr(crystal, 'id_to_hkl') else [0, 0, 0]
-        
-        # Ensure get_asu_xyz returns tensors
-        result['get_asu_xyz'] = lambda asu_id=0, unit_cell=None: self.array_to_tensor(
-            crystal.get_asu_xyz(asu_id, unit_cell) if hasattr(crystal, 'get_asu_xyz') else np.zeros((1, 3)),
-            requires_grad=True
-        )
-        
-        # Ensure get_unitcell_origin returns tensors
-        result['get_unitcell_origin'] = lambda unit_cell=None: self.array_to_tensor(
-            crystal.get_unitcell_origin(unit_cell) if hasattr(crystal, 'get_unitcell_origin') else np.zeros(3),
-            requires_grad=True
-        )
-        
-        return result
+        # Create and return a TorchCrystal wrapper
+        return self.TorchCrystal(crystal, self, self.device)
     
     def convert_gnm(self, gnm: Any) -> Dict[str, Any]:
         """

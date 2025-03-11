@@ -700,7 +700,7 @@ class OnePhonon:
         for j_cell in range(self.n_cell):
             if j_cell == self.id_cell_ref:
                 continue
-            r_cell = self.crystal['get_unitcell_origin'](self.crystal['id_to_hkl'](j_cell))
+            r_cell = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
             phase = torch.sum(kvec * r_cell)
             real_part, imag_part = torch.cos(phase), torch.sin(phase)
             eikr = torch.complex(real_part, imag_part)
@@ -771,7 +771,7 @@ class OnePhonon:
                         real_part, imag_part = ComplexTensorOps.complex_exp(phase)
                         eikr = torch.complex(real_part, imag_part)
                         self.covar[:, j_cell, :] += Kinv * eikr
-        self.ADP = torch.real(torch.diagonal(self.covar[:, self.crystal['hkl_to_id']([0, 0, 0]), :], dim1=0, dim2=1))
+        self.ADP = torch.real(torch.diagonal(self.covar[:, self.crystal.hkl_to_id([0, 0, 0]), :], dim1=0, dim2=1))
         Amat = torch.transpose(self.Amat, 0, 1).reshape(self.n_dof_per_asu_actual, self.n_asu * self.n_dof_per_asu)
         self.ADP = torch.matmul(Amat, self.ADP)
         self.ADP = torch.sum(self.ADP.reshape(int(self.ADP.shape[0] / 3), 3), dim=1)
