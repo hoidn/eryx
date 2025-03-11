@@ -500,10 +500,24 @@ class GemmiSerializer:
             else:
                 # Fallback
                 atom.element = gemmi.Element("")
-        # Explicitly set element from name if available
-        elif "name" in data and data["name"] in ["C", "N", "O", "S", "P", "H"]:
-            # Common element symbols that might be inferred from atom name
-            atom.element = gemmi.Element(data["name"][0])
+        # Try to infer element from atom name if available
+        elif "name" in data and data["name"]:
+            # Extract first 1-2 characters that might be an element symbol
+            # This handles both standard atom names (CA, N, O) and non-standard ones
+            import re
+            match = re.match(r'([A-Z][a-z]?)', data["name"])
+            if match:
+                potential_element = match.group(1)
+                # Try to create element - gemmi will validate if it's a real element
+                try:
+                    atom.element = gemmi.Element(potential_element)
+                except Exception:
+                    # If that fails, just use the first character if it's a valid element
+                    if len(data["name"]) > 0:
+                        try:
+                            atom.element = gemmi.Element(data["name"][0])
+                        except Exception:
+                            atom.element = gemmi.Element("")
         
         # Set position
         pos = data.get("pos", [0, 0, 0])
