@@ -70,7 +70,7 @@ class TestGemmiSerializer(unittest.TestCase):
         self.assertEqual(len(residue_dict["atoms"]), 1)
         atom_dict = residue_dict["atoms"][0]
         self.assertEqual(atom_dict["name"], "CA")
-        self.assertAlmostEqual(atom_dict["x"], 1.234, places=3)
+        self.assertAlmostEqual(atom_dict["pos"][0], 1.234, places=3)
         
         # Now deserialize
         restored_structure = serializer.deserialize_structure(serialized_dict)
