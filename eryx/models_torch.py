@@ -584,13 +584,27 @@ class OnePhonon:
                                self.n_cell, self.n_asu, self.n_dof_per_asu),
                               dtype=torch.complex64, device=self.device)
         
-        # Get NumPy hessian from GNM
-        hessian_allatoms_np = self.gnm.compute_hessian()
+        # Create a GaussianNetworkModelTorch instance for Hessian calculation
+        from eryx.pdb_torch import GaussianNetworkModelTorch
+        gnm_torch = GaussianNetworkModelTorch()
+        gnm_torch.device = self.device
+        gnm_torch.n_asu = self.n_asu
+        gnm_torch.n_atoms_per_asu = self.n_atoms_per_asu
+        gnm_torch.n_cell = self.n_cell
+        gnm_torch.id_cell_ref = self.id_cell_ref
+        gnm_torch.crystal = self.crystal
         
-        # Use PDBToTensor adapter to convert NumPy array to PyTorch tensor
-        from eryx.adapters import PDBToTensor
-        adapter = PDBToTensor(device=self.device)
-        hessian_allatoms = adapter.array_to_tensor(hessian_allatoms_np, dtype=torch.complex64)
+        # Convert gamma from NumPy GNM to PyTorch tensor
+        if hasattr(self.gnm, 'gamma'):
+            from eryx.adapters import PDBToTensor
+            adapter = PDBToTensor(device=self.device)
+            gnm_torch.gamma = adapter.array_to_tensor(self.gnm.gamma, dtype=torch.float32)
+            
+            # Copy neighbor list structure
+            gnm_torch.asu_neighbors = self.gnm.asu_neighbors
+        
+        # Compute Hessian using PyTorch implementation
+        hessian_allatoms = gnm_torch.compute_hessian()
         
         # Create identity matrix for Kronecker product
         eye3 = torch.eye(3, device=self.device, dtype=torch.complex64)
@@ -627,12 +641,23 @@ class OnePhonon:
         l_dim = int(self.lsampling[2])
         
         # Create a GaussianNetworkModelTorch instance for K matrix calculations
+        from eryx.pdb_torch import GaussianNetworkModelTorch
         gnm_torch = GaussianNetworkModelTorch()
         gnm_torch.n_asu = self.n_asu
+        gnm_torch.n_atoms_per_asu = self.n_atoms_per_asu
         gnm_torch.n_cell = self.n_cell
         gnm_torch.id_cell_ref = self.id_cell_ref
         gnm_torch.device = self.device
         gnm_torch.crystal = self.crystal
+        
+        # Convert gamma from NumPy GNM to PyTorch tensor if needed
+        if hasattr(self.gnm, 'gamma'):
+            from eryx.adapters import PDBToTensor
+            adapter = PDBToTensor(device=self.device)
+            gnm_torch.gamma = adapter.array_to_tensor(self.gnm.gamma, dtype=torch.float32)
+            
+            # Copy neighbor list structure
+            gnm_torch.asu_neighbors = self.gnm.asu_neighbors
         
         for dh in range(h_dim):
             for dk in range(k_dim):
