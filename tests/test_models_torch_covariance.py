@@ -281,8 +281,21 @@ class TestCovarianceMethods(TestBase):
             
             # Check if expected tensor exists
             if hessian_expected is None:
-                self.skipTest("Expected hessian not found in after state log")
-                return
+                # Try alternative keys that might contain the hessian
+                print("\nDEBUGGING after state keys:")
+                print(f"Available keys: {list(after_state.keys())}")
+                
+                # Try common alternative keys
+                for key in ['hessian', '_return_value', 'result']:
+                    if key in after_state:
+                        print(f"Found alternative key: {key}")
+                        hessian_expected = after_state[key]
+                        break
+                
+                # If still not found, skip
+                if hessian_expected is None:
+                    self.skipTest("Expected hessian not found in after state log")
+                    return
                 
             # Ensure tensor is in the right format for comparison
             hessian_expected = ensure_tensor(hessian_expected, device='cpu')
