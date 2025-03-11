@@ -200,11 +200,12 @@ class OnePhonon:
                 # Initialize Atmp once per asymmetric unit (outside the atom loop)
                 Atmp = torch.zeros((3, 3), device=self.device, dtype=torch.float64)
                 
+                # Initialize Atmp once per asymmetric unit (outside the atom loop)
+                # This allows cumulative updates across atoms, matching NumPy implementation
+                Atmp = torch.zeros((3, 3), device=self.device, dtype=torch.float64)
+                
                 # Process each atom
                 for i_atom in range(self.n_atoms_per_asu):
-                    # Reset Atmp for each atom (to match NumPy implementation)
-                    Atmp = torch.zeros((3, 3), device=self.device, dtype=torch.float64)
-                    
                     # Update skew-symmetric matrix for rotations first
                     if i_atom < xyz.shape[0]:
                         Atmp[0, 1] = xyz[i_atom, 2]  
@@ -223,6 +224,14 @@ class OnePhonon:
                 if self.n_atoms_per_asu > 1:
                     print(f"\nDEBUG _build_A: First ASU, second atom Amat block:")
                     print(self.Amat[0, 3:6, :].detach().cpu().numpy())
+                if self.n_atoms_per_asu > 2:
+                    print(f"\nDEBUG _build_A: First ASU, third atom Amat block:")
+                    print(self.Amat[0, 6:9, :].detach().cpu().numpy())
+                
+                # Print the entire Amat shape and a summary of its values
+                print(f"\nDEBUG _build_A: Amat shape: {self.Amat.shape}")
+                print(f"DEBUG _build_A: Amat min: {self.Amat.min().item()}, max: {self.Amat.max().item()}")
+                print(f"DEBUG _build_A: Amat mean: {self.Amat.mean().item()}, std: {self.Amat.std().item()}")
             
             # Convert back to float32 for consistency with the rest of the model
             # while preserving the higher-precision computation
