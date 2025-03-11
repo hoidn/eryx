@@ -584,8 +584,8 @@ class OnePhonon:
                                self.n_cell, self.n_asu, self.n_dof_per_asu),
                               dtype=torch.complex64, device=self.device)
         
-        # Create a GaussianNetworkModelTorch instance for Hessian calculation
-        from eryx.pdb_torch import GaussianNetworkModelTorch
+        # Create a GaussianNetworkModel instance for Hessian calculation
+        from eryx.pdb_torch import GaussianNetworkModel as GaussianNetworkModelTorch
         gnm_torch = GaussianNetworkModelTorch()
         gnm_torch.device = self.device
         gnm_torch.n_asu = self.n_asu
@@ -640,8 +640,8 @@ class OnePhonon:
         k_dim = int(self.ksampling[2])
         l_dim = int(self.lsampling[2])
         
-        # Create a GaussianNetworkModelTorch instance for K matrix calculations
-        from eryx.pdb_torch import GaussianNetworkModelTorch
+        # Create a GaussianNetworkModel instance for K matrix calculations
+        from eryx.pdb_torch import GaussianNetworkModel as GaussianNetworkModelTorch
         gnm_torch = GaussianNetworkModelTorch()
         gnm_torch.n_asu = self.n_asu
         gnm_torch.n_atoms_per_asu = self.n_atoms_per_asu
