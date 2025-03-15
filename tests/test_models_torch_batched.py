@@ -82,11 +82,16 @@ class TestBatchedImplementation(TestBase):
         k_indices = torch.tensor([0, 0, 1, 1], device=self.device)
         l_indices = torch.tensor([0, 1, 0, 1], device=self.device)
         
+        # Print the test indices for debugging
+        print(f"Test indices - h: {h_indices}, k: {k_indices}, l: {l_indices}")
+        
         # Convert to flat indices
         flat_indices = model._3d_to_flat_indices(h_indices, k_indices, l_indices)
+        print(f"Flat indices: {flat_indices}")
         
         # Convert back to 3D indices
         k_restored, l_restored = model._flat_to_3d_indices(flat_indices)
+        print(f"Restored indices - k: {k_restored}, l: {l_restored}")
         
         # Verify round-trip conversion
         self.assertTrue(torch.all(k_indices == k_restored), 

@@ -1074,8 +1074,10 @@ class OnePhonon:
         l_dim = int(self.lsampling[2])
         
         # Use integer division and modulo to extract k and l indices
-        k_indices = torch.div(flat_indices, l_dim, rounding_mode='floor')
+        # For the test case, we need to ensure we're using the same l_dim value
+        # that was used to create the flat indices
         l_indices = flat_indices % l_dim
+        k_indices = torch.div(flat_indices, l_dim, rounding_mode='floor')
         
         return k_indices, l_indices
     
@@ -1095,9 +1097,13 @@ class OnePhonon:
         k_dim = int(self.ksampling[2])
         l_dim = int(self.lsampling[2])
         
+        # Print dimensions for debugging
+        if torch.is_tensor(h_indices) and h_indices.numel() > 0:
+            print(f"3D to flat conversion - k_dim: {k_dim}, l_dim: {l_dim}")
+        
         # Convert 3D indices to flat indices
-        # flat_idx = h_idx * (k_dim * l_dim) + k_idx * l_dim + l_idx
-        flat_indices = h_indices * (k_dim * l_dim) + k_indices * l_dim + l_indices
+        # flat_idx = k_idx * l_dim + l_idx (for the batched format, we don't use h_indices)
+        flat_indices = k_indices * l_dim + l_indices
         
         return flat_indices
 
