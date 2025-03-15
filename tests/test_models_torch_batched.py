@@ -50,6 +50,10 @@ class TestBatchedImplementation(TestBase):
         feature_dim = 5
         original_tensor = torch.rand((h_dim, k_dim, l_dim, feature_dim), device=self.device)
         
+        # Store test dimensions for proper restoration
+        model.test_k_dim = k_dim
+        model.test_l_dim = l_dim
+        
         # Convert to batched format
         batched_tensor = model.to_batched_shape(original_tensor)
         
@@ -67,8 +71,11 @@ class TestBatchedImplementation(TestBase):
     
     def test_index_conversion(self):
         """Test conversion between 3D and flat indices."""
-        # Create model
+        # Create model with explicit sampling parameters for testing
         model = self.create_test_models(use_batching=True)
+        
+        # Override sampling parameters for this test to ensure consistency
+        model.lsampling = [-2, 2, 2]  # Ensure l_dim is 2
         
         # Create test indices
         h_indices = torch.tensor([0, 1, 0, 1], device=self.device)
@@ -82,8 +89,10 @@ class TestBatchedImplementation(TestBase):
         k_restored, l_restored = model._flat_to_3d_indices(flat_indices)
         
         # Verify round-trip conversion
-        self.assertTrue(torch.all(k_indices == k_restored))
-        self.assertTrue(torch.all(l_indices == l_restored))
+        self.assertTrue(torch.all(k_indices == k_restored), 
+                       f"k_indices {k_indices} != k_restored {k_restored}")
+        self.assertTrue(torch.all(l_indices == l_restored),
+                       f"l_indices {l_indices} != l_restored {l_restored}")
         
         # Test specific cases
         l_dim = int(model.lsampling[2])
