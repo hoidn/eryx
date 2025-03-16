@@ -154,6 +154,95 @@ class TestBatchedImplementation(TestBase):
         self.assertTrue(torch.all(h_computed == h_indices))
         self.assertTrue(torch.all(k_computed == k_indices))
         self.assertTrue(torch.all(l_computed == l_indices))
+        
+    def test_batched_vs_nonbatched_compute_K(self):
+        """Test that compute_K_batched produces equivalent results to compute_K."""
+        # Import necessary components
+        from eryx.pdb_torch import GaussianNetworkModel
+        
+        # Create a small GaussianNetworkModel instance
+        # For testing, we'll use a mock GNM with minimal dimensions
+        gnm = GaussianNetworkModel()
+        gnm.n_asu = 2
+        gnm.n_atoms_per_asu = 3
+        gnm.n_cell = 2
+        gnm.id_cell_ref = 0
+        gnm.device = self.device
+        
+        # Create a sample hessian tensor
+        hessian = torch.randn(
+            gnm.n_asu, gnm.n_atoms_per_asu,
+            gnm.n_cell, gnm.n_asu, gnm.n_atoms_per_asu,
+            dtype=torch.complex64, device=self.device
+        )
+        
+        # Ensure the hessian is Hermitian for numerical stability
+        for i_asu in range(gnm.n_asu):
+            for j_asu in range(gnm.n_asu):
+                for i_cell in range(gnm.n_cell):
+                    hessian[i_asu, :, i_cell, j_asu, :] = 0.5 * (
+                        hessian[i_asu, :, i_cell, j_asu, :] + 
+                        hessian[j_asu, :, i_cell, i_asu, :].transpose(-2, -1).conj()
+                    )
+        
+        # Mock the crystal methods needed for compute_K
+        class MockCrystal:
+            def __init__(self, device):
+                self.device = device
+                
+            def get_unitcell_origin(self, unitcell):
+                # Return a simple tensor as the unit cell origin
+                return torch.tensor([float(unitcell[0]), 0.0, 0.0], device=self.device)
+                
+            def id_to_hkl(self, cell_id):
+                # Return a simple list as the unit cell indices
+                return [cell_id, 0, 0]
+        
+        gnm.crystal = MockCrystal(self.device)
+        
+        # Test case 1: Single k-vector
+        k_vec = torch.tensor([[0.1, 0.2, 0.3]], device=self.device)
+        
+        # Compute K matrix using original method
+        K_single = gnm.compute_K(hessian, kvec=k_vec[0])
+        
+        # Compute using batched method
+        K_batch = gnm.compute_K_batched(hessian, k_vec)
+        
+        # Get the first matrix from batch result
+        if K_batch.dim() > 4:  # If reshaped output
+            K_batch_single = K_batch[0]
+        else:  # If 2D output
+            n_asu = gnm.n_asu
+            n_atoms = gnm.n_atoms_per_asu
+            K_batch_single = K_batch[0].reshape(n_asu, n_atoms, n_asu, n_atoms)
+        
+        # Compare results - should be very close
+        self.assertTrue(torch.allclose(K_single, K_batch_single, rtol=1e-5, atol=1e-7))
+        
+        # Test case 2: Multiple k-vectors
+        k_vecs = torch.tensor([
+            [0.1, 0.2, 0.3],
+            [0.4, 0.5, 0.6],
+            [0.7, 0.8, 0.9]
+        ], device=self.device)
+        
+        # Compute K matrices one by one using original method
+        K_list = []
+        for i in range(k_vecs.shape[0]):
+            K_list.append(gnm.compute_K(hessian, kvec=k_vecs[i]))
+        
+        # Compute K matrices in batch using batched method
+        K_batched = gnm.compute_K_batched(hessian, k_vecs)
+        
+        # Compare results for each k-vector
+        for i in range(k_vecs.shape[0]):
+            if K_batched.dim() > 4:  # If reshaped output
+                K_batch_i = K_batched[i]
+            else:  # If 2D output
+                K_batch_i = K_batched[i].reshape(n_asu, n_atoms, n_asu, n_atoms)
+            
+            self.assertTrue(torch.allclose(K_list[i], K_batch_i, rtol=1e-5, atol=1e-7))
     
     def test_batched_vs_nonbatched_kvec_brillouin(self):
         """Test that batched k-vector generation matches non-batched results."""
@@ -255,6 +344,97 @@ class TestBatchedImplementation(TestBase):
             model_batched._at_kvec_from_miller_points((max_h, max_k, max_l)) == 
             model_batched._at_kvec_from_miller_points(max_flat)
         ))
+
+    def test_batched_vs_nonbatched_compute_Kinv(self):
+        """Test that compute_Kinv_batched produces equivalent results to compute_Kinv."""
+        # Import necessary components
+        from eryx.pdb_torch import GaussianNetworkModel
+        
+        # Create a small GaussianNetworkModel instance
+        # For testing, we'll use a mock GNM with minimal dimensions
+        gnm = GaussianNetworkModel()
+        gnm.n_asu = 2
+        gnm.n_atoms_per_asu = 3
+        gnm.n_cell = 2
+        gnm.id_cell_ref = 0
+        gnm.device = self.device
+        
+        # Create a sample hessian tensor
+        hessian = torch.randn(
+            gnm.n_asu, gnm.n_atoms_per_asu,
+            gnm.n_cell, gnm.n_asu, gnm.n_atoms_per_asu,
+            dtype=torch.complex64, device=self.device
+        )
+        
+        # Ensure the hessian is Hermitian for numerical stability
+        for i_asu in range(gnm.n_asu):
+            for j_asu in range(gnm.n_asu):
+                for i_cell in range(gnm.n_cell):
+                    hessian[i_asu, :, i_cell, j_asu, :] = 0.5 * (
+                        hessian[i_asu, :, i_cell, j_asu, :] + 
+                        hessian[j_asu, :, i_cell, i_asu, :].transpose(-2, -1).conj()
+                    )
+        
+        # Mock the crystal methods needed for compute_K
+        class MockCrystal:
+            def __init__(self, device):
+                self.device = device
+                
+            def get_unitcell_origin(self, unitcell):
+                # Return a simple tensor as the unit cell origin
+                return torch.tensor([float(unitcell[0]), 0.0, 0.0], device=self.device)
+                
+            def id_to_hkl(self, cell_id):
+                # Return a simple list as the unit cell indices
+                return [cell_id, 0, 0]
+        
+        gnm.crystal = MockCrystal(self.device)
+        
+        # Test case 1: Single k-vector
+        k_vec = torch.tensor([[0.1, 0.2, 0.3]], device=self.device)
+        
+        # Compute Kinv using original method with reshape=True
+        Kinv_single = gnm.compute_Kinv(hessian, kvec=k_vec[0], reshape=True)
+        
+        # Compute using batched method with reshape=True
+        Kinv_batch = gnm.compute_Kinv_batched(hessian, k_vec, reshape=True)
+        
+        # Get the first matrix from batch result
+        Kinv_batch_single = Kinv_batch[0]
+        
+        # Compare results - should be very close
+        self.assertTrue(torch.allclose(Kinv_single, Kinv_batch_single, rtol=1e-5, atol=1e-7))
+        
+        # Test case 2: Multiple k-vectors
+        k_vecs = torch.tensor([
+            [0.1, 0.2, 0.3],
+            [0.4, 0.5, 0.6],
+            [0.7, 0.8, 0.9]
+        ], device=self.device)
+        
+        # Compute Kinv matrices one by one using original method
+        Kinv_list = []
+        for i in range(k_vecs.shape[0]):
+            Kinv_list.append(gnm.compute_Kinv(hessian, kvec=k_vecs[i], reshape=True))
+        
+        # Compute Kinv matrices in batch using batched method
+        Kinv_batched = gnm.compute_Kinv_batched(hessian, k_vecs, reshape=True)
+        
+        # Compare results for each k-vector
+        for i in range(k_vecs.shape[0]):
+            self.assertTrue(torch.allclose(Kinv_list[i], Kinv_batched[i], rtol=1e-5, atol=1e-7))
+        
+        # Test reshape parameter
+        # Call with reshape=False and verify output shape
+        n_asu = gnm.n_asu
+        n_atoms = gnm.n_atoms_per_asu
+        total_size = n_asu * n_atoms
+        
+        Kinv_batch_flat = gnm.compute_Kinv_batched(hessian, k_vecs, reshape=False)
+        expected_shape = (k_vecs.shape[0], total_size, total_size)
+        
+        self.assertEqual(Kinv_batch_flat.shape, expected_shape, 
+                      f"Expected shape {expected_shape}, got {Kinv_batch_flat.shape}")
 
 if __name__ == '__main__':
     unittest.main()
