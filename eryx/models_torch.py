@@ -912,39 +912,48 @@ class OnePhonon:
                     w_batch = torch.flip(w_batch, [-1])
                     v_batch = torch.flip(v_batch, [-1])
                 
+                # Recompute eigenvalues in a differentiable way using batched operations
                 # Initialize batch tensors for results
                 batch_size_actual = batch_end - batch_start
-                eig_values_batch = torch.zeros((batch_size_actual, v_batch.shape[-1]), 
-                                             dtype=torch.float32, device=self.device)
                 
-                # Recompute eigenvalues in a differentiable way - still need to do this per matrix
-                # but we can optimize the inner loop
+                # Vectorize eigenvalue computation for the entire batch at once
+                # We'll use batched matrix multiplication to compute all eigenvalues simultaneously
+                eigenvalues_batch = torch.zeros((batch_size_actual, v_batch.shape[-1]), 
+                                              dtype=torch.float32, device=self.device)
+                
+                # Transform eigenvectors to the right basis using Linv for all matrices at once
+                v_batch_transformed = torch.matmul(
+                    Linv_complex.T.unsqueeze(0).expand(batch_size_actual, -1, -1),
+                    v_batch
+                )
+                
+                # Compute all eigenvalues in parallel using batched operations
+                for j in range(v_batch.shape[-1]):
+                    # Extract j-th eigenvector for all matrices: shape [batch_size, n_dof]
+                    v_j_batch = v_batch[:, :, j:j+1]
+                    
+                    # Compute λ_j = v_j† D v_j for all matrices at once
+                    # First multiply v_j† with D: [batch_size, 1, n_dof] x [batch_size, n_dof, n_dof]
+                    temp = torch.matmul(v_j_batch.transpose(-2, -1).conj(), Dmat_batch)
+                    
+                    # Then multiply with v_j: [batch_size, 1, n_dof] x [batch_size, n_dof, 1]
+                    lambda_j_batch = torch.matmul(temp, v_j_batch).real
+                    
+                    # Store in eigenvalues tensor: shape [batch_size, n_modes]
+                    eigenvalues_batch[:, j] = lambda_j_batch[:, 0, 0]
+                
+                # Compute inverses with stability controls for all matrices at once
+                winv_batch = 1.0 / (torch.sqrt(torch.abs(eigenvalues_batch)) ** 2 + 1e-8)
+                
+                # Set extremely large values to NaN for consistency with NumPy
+                winv_batch = torch.where(winv_batch > 1e6,
+                                       torch.tensor(float('nan'), dtype=winv_batch.dtype, device=winv_batch.device),
+                                       winv_batch)
+                
+                # Store results in the flattened tensors
                 for i, idx in enumerate(range(batch_start, batch_end)):
-                    Dmat = Dmat_batch[i]
-                    v = v_batch[i]
-                    
-                    # Vectorize eigenvalue computation
-                    eigenvalues = torch.zeros(v.shape[1], dtype=torch.float32, device=self.device)
-                    for j in range(v.shape[1]):
-                        v_j = v[:, j:j+1]
-                        # Compute λ_j = v_j† D v_j (maintains gradient flow through magnitudes)
-                        lambda_j = torch.matmul(torch.matmul(v_j.conj().T, Dmat), v_j).real
-                        eigenvalues[j] = lambda_j[0, 0]
-                    
-                    # Compute inverses with stability controls
-                    winv_value = 1.0 / (torch.sqrt(torch.abs(eigenvalues)) ** 2 + 1e-8)
-                    
-                    # Set extremely large values to NaN for consistency with NumPy
-                    winv_value = torch.where(winv_value > 1e6,
-                                           torch.tensor(float('nan'), dtype=winv_value.dtype, device=winv_value.device),
-                                           winv_value)
-                    
-                    # Transform eigenvectors to the right basis using Linv
-                    v_value = torch.matmul(Linv_complex.T, v)
-                    
-                    # Store results in the flattened tensors
-                    self.Winv[idx] = winv_value
-                    self.V[idx] = v_value
+                    self.Winv[idx] = winv_batch[i]
+                    self.V[idx] = v_batch_transformed[i]
     
     #@debug
     def compute_gnm_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
