@@ -22,9 +22,9 @@ class TestBatchedImplementation(TestBase):
         # Test parameters
         self.test_params = {
             'pdb_path': 'tests/pdbs/5zck_p1.pdb',
-            'hsampling': [-2, 2, 2],
-            'ksampling': [-2, 2, 2],
-            'lsampling': [-2, 2, 2],
+            'hsampling': [-4, 4, 3],
+            'ksampling': [-17, 17, 3],
+            'lsampling': [-29, 29, 3],
             'expand_p1': True,
             'res_limit': 0.0,
             'gnm_cutoff': 4.0,
@@ -470,7 +470,7 @@ class TestBatchedImplementation(TestBase):
         pdb_path = "tests/pdbs/5zck_p1.pdb"
         model_batched = OnePhonon(
             pdb_path,
-            [-1, 1, 2], [-1, 1, 2], [-1, 1, 2],  # Small grid for testing
+            [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
             expand_p1=True,
             use_batching=True,
             device=self.device
@@ -478,7 +478,7 @@ class TestBatchedImplementation(TestBase):
         
         model_nonbatched = OnePhonon(
             pdb_path,
-            [-1, 1, 2], [-1, 1, 2], [-1, 1, 2],  # Same grid
+            [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
             expand_p1=True,
             use_batching=False,
             device=self.device
