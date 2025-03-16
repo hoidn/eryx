@@ -564,7 +564,10 @@ class TestBatchedImplementation(TestBase):
             device=self.device,
             # Pass gamma parameters directly to constructor to ensure they're used
             gamma_intra=torch.tensor(1.0, dtype=torch.float32, device=self.device, requires_grad=True),
-            gamma_inter=torch.tensor(0.5, dtype=torch.float32, device=self.device, requires_grad=True)
+            gamma_inter=torch.tensor(0.5, dtype=torch.float32, device=self.device, requires_grad=True),
+            # Set small batch sizes for testing
+            phonon_batch_size=2,
+            covar_batch_size=2
         )
         
         # Set a small batch size for testing
@@ -617,6 +620,78 @@ class TestBatchedImplementation(TestBase):
         self.assertGreater(torch.abs(model.gamma_inter.grad).item(), 1e-10)
         self.assertLess(torch.abs(model.gamma_inter.grad).item(), 1e6)
 
+    def test_batched_vs_nonbatched_covariance_matrix(self):
+        """Test that batched covariance matrix calculation produces equivalent results to non-batched."""
+        import time
+        
+        # Create models with both batching modes
+        pdb_path = "tests/pdbs/5zck_p1.pdb"
+        model_batched = OnePhonon(
+            pdb_path,
+            [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],
+            expand_p1=True,
+            use_batching=True,
+            device=self.device,
+            covar_batch_size=2  # Small batch size for testing
+        )
+        
+        model_nonbatched = OnePhonon(
+            pdb_path,
+            [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],
+            expand_p1=True,
+            use_batching=False,
+            device=self.device
+        )
+        
+        # Compute hessian for both models
+        hessian_batched = model_batched.compute_hessian()
+        hessian_nonbatched = model_nonbatched.compute_hessian()
+        
+        # Time the non-batched computation
+        start_time = time.time()
+        model_nonbatched.compute_covariance_matrix()
+        non_batched_time = time.time() - start_time
+        
+        # Time the batched computation
+        start_time = time.time()
+        model_batched.compute_covariance_matrix()
+        batched_time = time.time() - start_time
+        
+        # Print timing comparison
+        print(f"\nCovariance matrix calculation timing comparison:")
+        print(f"  Non-batched: {non_batched_time:.6f} seconds")
+        print(f"  Batched:     {batched_time:.6f} seconds")
+        print(f"  Speedup:     {non_batched_time/batched_time:.2f}x")
+        
+        # Convert batched covar to original shape for comparison if needed
+        if model_batched.covar.shape != model_nonbatched.covar.shape:
+            print(f"Warning: Shape mismatch - batched: {model_batched.covar.shape}, non-batched: {model_nonbatched.covar.shape}")
+        
+        # Compare covariance matrices
+        # For non-NaN values, check they're close
+        covar_batched_flat = model_batched.covar.flatten()
+        covar_nonbatched_flat = model_nonbatched.covar.flatten()
+        
+        non_nan_mask = ~torch.isnan(covar_batched_flat) & ~torch.isnan(covar_nonbatched_flat)
+        if non_nan_mask.any():
+            self.assertTrue(torch.allclose(
+                covar_batched_flat[non_nan_mask], 
+                covar_nonbatched_flat[non_nan_mask], 
+                rtol=1e-5, atol=1e-7
+            ))
+        
+        # For NaN values, check they're in the same positions
+        nan_mask_batched = torch.isnan(covar_batched_flat)
+        nan_mask_nonbatched = torch.isnan(covar_nonbatched_flat)
+        self.assertTrue(torch.all(nan_mask_batched == nan_mask_nonbatched))
+        
+        # Compare ADP values
+        self.assertTrue(torch.allclose(
+            model_batched.ADP, 
+            model_nonbatched.ADP, 
+            rtol=1e-5, atol=1e-7
+        ))
+        
     def test_full_pipeline_timing(self):
         """Test timing comparison for the full pipeline including initialization and disorder application."""
         import time

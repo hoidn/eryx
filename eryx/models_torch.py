@@ -39,7 +39,7 @@ class OnePhonon:
                  res_limit: float = 0., model: str = 'gnm',
                  gnm_cutoff: float = 4., gamma_intra: float = 1., gamma_inter: float = 1.,
                  batch_size: int = 10000, n_processes: int = 8, device: Optional[torch.device] = None,
-                 use_batching: bool = True):
+                 use_batching: bool = True, phonon_batch_size: int = 1000, covar_batch_size: int = 1000):
         """
         Initialize the OnePhonon model with PyTorch tensors.
         
@@ -68,6 +68,8 @@ class OnePhonon:
         self.model_type = model
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.use_batching = use_batching
+        self.phonon_batch_size = phonon_batch_size
+        self.covar_batch_size = covar_batch_size
         
         self._setup(pdb_path, expand_p1, res_limit, group_by)
         self._setup_phonons(pdb_path, model, gnm_cutoff, gamma_intra, gamma_inter)
@@ -1031,25 +1033,67 @@ class OnePhonon:
                             eikr = torch.complex(real_part, imag_part)
                             self.covar[:, j_cell, :] += Kinv * eikr
         else:
-            # Fully collapsed batching implementation
+            # True batched implementation for fully collapsed format
             total_points = h_dim * k_dim * l_dim
-            for idx in range(total_points):
-                kvec = self.kvec[idx]
-                # Use the PyTorch implementation from pdb_torch
-                Kinv = gnm_torch.compute_Kinv(hessian, kvec=kvec, reshape=False)
+            
+            # Determine batch size for processing k-vectors
+            # Default to a reasonable batch size if not specified
+            batch_size = getattr(self, 'covar_batch_size', min(1000, total_points))
+            
+            # Process k-vectors in batches
+            for batch_start in range(0, total_points, batch_size):
+                batch_end = min(batch_start + batch_size, total_points)
+                batch_indices = torch.arange(batch_start, batch_end, device=self.device)
+                
+                # Get batch of k-vectors
+                kvec_batch = self.kvec[batch_indices]
+                
+                # Compute Kinv matrices for the entire batch at once
+                Kinv_batch = gnm_torch.compute_Kinv_batched(hessian, kvec_batch, reshape=False)
+                
+                # For each unit cell, compute phase factors and accumulate contributions
                 for j_cell in range(self.n_cell):
+                    # Get unit cell origin
                     r_cell = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
-                    phase = torch.sum(kvec * r_cell)
-                    real_part, imag_part = ComplexTensorOps.complex_exp(phase)
-                    eikr = torch.complex(real_part, imag_part)
-                    self.covar[:, j_cell, :] += Kinv * eikr
-        self.ADP = torch.real(torch.diagonal(self.covar[:, self.crystal.hkl_to_id([0, 0, 0]), :], dim1=0, dim2=1))
+                    
+                    # Calculate phase for all k-vectors in batch: batch_phases has shape [batch_size]
+                    # Sum along last dimension (3) to get dot product of each k-vector with r_cell
+                    batch_phases = torch.sum(kvec_batch * r_cell, dim=1)
+                    
+                    # Compute complex exponentials for all phases
+                    real_part, imag_part = ComplexTensorOps.complex_exp(batch_phases)
+                    eikr_batch = torch.complex(real_part, imag_part)
+                    
+                    # Apply phase factors to Kinv matrices and accumulate
+                    # Need to reshape eikr_batch to allow broadcasting
+                    # [batch_size] -> [batch_size, 1, 1] for proper broadcasting
+                    eikr_reshaped = eikr_batch.view(-1, 1, 1)
+                    
+                    # Accumulate contributions to covariance matrix
+                    # Sum over all k-vectors in the batch
+                    self.covar[:, j_cell, :] += torch.sum(Kinv_batch * eikr_reshaped, dim=0)
+        # Get the reference cell ID for [0,0,0]
+        ref_cell_id = self.crystal.hkl_to_id([0, 0, 0])
+        
+        # Extract diagonal elements for ADP calculation
+        self.ADP = torch.real(torch.diagonal(self.covar[:, ref_cell_id, :], dim1=0, dim2=1))
+        
+        # Transform ADP using the displacement projection matrix
         Amat = torch.transpose(self.Amat, 0, 1).reshape(self.n_dof_per_asu_actual, self.n_asu * self.n_dof_per_asu)
         self.ADP = torch.matmul(Amat, self.ADP)
+        
+        # Sum over spatial dimensions (x,y,z)
         self.ADP = torch.sum(self.ADP.reshape(int(self.ADP.shape[0] / 3), 3), dim=1)
-        ADP_scale = torch.mean(self.array_to_tensor(self.model.adp)) / (8 * torch.pi * torch.pi * torch.mean(self.ADP) / 3)
+        
+        # Scale ADP to match experimental values
+        model_adp_tensor = self.array_to_tensor(self.model.adp)
+        ADP_scale = torch.mean(model_adp_tensor) / (8 * torch.pi * torch.pi * torch.mean(self.ADP) / 3)
+        
+        # Apply scaling to ADP and covariance matrix
         self.ADP = self.ADP * ADP_scale
         self.covar = self.covar * ADP_scale
+        
+        # Reshape covariance matrix to final format
         self.covar = torch.real(self.covar.reshape((self.n_asu, self.n_dof_per_asu,
                                                      self.n_cell, self.n_asu, self.n_dof_per_asu)))
     
