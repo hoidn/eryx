@@ -928,7 +928,9 @@ class OnePhonon:
                 winv_batch = 1.0 / (eigenvalues_clamped + 1e-8)
                 
                 # Set extremely large values to NaN for consistency with NumPy
-                winv_batch = torch.where(winv_batch > 1e6,
+                # Convert to real for comparison since > is not implemented for complex numbers
+                winv_batch_abs = torch.abs(winv_batch)
+                winv_batch = torch.where(winv_batch_abs > 1e6,
                                        torch.tensor(float('nan'), dtype=winv_batch.dtype, device=winv_batch.device),
                                        winv_batch)
                 
