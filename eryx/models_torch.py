@@ -752,6 +752,9 @@ class OnePhonon:
         This implementation uses a modified SVD approach that ensures stable gradient flow
         through the eigenvalues while avoiding problematic backpropagation through
         complex singular vectors.
+        
+        For batched mode, this method processes multiple k-vectors simultaneously
+        to improve computational efficiency.
         """
         hessian = self.compute_hessian()
         h_dim = int(self.hsampling[2])
@@ -842,56 +845,81 @@ class OnePhonon:
                         self.Winv[dh, dk, dl] = winv_value
                         self.V[dh, dk, dl] = v_value
         else:
-            # Fully collapsed batching implementation
-            for idx in range(h_dim * k_dim * l_dim):
-                # Convert flat index to 3D indices for debugging
-                h_idx, k_idx, l_idx = self._flat_to_3d_indices(torch.tensor([idx], device=self.device))
-                h_idx, k_idx, l_idx = h_idx.item(), k_idx.item(), l_idx.item()
+            # Optimized fully collapsed batching implementation
+            total_points = h_dim * k_dim * l_dim
+            
+            # Determine batch size for processing k-vectors
+            # Default to a reasonable batch size if not specified
+            batch_size = getattr(self, 'phonon_batch_size', min(1000, total_points))
+            
+            # Convert Linv to complex for matrix operations
+            Linv_complex = self.Linv.to(dtype=torch.complex64)
+            
+            # Process k-vectors in batches
+            for batch_start in range(0, total_points, batch_size):
+                batch_end = min(batch_start + batch_size, total_points)
+                batch_indices = torch.arange(batch_start, batch_end, device=self.device)
                 
-                # Get the corresponding k-vector from the flattened tensor
-                kvec = self.kvec[idx]
+                # Get batch of k-vectors
+                kvec_batch = self.kvec[batch_indices]
                 
-                # Compute K matrix
-                Kmat = gnm_torch.compute_K(hessian, kvec=kvec)
-                Kmat_2d = Kmat.reshape((self.n_asu * self.n_dof_per_asu,
-                                        self.n_asu * self.n_dof_per_asu))
-                Linv_complex = self.Linv.to(dtype=torch.complex64)
-                Dmat = torch.matmul(Linv_complex, torch.matmul(Kmat_2d, Linv_complex.T))
+                # Compute K matrices for the entire batch at once
+                Kmat_batch = gnm_torch.compute_K_batched(hessian, kvec_batch)
                 
-                # Extract eigenvalues and eigenvectors without tracking phase gradients
-                with torch.no_grad():
-                    v, w, _ = torch.linalg.svd(Dmat, full_matrices=False)
-                    w = torch.sqrt(w)  # w contains singular values from SVD
-                    w = torch.where(w < 1e-6,
-                                  torch.tensor(float('nan'), dtype=w.dtype, device=w.device),
-                                  w)
-                    w = torch.flip(w, [0])
-                    v = torch.flip(v, [1])
+                # Reshape each K matrix to 2D
+                batch_size_actual = batch_end - batch_start
+                Kmat_batch_2d = Kmat_batch.reshape(batch_size_actual, 
+                                                  self.n_asu * self.n_dof_per_asu,
+                                                  self.n_asu * self.n_dof_per_asu)
                 
-                # Recompute eigenvalues in a differentiable way
-                eigenvalues = []
-                for i in range(v.shape[1]):
-                    v_i = v[:, i:i+1]
-                    # Compute λ_i = v_i† D v_i (maintains gradient flow through magnitudes)
-                    lambda_i = torch.matmul(torch.matmul(v_i.conj().T, Dmat), v_i).real
-                    eigenvalues.append(lambda_i[0, 0])
+                # Compute D matrices for the batch
+                # D = Linv * K * Linv^T for each k-vector
+                Dmat_batch = torch.matmul(
+                    Linv_complex.unsqueeze(0).expand(batch_size_actual, -1, -1),
+                    torch.matmul(
+                        Kmat_batch_2d,
+                        Linv_complex.T.unsqueeze(0).expand(batch_size_actual, -1, -1)
+                    )
+                )
                 
-                eig_values = torch.stack(eigenvalues)
-                
-                # Compute inverses with stability controls
-                winv_value = 1.0 / (torch.sqrt(torch.abs(eig_values)) ** 2 + 1e-8)
-                
-                # Set extremely large values to NaN for consistency with NumPy
-                winv_value = torch.where(winv_value > 1e6,
-                                       torch.tensor(float('nan'), dtype=winv_value.dtype, device=winv_value.device),
-                                       winv_value)
-                
-                # Transform eigenvectors to the right basis using Linv
-                v_value = torch.matmul(Linv_complex.T, v)
-                
-                # Store results in the flattened tensors
-                self.Winv[idx] = winv_value
-                self.V[idx] = v_value
+                # Process each D matrix in the batch
+                for i, idx in enumerate(range(batch_start, batch_end)):
+                    Dmat = Dmat_batch[i]
+                    
+                    # Extract eigenvalues and eigenvectors without tracking phase gradients
+                    with torch.no_grad():
+                        v, w, _ = torch.linalg.svd(Dmat, full_matrices=False)
+                        w = torch.sqrt(w)  # w contains singular values from SVD
+                        w = torch.where(w < 1e-6,
+                                      torch.tensor(float('nan'), dtype=w.dtype, device=w.device),
+                                      w)
+                        w = torch.flip(w, [0])
+                        v = torch.flip(v, [1])
+                    
+                    # Recompute eigenvalues in a differentiable way
+                    eigenvalues = []
+                    for j in range(v.shape[1]):
+                        v_j = v[:, j:j+1]
+                        # Compute λ_j = v_j† D v_j (maintains gradient flow through magnitudes)
+                        lambda_j = torch.matmul(torch.matmul(v_j.conj().T, Dmat), v_j).real
+                        eigenvalues.append(lambda_j[0, 0])
+                    
+                    eig_values = torch.stack(eigenvalues)
+                    
+                    # Compute inverses with stability controls
+                    winv_value = 1.0 / (torch.sqrt(torch.abs(eig_values)) ** 2 + 1e-8)
+                    
+                    # Set extremely large values to NaN for consistency with NumPy
+                    winv_value = torch.where(winv_value > 1e6,
+                                           torch.tensor(float('nan'), dtype=winv_value.dtype, device=winv_value.device),
+                                           winv_value)
+                    
+                    # Transform eigenvectors to the right basis using Linv
+                    v_value = torch.matmul(Linv_complex.T, v)
+                    
+                    # Store results in the flattened tensors
+                    self.Winv[idx] = winv_value
+                    self.V[idx] = v_value
     
     #@debug
     def compute_gnm_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:

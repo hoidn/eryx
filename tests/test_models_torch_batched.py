@@ -435,6 +435,134 @@ class TestBatchedImplementation(TestBase):
         
         self.assertEqual(Kinv_batch_flat.shape, expected_shape, 
                       f"Expected shape {expected_shape}, got {Kinv_batch_flat.shape}")
+    
+    def test_batched_vs_nonbatched_phonon_calculation(self):
+        """Test that batched phonon calculation produces equivalent results to non-batched."""
+        # Create models with both batching modes
+        pdb_path = "tests/pdbs/5zck_p1.pdb"
+        model_batched = OnePhonon(
+            pdb_path,
+            [-1, 1, 2], [-1, 1, 2], [-1, 1, 2],  # Small grid for testing
+            expand_p1=True,
+            use_batching=True,
+            device=self.device
+        )
+        
+        model_nonbatched = OnePhonon(
+            pdb_path,
+            [-1, 1, 2], [-1, 1, 2], [-1, 1, 2],  # Same grid
+            expand_p1=True,
+            use_batching=False,
+            device=self.device
+        )
+        
+        # Set a small batch size for testing batched processing
+        model_batched.phonon_batch_size = 2
+        
+        # Run compute_gnm_phonons on both models
+        model_batched.compute_gnm_phonons()
+        model_nonbatched.compute_gnm_phonons()
+        
+        # Convert batched tensors to original shape for comparison
+        V_batched_original = model_batched.to_original_shape(model_batched.V)
+        Winv_batched_original = model_batched.to_original_shape(model_batched.Winv)
+        
+        # Compare V tensors
+        # Note: We need to handle NaN values specially
+        V_nonbatched_flat = model_nonbatched.V.flatten()
+        V_batched_flat = V_batched_original.flatten()
+        
+        # For non-NaN values, check they're close
+        non_nan_mask = ~torch.isnan(V_nonbatched_flat) & ~torch.isnan(V_batched_flat)
+        if non_nan_mask.any():
+            self.assertTrue(torch.allclose(
+                V_nonbatched_flat[non_nan_mask], 
+                V_batched_flat[non_nan_mask], 
+                rtol=1e-5, atol=1e-7
+            ))
+        
+        # For NaN values, check they're in the same positions
+        nan_mask_nonbatched = torch.isnan(V_nonbatched_flat)
+        nan_mask_batched = torch.isnan(V_batched_flat)
+        self.assertTrue(torch.all(nan_mask_nonbatched == nan_mask_batched))
+        
+        # Compare Winv tensors with similar NaN handling
+        Winv_nonbatched_flat = model_nonbatched.Winv.flatten()
+        Winv_batched_flat = Winv_batched_original.flatten()
+        
+        # For non-NaN values, check they're close
+        non_nan_mask = ~torch.isnan(Winv_nonbatched_flat) & ~torch.isnan(Winv_batched_flat)
+        if non_nan_mask.any():
+            self.assertTrue(torch.allclose(
+                Winv_nonbatched_flat[non_nan_mask], 
+                Winv_batched_flat[non_nan_mask], 
+                rtol=1e-5, atol=1e-7
+            ))
+        
+        # For NaN values, check they're in the same positions
+        nan_mask_nonbatched = torch.isnan(Winv_nonbatched_flat)
+        nan_mask_batched = torch.isnan(Winv_batched_flat)
+        self.assertTrue(torch.all(nan_mask_nonbatched == nan_mask_batched))
+        
+        # Verify shapes match
+        self.assertEqual(V_batched_original.shape, model_nonbatched.V.shape)
+        self.assertEqual(Winv_batched_original.shape, model_nonbatched.Winv.shape)
+        
+        # Verify gradient requirements
+        self.assertTrue(model_batched.V.requires_grad)
+        self.assertTrue(model_batched.Winv.requires_grad)
+    
+    def test_gradient_flow_through_phonon_calculation(self):
+        """Test that gradients flow properly through batched phonon calculation."""
+        # Create a model with batching enabled and small dimensions
+        pdb_path = "tests/pdbs/5zck_p1.pdb"
+        model = OnePhonon(
+            pdb_path,
+            [-1, 1, 2], [-1, 1, 2], [-1, 1, 2],  # Small grid for testing
+            expand_p1=True,
+            use_batching=True,
+            device=self.device
+        )
+        
+        # Set a small batch size for testing
+        model.phonon_batch_size = 2
+        
+        # Make sure gamma parameters require gradients
+        model.gamma_intra = torch.tensor(1.0, dtype=torch.float32, 
+                                        device=self.device, requires_grad=True)
+        model.gamma_inter = torch.tensor(0.5, dtype=torch.float32, 
+                                        device=self.device, requires_grad=True)
+        
+        # Run compute_gnm_phonons
+        model.compute_gnm_phonons()
+        
+        # Verify tensors require gradients
+        self.assertTrue(model.V.requires_grad)
+        self.assertTrue(model.Winv.requires_grad)
+        
+        # Calculate a simple loss function using V and Winv
+        # We'll use the sum of absolute values as a simple scalar loss
+        V_abs = torch.abs(model.V)
+        Winv_abs = torch.abs(model.Winv)
+        
+        # Handle NaN values by replacing them with zeros for the loss calculation
+        V_abs_no_nan = torch.where(torch.isnan(V_abs), torch.zeros_like(V_abs), V_abs)
+        Winv_abs_no_nan = torch.where(torch.isnan(Winv_abs), torch.zeros_like(Winv_abs), Winv_abs)
+        
+        loss = torch.sum(V_abs_no_nan) + torch.sum(Winv_abs_no_nan)
+        
+        # Perform backward pass
+        loss.backward()
+        
+        # Verify gradients are computed
+        self.assertIsNotNone(model.gamma_intra.grad)
+        self.assertIsNotNone(model.gamma_inter.grad)
+        
+        # Check gradient magnitudes are reasonable (not zero or exploding)
+        self.assertGreater(torch.abs(model.gamma_intra.grad).item(), 1e-10)
+        self.assertLess(torch.abs(model.gamma_intra.grad).item(), 1e6)
+        self.assertGreater(torch.abs(model.gamma_inter.grad).item(), 1e-10)
+        self.assertLess(torch.abs(model.gamma_inter.grad).item(), 1e6)
 
 if __name__ == '__main__':
     unittest.main()
