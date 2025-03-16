@@ -900,50 +900,32 @@ class OnePhonon:
                 # Extract eigenvalues and eigenvectors without tracking phase gradients
                 with torch.no_grad():
                     # Batched SVD - processes all matrices at once
-                    v_batch, w_batch, _ = torch.linalg.svd(Dmat_batch, full_matrices=False)
+                    U, S, _ = torch.linalg.svd(Dmat_batch, full_matrices=False)
                     
-                    # Apply operations to the entire batch
-                    w_batch = torch.sqrt(w_batch)  # w contains singular values from SVD
-                    w_batch = torch.where(w_batch < 1e-6,
-                                      torch.tensor(float('nan'), dtype=w_batch.dtype, device=w_batch.device),
-                                      w_batch)
-                    
-                    # Flip along the last dimension for both tensors
-                    w_batch = torch.flip(w_batch, [-1])
-                    v_batch = torch.flip(v_batch, [-1])
+                    # Reverse the order so that eigenvalues are descending
+                    S = torch.flip(S, dims=[1])
+                    U = torch.flip(U, dims=[2])
                 
-                # Recompute eigenvalues in a differentiable way using batched operations
-                # Initialize batch tensors for results
-                batch_size_actual = batch_end - batch_start
-                
-                # Vectorize eigenvalue computation for the entire batch at once
-                # We'll use batched matrix multiplication to compute all eigenvalues simultaneously
-                eigenvalues_batch = torch.zeros((batch_size_actual, v_batch.shape[-1]), 
-                                              dtype=torch.float32, device=self.device)
+                # Instead of looping over each eigenmode, extract eigenvalues directly from U^H D U
+                # Since Dmat_batch is diagonalizable, we can use:
+                lambda_matrix = torch.matmul(U.conj().transpose(-2, -1), torch.matmul(Dmat_batch, U))
+                # The diagonal contains the eigenvalues computed in a differentiable manner
+                eigenvalues_batch = lambda_matrix.diagonal(offset=0, dim1=-2, dim2=-1)  # shape [batch_size, n_dof]
                 
                 # Transform eigenvectors to the right basis using Linv for all matrices at once
                 v_batch_transformed = torch.matmul(
                     Linv_complex.T.unsqueeze(0).expand(batch_size_actual, -1, -1),
-                    v_batch
+                    U
                 )
                 
-                # Compute all eigenvalues in parallel using batched operations
-                for j in range(v_batch.shape[-1]):
-                    # Extract j-th eigenvector for all matrices: shape [batch_size, n_dof]
-                    v_j_batch = v_batch[:, :, j:j+1]
-                    
-                    # Compute λ_j = v_j† D v_j for all matrices at once
-                    # First multiply v_j† with D: [batch_size, 1, n_dof] x [batch_size, n_dof, n_dof]
-                    temp = torch.matmul(v_j_batch.transpose(-2, -1).conj(), Dmat_batch)
-                    
-                    # Then multiply with v_j: [batch_size, 1, n_dof] x [batch_size, n_dof, 1]
-                    lambda_j_batch = torch.matmul(temp, v_j_batch).real
-                    
-                    # Store in eigenvalues tensor: shape [batch_size, n_modes]
-                    eigenvalues_batch[:, j] = lambda_j_batch[:, 0, 0]
+                # For numerical stability, apply thresholds to eigenvalues
+                eps = 1e-6
+                eigenvalues_clamped = torch.where(eigenvalues_batch.real < eps, 
+                                                torch.tensor(float('nan'), dtype=eigenvalues_batch.dtype, device=eigenvalues_batch.device),
+                                                eigenvalues_batch.real)
                 
                 # Compute inverses with stability controls for all matrices at once
-                winv_batch = 1.0 / (torch.sqrt(torch.abs(eigenvalues_batch)) ** 2 + 1e-8)
+                winv_batch = 1.0 / (eigenvalues_clamped + 1e-8)
                 
                 # Set extremely large values to NaN for consistency with NumPy
                 winv_batch = torch.where(winv_batch > 1e6,
