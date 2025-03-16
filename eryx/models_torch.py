@@ -896,32 +896,43 @@ class OnePhonon:
                     )
                 )
                 
-                # Process each D matrix in the batch
+                # Process all D matrices in the batch at once
+                # Extract eigenvalues and eigenvectors without tracking phase gradients
+                with torch.no_grad():
+                    # Batched SVD - processes all matrices at once
+                    v_batch, w_batch, _ = torch.linalg.svd(Dmat_batch, full_matrices=False)
+                    
+                    # Apply operations to the entire batch
+                    w_batch = torch.sqrt(w_batch)  # w contains singular values from SVD
+                    w_batch = torch.where(w_batch < 1e-6,
+                                      torch.tensor(float('nan'), dtype=w_batch.dtype, device=w_batch.device),
+                                      w_batch)
+                    
+                    # Flip along the last dimension for both tensors
+                    w_batch = torch.flip(w_batch, [-1])
+                    v_batch = torch.flip(v_batch, [-1])
+                
+                # Initialize batch tensors for results
+                batch_size_actual = batch_end - batch_start
+                eig_values_batch = torch.zeros((batch_size_actual, v_batch.shape[-1]), 
+                                             dtype=torch.float32, device=self.device)
+                
+                # Recompute eigenvalues in a differentiable way - still need to do this per matrix
+                # but we can optimize the inner loop
                 for i, idx in enumerate(range(batch_start, batch_end)):
                     Dmat = Dmat_batch[i]
+                    v = v_batch[i]
                     
-                    # Extract eigenvalues and eigenvectors without tracking phase gradients
-                    with torch.no_grad():
-                        v, w, _ = torch.linalg.svd(Dmat, full_matrices=False)
-                        w = torch.sqrt(w)  # w contains singular values from SVD
-                        w = torch.where(w < 1e-6,
-                                      torch.tensor(float('nan'), dtype=w.dtype, device=w.device),
-                                      w)
-                        w = torch.flip(w, [0])
-                        v = torch.flip(v, [1])
-                    
-                    # Recompute eigenvalues in a differentiable way
-                    eigenvalues = []
+                    # Vectorize eigenvalue computation
+                    eigenvalues = torch.zeros(v.shape[1], dtype=torch.float32, device=self.device)
                     for j in range(v.shape[1]):
                         v_j = v[:, j:j+1]
                         # Compute λ_j = v_j† D v_j (maintains gradient flow through magnitudes)
                         lambda_j = torch.matmul(torch.matmul(v_j.conj().T, Dmat), v_j).real
-                        eigenvalues.append(lambda_j[0, 0])
-                    
-                    eig_values = torch.stack(eigenvalues)
+                        eigenvalues[j] = lambda_j[0, 0]
                     
                     # Compute inverses with stability controls
-                    winv_value = 1.0 / (torch.sqrt(torch.abs(eig_values)) ** 2 + 1e-8)
+                    winv_value = 1.0 / (torch.sqrt(torch.abs(eigenvalues)) ** 2 + 1e-8)
                     
                     # Set extremely large values to NaN for consistency with NumPy
                     winv_value = torch.where(winv_value > 1e6,
