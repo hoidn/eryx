@@ -707,6 +707,20 @@ class OnePhonon:
         
         # Use our differentiable gamma tensor instead of the NumPy GNM gamma
         if hasattr(self, 'gamma_tensor'):
+            # Make sure gamma_tensor is properly connected to gamma_intra and gamma_inter
+            if not self.gamma_tensor.requires_grad and (self.gamma_intra.requires_grad or self.gamma_inter.requires_grad):
+                # Rebuild gamma tensor to ensure it uses the parameters with gradients
+                self.gamma_tensor = torch.zeros((self.n_cell, self.n_asu, self.n_asu), 
+                                              device=self.device, dtype=torch.float32)
+                    
+                # Fill gamma tensor with our parameter tensors that require gradients
+                for i_asu in range(self.n_asu):
+                    for i_cell in range(self.n_cell):
+                        for j_asu in range(self.n_asu):
+                            self.gamma_tensor[i_cell, i_asu, j_asu] = self.gamma_inter
+                            if (i_cell == self.id_cell_ref) and (j_asu == i_asu):
+                                self.gamma_tensor[i_cell, i_asu, j_asu] = self.gamma_intra
+                
             gnm_torch.gamma = self.gamma_tensor
         # Fallback to NumPy GNM gamma if needed
         elif hasattr(self.gnm, 'gamma'):

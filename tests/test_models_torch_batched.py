@@ -521,17 +521,30 @@ class TestBatchedImplementation(TestBase):
             [-1, 1, 2], [-1, 1, 2], [-1, 1, 2],  # Small grid for testing
             expand_p1=True,
             use_batching=True,
-            device=self.device
+            device=self.device,
+            # Pass gamma parameters directly to constructor to ensure they're used
+            gamma_intra=torch.tensor(1.0, dtype=torch.float32, device=self.device, requires_grad=True),
+            gamma_inter=torch.tensor(0.5, dtype=torch.float32, device=self.device, requires_grad=True)
         )
         
         # Set a small batch size for testing
         model.phonon_batch_size = 2
         
-        # Make sure gamma parameters require gradients
-        model.gamma_intra = torch.tensor(1.0, dtype=torch.float32, 
-                                        device=self.device, requires_grad=True)
-        model.gamma_inter = torch.tensor(0.5, dtype=torch.float32, 
-                                        device=self.device, requires_grad=True)
+        # Verify gamma parameters require gradients
+        self.assertTrue(model.gamma_intra.requires_grad)
+        self.assertTrue(model.gamma_inter.requires_grad)
+        
+        # Rebuild gamma tensor to ensure it uses the parameters with gradients
+        model.gamma_tensor = torch.zeros((model.n_cell, model.n_asu, model.n_asu), 
+                                       device=model.device, dtype=torch.float32)
+        
+        # Fill gamma tensor with our parameter tensors that require gradients
+        for i_asu in range(model.n_asu):
+            for i_cell in range(model.n_cell):
+                for j_asu in range(model.n_asu):
+                    model.gamma_tensor[i_cell, i_asu, j_asu] = model.gamma_inter
+                    if (i_cell == model.id_cell_ref) and (j_asu == i_asu):
+                        model.gamma_tensor[i_cell, i_asu, j_asu] = model.gamma_intra
         
         # Run compute_gnm_phonons
         model.compute_gnm_phonons()
