@@ -617,5 +617,73 @@ class TestBatchedImplementation(TestBase):
         self.assertGreater(torch.abs(model.gamma_inter.grad).item(), 1e-10)
         self.assertLess(torch.abs(model.gamma_inter.grad).item(), 1e6)
 
+    def test_full_pipeline_timing(self):
+        """Test timing comparison for the full pipeline including initialization and disorder application."""
+        import time
+        
+        # Parameters for a small test case
+        pdb_path = "tests/pdbs/5zck_p1.pdb"
+        h_sampling = [-2, 2, 2]
+        k_sampling = [-2, 2, 2]
+        l_sampling = [-2, 2, 2]
+        
+        # Time the non-batched implementation
+        start_time = time.time()
+        model_nonbatched = OnePhonon(
+            pdb_path,
+            h_sampling, k_sampling, l_sampling,
+            expand_p1=True,
+            use_batching=False,
+            device=self.device
+        )
+        # Apply disorder to get diffuse intensity
+        intensity_nonbatched = model_nonbatched.apply_disorder(use_data_adp=True)
+        nonbatched_time = time.time() - start_time
+        
+        # Time the batched implementation
+        start_time = time.time()
+        model_batched = OnePhonon(
+            pdb_path,
+            h_sampling, k_sampling, l_sampling,
+            expand_p1=True,
+            use_batching=True,
+            device=self.device
+        )
+        # Apply disorder to get diffuse intensity
+        intensity_batched = model_batched.apply_disorder(use_data_adp=True)
+        batched_time = time.time() - start_time
+        
+        # Print timing comparison
+        print(f"\nFull pipeline timing comparison (initialization + apply_disorder):")
+        print(f"  Non-batched: {nonbatched_time:.6f} seconds")
+        print(f"  Batched:     {batched_time:.6f} seconds")
+        print(f"  Speedup:     {nonbatched_time/batched_time:.2f}x")
+        
+        # Verify results are equivalent
+        # Convert batched result to original shape for comparison
+        if intensity_batched.dim() == 1:
+            # Reshape batched result to match non-batched shape
+            h_dim = int(model_batched.hsampling[2])
+            k_dim = int(model_batched.ksampling[2])
+            l_dim = int(model_batched.lsampling[2])
+            intensity_batched_reshaped = intensity_batched.reshape(h_dim, k_dim, l_dim)
+        else:
+            intensity_batched_reshaped = intensity_batched
+            
+        # Compare results, handling NaN values
+        # For non-NaN values, check they're close
+        non_nan_mask = ~torch.isnan(intensity_nonbatched) & ~torch.isnan(intensity_batched_reshaped)
+        if non_nan_mask.any():
+            self.assertTrue(torch.allclose(
+                intensity_nonbatched[non_nan_mask], 
+                intensity_batched_reshaped[non_nan_mask], 
+                rtol=1e-5, atol=1e-7
+            ))
+        
+        # For NaN values, check they're in the same positions
+        nan_mask_nonbatched = torch.isnan(intensity_nonbatched)
+        nan_mask_batched = torch.isnan(intensity_batched_reshaped)
+        self.assertTrue(torch.all(nan_mask_nonbatched == nan_mask_batched))
+
 if __name__ == '__main__':
     unittest.main()
