@@ -159,6 +159,7 @@ class TestBatchedImplementation(TestBase):
         """Test that compute_K_batched produces equivalent results to compute_K."""
         # Import necessary components
         from eryx.pdb_torch import GaussianNetworkModel
+        import time
         
         # Create a small GaussianNetworkModel instance
         # For testing, we'll use a mock GNM with minimal dimensions
@@ -227,13 +228,25 @@ class TestBatchedImplementation(TestBase):
             [0.7, 0.8, 0.9]
         ], device=self.device)
         
+        # Time the non-batched computation
+        start_time = time.time()
         # Compute K matrices one by one using original method
         K_list = []
         for i in range(k_vecs.shape[0]):
             K_list.append(gnm.compute_K(hessian, kvec=k_vecs[i]))
+        non_batched_time = time.time() - start_time
         
+        # Time the batched computation
+        start_time = time.time()
         # Compute K matrices in batch using batched method
         K_batched = gnm.compute_K_batched(hessian, k_vecs)
+        batched_time = time.time() - start_time
+        
+        # Print timing comparison
+        print(f"\nCompute_K timing comparison (3 k-vectors):")
+        print(f"  Non-batched: {non_batched_time:.6f} seconds")
+        print(f"  Batched:     {batched_time:.6f} seconds")
+        print(f"  Speedup:     {non_batched_time/batched_time:.2f}x")
         
         # Compare results for each k-vector
         for i in range(k_vecs.shape[0]):
@@ -349,6 +362,7 @@ class TestBatchedImplementation(TestBase):
         """Test that compute_Kinv_batched produces equivalent results to compute_Kinv."""
         # Import necessary components
         from eryx.pdb_torch import GaussianNetworkModel
+        import time
         
         # Create a small GaussianNetworkModel instance
         # For testing, we'll use a mock GNM with minimal dimensions
@@ -412,13 +426,25 @@ class TestBatchedImplementation(TestBase):
             [0.7, 0.8, 0.9]
         ], device=self.device)
         
+        # Time the non-batched computation
+        start_time = time.time()
         # Compute Kinv matrices one by one using original method
         Kinv_list = []
         for i in range(k_vecs.shape[0]):
             Kinv_list.append(gnm.compute_Kinv(hessian, kvec=k_vecs[i], reshape=True))
+        non_batched_time = time.time() - start_time
         
+        # Time the batched computation
+        start_time = time.time()
         # Compute Kinv matrices in batch using batched method
         Kinv_batched = gnm.compute_Kinv_batched(hessian, k_vecs, reshape=True)
+        batched_time = time.time() - start_time
+        
+        # Print timing comparison
+        print(f"\nCompute_Kinv timing comparison (3 k-vectors):")
+        print(f"  Non-batched: {non_batched_time:.6f} seconds")
+        print(f"  Batched:     {batched_time:.6f} seconds")
+        print(f"  Speedup:     {non_batched_time/batched_time:.2f}x")
         
         # Compare results for each k-vector
         for i in range(k_vecs.shape[0]):
@@ -438,6 +464,8 @@ class TestBatchedImplementation(TestBase):
     
     def test_batched_vs_nonbatched_phonon_calculation(self):
         """Test that batched phonon calculation produces equivalent results to non-batched."""
+        import time
+        
         # Create models with both batching modes
         pdb_path = "tests/pdbs/5zck_p1.pdb"
         model_batched = OnePhonon(
@@ -459,9 +487,21 @@ class TestBatchedImplementation(TestBase):
         # Set a small batch size for testing batched processing
         model_batched.phonon_batch_size = 2
         
-        # Run compute_gnm_phonons on both models
-        model_batched.compute_gnm_phonons()
+        # Time the non-batched computation
+        start_time = time.time()
         model_nonbatched.compute_gnm_phonons()
+        non_batched_time = time.time() - start_time
+        
+        # Time the batched computation
+        start_time = time.time()
+        model_batched.compute_gnm_phonons()
+        batched_time = time.time() - start_time
+        
+        # Print timing comparison
+        print(f"\nPhonon calculation timing comparison:")
+        print(f"  Non-batched: {non_batched_time:.6f} seconds")
+        print(f"  Batched:     {batched_time:.6f} seconds")
+        print(f"  Speedup:     {non_batched_time/batched_time:.2f}x")
         
         # Convert batched tensors to original shape for comparison
         V_batched_original = model_batched.to_original_shape(model_batched.V)
