@@ -39,6 +39,44 @@ class TestBatchedImplementation(TestBase):
             device=self.device,
             use_batching=use_batching
         )
+        
+    def _create_test_model(self):
+        """Create a small model instance for testing."""
+        # Create model with minimal dimensions
+        pdb_path = "tests/pdbs/5zck_p1.pdb"
+        return OnePhonon(
+            pdb_path,
+            [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],  # Small grid for testing
+            expand_p1=True,
+            use_batching=True,
+            device=self.device
+        )
+        
+    def test_fully_collapsed_tensor_conversion(self):
+        """Test conversion between original and fully collapsed tensor formats."""
+        # Create a model instance with small dimensions for testing
+        model = self._create_test_model()
+        
+        # Create a test tensor with original 3D shape
+        h_dim, k_dim, l_dim = 2, 3, 4
+        features = 5
+        original_tensor = torch.randn(h_dim, k_dim, l_dim, features, device=self.device)
+        
+        # Convert to fully collapsed shape
+        collapsed_tensor = model.to_batched_shape(original_tensor)
+        
+        # Verify shape is correct
+        expected_shape = (h_dim * k_dim * l_dim, features)
+        self.assertEqual(collapsed_tensor.shape, expected_shape)
+        
+        # Convert back to original shape
+        model.test_k_dim = k_dim
+        model.test_l_dim = l_dim
+        restored_tensor = model.to_original_shape(collapsed_tensor)
+        
+        # Verify shape and values are preserved
+        self.assertEqual(restored_tensor.shape, original_tensor.shape)
+        self.assertTrue(torch.allclose(restored_tensor, original_tensor))
     
     def test_tensor_format_conversion(self):
         """Test conversion between original and batched tensor formats."""
@@ -58,7 +96,7 @@ class TestBatchedImplementation(TestBase):
         batched_tensor = model.to_batched_shape(original_tensor)
         
         # Verify dimensions
-        self.assertEqual(batched_tensor.shape, (h_dim, k_dim * l_dim, feature_dim))
+        self.assertEqual(batched_tensor.shape, (h_dim * k_dim * l_dim, feature_dim))
         
         # Convert back to original format
         restored_tensor = model.to_original_shape(batched_tensor)
@@ -69,113 +107,154 @@ class TestBatchedImplementation(TestBase):
         # Verify values are preserved
         self.assertTrue(torch.allclose(original_tensor, restored_tensor))
     
-    def test_index_conversion(self):
-        """Test conversion between 3D and flat indices."""
-        # Create model with explicit sampling parameters for testing
-        model = self.create_test_models(use_batching=True)
+    def test_fully_collapsed_index_conversion(self):
+        """Test conversion between 3D indices and fully collapsed indices."""
+        # Create a model instance
+        model = self._create_test_model()
         
-        # Override sampling parameters for this test to ensure consistency
-        model.lsampling = [-2, 2, 2]  # Ensure l_dim is 2
-        
-        # Create test indices
-        h_indices = torch.tensor([0, 1, 0, 1], device=self.device)
-        k_indices = torch.tensor([0, 0, 1, 1], device=self.device)
-        l_indices = torch.tensor([0, 1, 0, 1], device=self.device)
-        
-        # Print the test indices for debugging
-        print(f"Test indices - h: {h_indices}, k: {k_indices}, l: {l_indices}")
-        
-        # Convert to flat indices
-        flat_indices = model._3d_to_flat_indices(h_indices, k_indices, l_indices)
-        print(f"Flat indices: {flat_indices}")
-        
-        # Convert back to 3D indices
-        k_restored, l_restored = model._flat_to_3d_indices(flat_indices)
-        print(f"Restored indices - k: {k_restored}, l: {l_restored}")
-        
-        # Verify round-trip conversion
-        self.assertTrue(torch.all(k_indices == k_restored), 
-                       f"k_indices {k_indices} != k_restored {k_restored}")
-        self.assertTrue(torch.all(l_indices == l_restored),
-                       f"l_indices {l_indices} != l_restored {l_restored}")
-        
-        # Test specific cases
-        l_dim = int(model.lsampling[2])
-        
-        # Test (0,0,0) -> flat -> (0,0)
-        flat_idx = model._3d_to_flat_indices(
-            torch.tensor([0], device=self.device),
-            torch.tensor([0], device=self.device),
-            torch.tensor([0], device=self.device)
-        )
-        self.assertEqual(flat_idx.item(), 0)
-        
-        # Test (0,1,0) -> flat -> (1,0)
-        flat_idx = model._3d_to_flat_indices(
-            torch.tensor([0], device=self.device),
-            torch.tensor([1], device=self.device),
-            torch.tensor([0], device=self.device)
-        )
-        self.assertEqual(flat_idx.item(), l_dim)
-    
-    def test_batched_kvector_generation(self):
-        """Test k-vector generation in batched and non-batched modes."""
-        # Create models with different batching settings
-        batched_model = self.create_test_models(use_batching=True)
-        nonbatched_model = self.create_test_models(use_batching=False)
-        
-        # Generate k-vectors
-        batched_model._build_kvec_Brillouin()
-        nonbatched_model._build_kvec_Brillouin()
-        
-        # Convert batched output to original format for comparison
-        batched_kvec_original = batched_model.to_original_shape(batched_model.kvec)
-        batched_norm_original = batched_model.to_original_shape(batched_model.kvec_norm)
-        
-        # Compare values
-        self.assertTrue(torch.allclose(batched_kvec_original, nonbatched_model.kvec))
-        self.assertTrue(torch.allclose(batched_norm_original, nonbatched_model.kvec_norm))
-        
-        # Verify shapes
-        h_dim = int(batched_model.hsampling[2])
-        k_dim = int(batched_model.ksampling[2])
-        l_dim = int(batched_model.lsampling[2])
-        
-        self.assertEqual(batched_model.kvec.shape, (h_dim, k_dim * l_dim, 3))
-        self.assertEqual(batched_model.kvec_norm.shape, (h_dim, k_dim * l_dim, 1))
-        self.assertEqual(nonbatched_model.kvec.shape, (h_dim, k_dim, l_dim, 3))
-        self.assertEqual(nonbatched_model.kvec_norm.shape, (h_dim, k_dim, l_dim, 1))
-    
-    def test_at_kvec_from_miller_points(self):
-        """Test _at_kvec_from_miller_points with different input formats."""
-        # Create model
-        model = self.create_test_models(use_batching=True)
-        
-        # Test traditional format input (h, k, l)
-        traditional_input = (0, 0, 0)
-        traditional_output = model._at_kvec_from_miller_points(traditional_input)
-        
-        # Test batched format input (h, flat_idx)
-        batched_input = (0, 0)  # Equivalent to (0, 0, 0)
-        batched_output = model._at_kvec_from_miller_points(batched_input)
-        
-        # Verify both formats produce the same output
-        self.assertTrue(torch.all(traditional_output == batched_output))
-        
-        # Test edge cases
-        # Maximum values
+        # Get dimensions
         h_dim = int(model.hsampling[2])
         k_dim = int(model.ksampling[2])
         l_dim = int(model.lsampling[2])
         
-        max_traditional = (h_dim-1, k_dim-1, l_dim-1)
-        max_batched = (h_dim-1, (k_dim-1) * l_dim + (l_dim-1))
+        # Test case 1: Single index
+        h, k, l = 1, 1, 1
+        flat_idx = h * (k_dim * l_dim) + k * l_dim + l
         
-        max_traditional_output = model._at_kvec_from_miller_points(max_traditional)
-        max_batched_output = model._at_kvec_from_miller_points(max_batched)
+        # Convert to 3D indices
+        h_computed, k_computed, l_computed = model._flat_to_3d_indices(torch.tensor([flat_idx], device=self.device))
         
-        # Verify outputs match for equivalent inputs
-        self.assertTrue(torch.all(max_traditional_output == max_batched_output))
+        # Verify conversion
+        self.assertEqual(h_computed.item(), h)
+        self.assertEqual(k_computed.item(), k)
+        self.assertEqual(l_computed.item(), l)
+        
+        # Convert back to flat index
+        flat_computed = model._3d_to_flat_indices(
+            torch.tensor([h], device=self.device),
+            torch.tensor([k], device=self.device),
+            torch.tensor([l], device=self.device)
+        )
+        
+        # Verify round-trip conversion
+        self.assertEqual(flat_computed.item(), flat_idx)
+        
+        # Test case 2: Multiple indices
+        h_indices = torch.tensor([0, 1, 0, 1], device=self.device)
+        k_indices = torch.tensor([0, 0, 1, 1], device=self.device)
+        l_indices = torch.tensor([0, 1, 1, 0], device=self.device)
+        
+        # Convert to flat indices
+        flat_indices = model._3d_to_flat_indices(h_indices, k_indices, l_indices)
+        
+        # Convert back to 3D
+        h_computed, k_computed, l_computed = model._flat_to_3d_indices(flat_indices)
+        
+        # Verify round-trip conversion
+        self.assertTrue(torch.all(h_computed == h_indices))
+        self.assertTrue(torch.all(k_computed == k_indices))
+        self.assertTrue(torch.all(l_computed == l_indices))
+    
+    def test_batched_vs_nonbatched_kvec_brillouin(self):
+        """Test that batched k-vector generation matches non-batched results."""
+        # Create two models: one with batching, one without
+        pdb_path = "tests/pdbs/5zck_p1.pdb"
+        model_batched = OnePhonon(
+            pdb_path,
+            [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],
+            expand_p1=True,
+            use_batching=True,
+            device=self.device
+        )
+        
+        model_nonbatched = OnePhonon(
+            pdb_path,
+            [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],
+            expand_p1=True,
+            use_batching=False,
+            device=self.device
+        )
+        
+        # Generate k-vectors with both implementations
+        model_batched._build_kvec_Brillouin()
+        model_nonbatched._build_kvec_Brillouin()
+        
+        # Convert batched result to original shape for comparison
+        kvec_batched_original = model_batched.to_original_shape(model_batched.kvec)
+        kvec_norm_batched_original = model_batched.to_original_shape(model_batched.kvec_norm)
+        
+        # Compare results
+        self.assertTrue(torch.allclose(kvec_batched_original, model_nonbatched.kvec, rtol=1e-5, atol=1e-8))
+        self.assertTrue(torch.allclose(kvec_norm_batched_original, model_nonbatched.kvec_norm, rtol=1e-5, atol=1e-8))
+        
+        # Verify gradient requirements
+        self.assertTrue(model_batched.kvec.requires_grad)
+        self.assertTrue(model_batched.kvec_norm.requires_grad)
+        
+        # Verify shapes
+        h_dim = int(model_batched.hsampling[2])
+        k_dim = int(model_batched.ksampling[2])
+        l_dim = int(model_batched.lsampling[2])
+        
+        self.assertEqual(model_batched.kvec.shape, (h_dim * k_dim * l_dim, 3))
+        self.assertEqual(model_batched.kvec_norm.shape, (h_dim * k_dim * l_dim, 1))
+        self.assertEqual(model_nonbatched.kvec.shape, (h_dim, k_dim, l_dim, 3))
+        self.assertEqual(model_nonbatched.kvec_norm.shape, (h_dim, k_dim, l_dim, 1))
+    
+    def test_at_kvec_from_miller_points_fully_collapsed(self):
+        """Test that _at_kvec_from_miller_points works with fully collapsed indices."""
+        # Create batched and non-batched models
+        pdb_path = "tests/pdbs/5zck_p1.pdb"
+        model_batched = OnePhonon(
+            pdb_path,
+            [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],
+            expand_p1=True,
+            use_batching=True,
+            device=self.device
+        )
+        
+        model_nonbatched = OnePhonon(
+            pdb_path,
+            [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],
+            expand_p1=True,
+            use_batching=False,
+            device=self.device
+        )
+        
+        # Get dimensions
+        h_dim = int(model_batched.hsampling[2])
+        k_dim = int(model_batched.ksampling[2])
+        l_dim = int(model_batched.lsampling[2])
+        
+        # Test with traditional format
+        h, k, l = 1, 1, 1
+        indices_nonbatched = model_nonbatched._at_kvec_from_miller_points((h, k, l))
+        indices_batched = model_batched._at_kvec_from_miller_points((h, k, l))
+        
+        # Verify both implementations return the same indices
+        self.assertTrue(torch.all(indices_nonbatched == indices_batched))
+        
+        # Test with fully collapsed format
+        flat_idx = h * (k_dim * l_dim) + k * l_dim + l
+        indices_from_flat = model_batched._at_kvec_from_miller_points(flat_idx)
+        
+        # Verify flat index input produces the same result as tuple input
+        self.assertTrue(torch.all(indices_batched == indices_from_flat))
+        
+        # Test with edge cases
+        # Case 1: Origin (0, 0, 0)
+        self.assertTrue(torch.all(
+            model_batched._at_kvec_from_miller_points((0, 0, 0)) == 
+            model_batched._at_kvec_from_miller_points(0)
+        ))
+        
+        # Case 2: Maximum indices
+        max_h, max_k, max_l = h_dim - 1, k_dim - 1, l_dim - 1
+        max_flat = max_h * (k_dim * l_dim) + max_k * l_dim + max_l
+        self.assertTrue(torch.all(
+            model_batched._at_kvec_from_miller_points((max_h, max_k, max_l)) == 
+            model_batched._at_kvec_from_miller_points(max_flat)
+        ))
 
 if __name__ == '__main__':
     unittest.main()

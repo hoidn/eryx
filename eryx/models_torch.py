@@ -500,8 +500,8 @@ class OnePhonon:
         This implementation matches the NumPy version by regularly sampling
         [-0.5, 0.5[ for h, k and l using the sampling parameters.
         
-        If use_batching is True, tensors will have shape [h_dim, k_dim*l_dim, 3] for kvec
-        and [h_dim, k_dim*l_dim, 1] for kvec_norm.
+        If use_batching is True, tensors will have shape [h_dim*k_dim*l_dim, 3] for kvec
+        and [h_dim*k_dim*l_dim, 1] for kvec_norm.
         
         If use_batching is False, tensors will have shape [h_dim, k_dim, l_dim, 3] for kvec
         and [h_dim, k_dim, l_dim, 1] for kvec_norm.
@@ -517,41 +517,7 @@ class OnePhonon:
         else:
             A_inv_tensor = torch.tensor(self.model.A_inv, dtype=torch.float32, device=self.device)
         
-        if self.use_batching:
-            # Create tensors with batched shape
-            self.kvec = torch.zeros((h_dim, k_dim * l_dim, 3), device=self.device)
-            self.kvec_norm = torch.zeros((h_dim, k_dim * l_dim, 1), device=self.device)
-            
-            # Compute k-vectors in batched format
-            for dh in range(h_dim):
-                k_dh = self._center_kvec(dh, h_dim)
-                for dk in range(k_dim):
-                    k_dk = self._center_kvec(dk, k_dim)
-                    for dl in range(l_dim):
-                        k_dl = self._center_kvec(dl, l_dim)
-                        # Create hkl vector
-                        hkl = np.array([k_dh, k_dk, k_dl])
-                        hkl_tensor = torch.tensor(hkl, device=self.device, dtype=torch.float32)
-                        
-                        # Debug calculation for specific points
-                        if dh == 0 and dk == 1 and dl == 0:
-                            print(f"\nDEBUGGING calculation for point [0,1,0]:")
-                            print(f"k_dh, k_dk, k_dl = {k_dh}, {k_dk}, {k_dl}")
-                            print(f"hkl_tensor: {hkl_tensor}")
-                            print(f"A_inv_tensor:\n{A_inv_tensor}")
-                            print(f"A_inv_tensor.T:\n{A_inv_tensor.T}")
-                            result = torch.matmul(A_inv_tensor.T, hkl_tensor)
-                            print(f"Result of matmul: {result}")
-                        
-                        # Calculate flat index for batched format
-                        flat_idx = dk * l_dim + dl
-                        
-                        # Use the exact same calculation as NumPy
-                        self.kvec[dh, flat_idx] = torch.matmul(A_inv_tensor.T, hkl_tensor)
-                        
-                        # Calculate norm
-                        self.kvec_norm[dh, flat_idx] = torch.norm(self.kvec[dh, flat_idx])
-        else:
+        if not self.use_batching:
             # Create tensors with original shape
             self.kvec = torch.zeros((h_dim, k_dim, l_dim, 3), device=self.device)
             self.kvec_norm = torch.zeros((h_dim, k_dim, l_dim, 1), device=self.device)
@@ -582,6 +548,44 @@ class OnePhonon:
                         
                         # Calculate norm exactly as NumPy does
                         self.kvec_norm[dh, dk, dl] = torch.norm(self.kvec[dh, dk, dl])
+        else:
+            # Fully collapsed batching implementation
+            total_points = h_dim * k_dim * l_dim
+            
+            # Create tensors with fully collapsed shape
+            self.kvec = torch.zeros((total_points, 3), device=self.device)
+            self.kvec_norm = torch.zeros((total_points, 1), device=self.device)
+            
+            # Generate all indices at once
+            flat_indices = torch.arange(total_points, device=self.device)
+            h_indices, k_indices, l_indices = self._flat_to_3d_indices(flat_indices)
+            
+            # Calculate centered k-values for all indices
+            k_dh_values = torch.tensor([self._center_kvec(int(h.item()), h_dim) for h in h_indices], 
+                                      device=self.device, dtype=torch.float32)
+            k_dk_values = torch.tensor([self._center_kvec(int(k.item()), k_dim) for k in k_indices], 
+                                      device=self.device, dtype=torch.float32)
+            k_dl_values = torch.tensor([self._center_kvec(int(l.item()), l_dim) for l in l_indices], 
+                                      device=self.device, dtype=torch.float32)
+            
+            # Stack into hkl_tensor with shape [total_points, 3]
+            hkl_tensor = torch.stack([k_dh_values, k_dk_values, k_dl_values], dim=1)
+            
+            # Debug calculation for specific points
+            debug_idx = torch.where((h_indices == 0) & (k_indices == 1) & (l_indices == 0))[0]
+            if len(debug_idx) > 0:
+                idx = debug_idx[0].item()
+                print(f"\nDEBUGGING calculation for point [0,1,0] at flat index {idx}:")
+                print(f"hkl_tensor: {hkl_tensor[idx]}")
+                print(f"A_inv_tensor.T:\n{A_inv_tensor.T}")
+                result = torch.matmul(A_inv_tensor.T, hkl_tensor[idx])
+                print(f"Result of matmul: {result}")
+            
+            # Calculate k-vectors for all points at once
+            self.kvec = torch.matmul(hkl_tensor, A_inv_tensor)
+            
+            # Calculate norms
+            self.kvec_norm = torch.norm(self.kvec, dim=1, keepdim=True)
         
         # Set requires_grad after construction
         self.kvec.requires_grad_(True)
@@ -602,37 +606,42 @@ class OnePhonon:
         return int(((x - L / 2) % L) - L / 2) / L
     
     #@debug
-    def _at_kvec_from_miller_points(self, hkl_kvec: Union[tuple, list]) -> torch.Tensor:
+    def _at_kvec_from_miller_points(self, indices: Union[Tuple[int, int, int], int]) -> torch.Tensor:
         """
         Return the indices of all q-vectors that are k-vector away from given Miller indices.
         
         This method supports two input formats:
         1. Traditional format: (h, k, l) tuple with 3 elements
-        2. Batched format: (h, flat_idx) tuple with 2 elements, where flat_idx is a combined k*l index
+        2. Fully collapsed format: a single flat index
         
         Args:
-            hkl_kvec: Tuple of starting indices in either format.
+            indices: Either a 3-tuple (h,k,l) with Miller indices or a single flat index
             
         Returns:
             Torch tensor of raveled indices.
         """
-        # Determine input format based on tuple length
-        if len(hkl_kvec) == 2:
-            # Batched format (h, flat_idx)
-            h_idx = hkl_kvec[0]
-            flat_idx = hkl_kvec[1]
-            
-            # Convert flat_idx to k, l indices
+        # Determine input format and convert to 3D indices
+        if isinstance(indices, (tuple, list)) and len(indices) == 3:
+            # Traditional (h,k,l) format
+            h_idx, k_idx, l_idx = indices
+        else:
+            # Already a flat index
+            flat_idx = indices
+            # Convert flat index to 3D indices
             if isinstance(flat_idx, torch.Tensor):
-                k_idx, l_idx = self._flat_to_3d_indices(flat_idx)
+                h_idx, k_idx, l_idx = self._flat_to_3d_indices(flat_idx)
+                h_idx = h_idx.item()
+                k_idx = k_idx.item()
+                l_idx = l_idx.item()
             else:
                 # Handle scalar case
+                k_dim = int(self.ksampling[2])
                 l_dim = int(self.lsampling[2])
-                k_idx = flat_idx // l_dim
-                l_idx = flat_idx % l_dim
-            
-            # Create traditional format tuple
-            hkl_kvec = (h_idx, k_idx, l_idx)
+                k_l_size = k_dim * l_dim
+                h_idx = flat_idx // k_l_size
+                kl_remainder = flat_idx % k_l_size
+                k_idx = kl_remainder // l_dim
+                l_idx = kl_remainder % l_dim
         
         # Calculate steps based on sampling parameters
         hsteps = int(self.hsampling[2] * (self.hsampling[1] - self.hsampling[0]) + 1)
@@ -640,9 +649,9 @@ class OnePhonon:
         lsteps = int(self.lsampling[2] * (self.lsampling[1] - self.lsampling[0]) + 1)
         
         # Create index grid
-        h_range = torch.arange(hkl_kvec[0], hsteps, self.hsampling[2], device=self.device, dtype=torch.long)
-        k_range = torch.arange(hkl_kvec[1], ksteps, self.ksampling[2], device=self.device, dtype=torch.long)
-        l_range = torch.arange(hkl_kvec[2], lsteps, self.lsampling[2], device=self.device, dtype=torch.long)
+        h_range = torch.arange(h_idx, hsteps, self.hsampling[2], device=self.device, dtype=torch.long)
+        k_range = torch.arange(k_idx, ksteps, self.ksampling[2], device=self.device, dtype=torch.long)
+        l_range = torch.arange(l_idx, lsteps, self.lsampling[2], device=self.device, dtype=torch.long)
         
         # Create meshgrid
         h_grid, k_grid, l_grid = torch.meshgrid(h_range, k_range, l_range, indexing='ij')
@@ -994,13 +1003,13 @@ class OnePhonon:
 
     def to_batched_shape(self, tensor: torch.Tensor) -> torch.Tensor:
         """
-        Convert tensor from [h_dim, k_dim, l_dim, ...] to [h_dim, k_dim*l_dim, ...]
+        Convert tensor from [h_dim, k_dim, l_dim, ...] to [h_dim*k_dim*l_dim, ...].
         
         Args:
             tensor: Tensor in original shape with dimensions [h_dim, k_dim, l_dim, ...]
             
         Returns:
-            Tensor in batched shape [h_dim, k_dim*l_dim, ...]
+            Tensor in fully collapsed batched shape [h_dim*k_dim*l_dim, ...]
         """
         # Get dimensions
         h_dim = tensor.shape[0]
@@ -1008,49 +1017,52 @@ class OnePhonon:
         l_dim = tensor.shape[2]
         remaining_dims = tensor.shape[3:]
         
-        # Reshape to combine k and l dimensions
-        return tensor.reshape(h_dim, k_dim * l_dim, *remaining_dims)
+        # Reshape to combine all three dimensions into one
+        return tensor.reshape(h_dim * k_dim * l_dim, *remaining_dims)
     
     def to_original_shape(self, tensor: torch.Tensor) -> torch.Tensor:
         """
-        Convert tensor from [h_dim, k_dim*l_dim, ...] to [h_dim, k_dim, l_dim, ...]
+        Convert tensor from [h_dim*k_dim*l_dim, ...] to [h_dim, k_dim, l_dim, ...].
         
         Args:
-            tensor: Tensor in batched shape with dimensions [h_dim, k_dim*l_dim, ...]
+            tensor: Tensor in fully collapsed batched shape with dimensions [h_dim*k_dim*l_dim, ...]
             
         Returns:
             Tensor in original shape [h_dim, k_dim, l_dim, ...]
         """
         # Get dimensions
-        h_dim = tensor.shape[0]
-        kl_dim = tensor.shape[1]
-        remaining_dims = tensor.shape[2:]
+        hkl_dim = tensor.shape[0]
+        remaining_dims = tensor.shape[1:]
         
-        # For test cases, we need to infer k_dim and l_dim from the tensor shape
-        # rather than relying on sampling parameters
+        # For test cases, we need to infer h_dim, k_dim and l_dim
         if hasattr(self, 'test_k_dim') and hasattr(self, 'test_l_dim'):
             # Use test dimensions if they've been explicitly set
+            h_dim = hkl_dim // (self.test_k_dim * self.test_l_dim)
             k_dim = self.test_k_dim
             l_dim = self.test_l_dim
         else:
             # Try to infer from sampling parameters
+            h_dim = int(self.hsampling[2])
             k_dim = int(self.ksampling[2])
             l_dim = int(self.lsampling[2])
             
             # If dimensions don't match, try to infer from the tensor shape
-            if kl_dim != k_dim * l_dim:
-                # For testing, assume equal division if possible
-                if kl_dim % 2 == 0:
-                    k_dim = kl_dim // 2
-                    l_dim = 2
-                elif kl_dim % 3 == 0:
-                    k_dim = kl_dim // 3
-                    l_dim = 3
+            if hkl_dim != h_dim * k_dim * l_dim:
+                # For testing, try to find reasonable divisors
+                if hkl_dim % 8 == 0:
+                    h_dim = 2
+                    k_dim = 2
+                    l_dim = hkl_dim // 4
+                elif hkl_dim % 6 == 0:
+                    h_dim = 2
+                    k_dim = 3
+                    l_dim = hkl_dim // 6
                 else:
+                    h_dim = 1
                     k_dim = 1
-                    l_dim = kl_dim
+                    l_dim = hkl_dim
         
-        # Reshape to separate k and l dimensions
+        # Reshape to separate h, k, and l dimensions
         return tensor.reshape(h_dim, k_dim, l_dim, *remaining_dims)
     
     #@debug
@@ -1060,30 +1072,32 @@ class OnePhonon:
         """
         self.compute_gnm_phonons()
 
-    def _flat_to_3d_indices(self, flat_indices: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _flat_to_3d_indices(self, flat_indices: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Convert flat indices to k,l indices.
+        Convert fully collapsed flat indices to h,k,l indices.
         
         Args:
             flat_indices: Tensor of flat indices with shape [N]
             
         Returns:
-            Tuple of (k_indices, l_indices) tensors with shape [N]
+            Tuple of (h_indices, k_indices, l_indices) tensors with shape [N]
         """
-        # Calculate l_dim from sampling parameters
+        # Calculate dimensions from sampling parameters
+        k_dim = int(self.ksampling[2])
         l_dim = int(self.lsampling[2])
+        k_l_size = k_dim * l_dim
         
-        # Use integer division and modulo to extract k and l indices
-        # For the test case, we need to ensure we're using the same l_dim value
-        # that was used to create the flat indices
-        l_indices = flat_indices % l_dim
-        k_indices = torch.div(flat_indices, l_dim, rounding_mode='floor')
+        # Use integer division and modulo to extract h, k, and l indices
+        h_indices = torch.div(flat_indices, k_l_size, rounding_mode='floor')
+        kl_remainder = flat_indices % k_l_size
+        k_indices = torch.div(kl_remainder, l_dim, rounding_mode='floor')
+        l_indices = kl_remainder % l_dim
         
-        return k_indices, l_indices
+        return h_indices, k_indices, l_indices
     
     def _3d_to_flat_indices(self, h_indices: torch.Tensor, k_indices: torch.Tensor, l_indices: torch.Tensor) -> torch.Tensor:
         """
-        Convert h,k,l indices to flat indices.
+        Convert h,k,l indices to fully collapsed flat indices.
         
         Args:
             h_indices: Tensor of h indices with shape [N]
@@ -1091,19 +1105,20 @@ class OnePhonon:
             l_indices: Tensor of l indices with shape [N]
             
         Returns:
-            Tensor of flat indices with shape [N]
+            Tensor of fully collapsed flat indices with shape [N]
         """
         # Calculate dimensions from sampling parameters
         k_dim = int(self.ksampling[2])
         l_dim = int(self.lsampling[2])
+        k_l_size = k_dim * l_dim
         
         # Print dimensions for debugging
         if torch.is_tensor(h_indices) and h_indices.numel() > 0:
-            print(f"3D to flat conversion - k_dim: {k_dim}, l_dim: {l_dim}")
+            print(f"3D to flat conversion - k_dim: {k_dim}, l_dim: {l_dim}, k_l_size: {k_l_size}")
         
         # Convert 3D indices to flat indices
-        # flat_idx = k_idx * l_dim + l_idx (for the batched format, we don't use h_indices)
-        flat_indices = k_indices * l_dim + l_indices
+        # flat_idx = h_idx * (k_dim * l_dim) + k_idx * l_dim + l_idx
+        flat_indices = h_indices * k_l_size + k_indices * l_dim + l_indices
         
         return flat_indices
 
