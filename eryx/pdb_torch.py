@@ -123,8 +123,9 @@ class GaussianNetworkModel:
         batch_size = kvec_batch.shape[0]
         
         # Start with reference cell contributions (which don't depend on k-vector)
-        # Expand to batch dimension by repeating reference cell hessian
-        Kmat_batch = hessian[:, :, self.id_cell_ref, :, :].clone().expand(batch_size, -1, -1, -1, -1)
+        # Create a proper copy by using repeat instead of expand to avoid overlapping memory
+        ref_cell_hessian = hessian[:, :, self.id_cell_ref, :, :].clone()
+        Kmat_batch = ref_cell_hessian.unsqueeze(0).repeat(batch_size, 1, 1, 1, 1)
         
         # Handle complex data type for batch
         if hessian.dtype != torch.complex64:
