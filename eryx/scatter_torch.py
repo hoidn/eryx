@@ -19,6 +19,9 @@ def compute_form_factors(q_grid: torch.Tensor, ff_a: torch.Tensor,
     """
     Calculate atomic form factors at the input q-vectors using PyTorch.
     
+    This optimized version efficiently handles fully collapsed tensor format
+    where q_grid has shape [n_points, 3] with n_points = h_dim * k_dim * l_dim.
+    
     Args:
         q_grid: PyTorch tensor of shape (n_points, 3) containing q-vectors in Angstrom
         ff_a: PyTorch tensor of shape (n_atoms, 4) with a coefficients of atomic form factors
@@ -31,24 +34,40 @@ def compute_form_factors(q_grid: torch.Tensor, ff_a: torch.Tensor,
     References:
         - Original implementation: eryx/scatter.py:compute_form_factors
     """
-    # Calculate Q = ||q||^2 / (4*pi)^2
-    Q = torch.square(torch.norm(q_grid, dim=1) / (4 * torch.pi))
+    # Compute q^2 / (16π^2) for each q-vector
+    # Shape: [n_points, 1]
+    q_squared = torch.sum(q_grid * q_grid, dim=1, keepdim=True) / (16 * torch.pi * torch.pi)
     
-    # Reshape Q for broadcasting with ff_a and ff_b
-    # Q shape: (n_points, 1, 1)
-    Q = Q.view(-1, 1, 1)
+    # Prepare form factor arrays
+    # ff_a, ff_b: [n_atoms, 4] → [1, n_atoms, 4]
+    # q_squared: [n_points, 1] → [n_points, 1, 1]
+    ff_a_expanded = ff_a.unsqueeze(0)
+    ff_b_expanded = ff_b.unsqueeze(0)
+    q_squared_expanded = q_squared.unsqueeze(2)
     
-    # Compute the exponential terms for each atom and coefficient
-    # ff_a shape: (n_atoms, 4, 1) for broadcasting
-    # ff_b shape: (n_atoms, 4, 1) for broadcasting
-    exp_terms = ff_a.unsqueeze(-1) * torch.exp(-1 * ff_b.unsqueeze(-1) * Q.transpose(0, 2))
+    # Compute Gaussian form factor components: a_i * exp(-b_i * s^2)
+    # Broadcasting: [n_points, 1, 1] * [1, n_atoms, 4] = [n_points, n_atoms, 4]
+    # The exponential is applied to all elements simultaneously
+    exponents = -ff_b_expanded * q_squared_expanded
     
-    # Sum over coefficients (dim=1) and add ff_c
-    # Result shape before adding ff_c: (n_atoms, n_points)
-    fj = torch.sum(exp_terms, dim=1) + ff_c.unsqueeze(-1)
+    # Clamp extreme values to avoid numerical issues
+    exponents = torch.clamp(exponents, min=-50.0, max=50.0)
     
-    # Transpose to get shape (n_points, n_atoms)
-    return fj.transpose(0, 1)
+    # Compute the exponential terms
+    exp_terms = torch.exp(exponents)
+    
+    # Multiply by a coefficients and sum over the 4 Gaussian components
+    # [n_points, n_atoms, 4] × [1, n_atoms, 4] = [n_points, n_atoms, 4]
+    gaussian_terms = ff_a_expanded * exp_terms
+    
+    # Sum over the last dimension to get [n_points, n_atoms]
+    ff_gauss = torch.sum(gaussian_terms, dim=2)
+    
+    # Add the constant term c
+    # [n_points, n_atoms] + [1, n_atoms] = [n_points, n_atoms]
+    form_factors = ff_gauss + ff_c.unsqueeze(0)
+    
+    return form_factors
 
 def structure_factors_batch(q_grid: torch.Tensor, xyz: torch.Tensor, 
                            ff_a: torch.Tensor, ff_b: torch.Tensor, ff_c: torch.Tensor, 
@@ -56,6 +75,29 @@ def structure_factors_batch(q_grid: torch.Tensor, xyz: torch.Tensor,
                            compute_qF: bool = False, 
                            project_on_components: Optional[torch.Tensor] = None,
                            sum_over_atoms: bool = True) -> torch.Tensor:
+    """
+    Compute structure factors for an atomic model at the given q-vectors using PyTorch.
+    
+    This optimized version efficiently handles fully collapsed tensor format
+    where q_grid has shape [n_points, 3] with n_points = h_dim * k_dim * l_dim.
+    
+    Args:
+        q_grid: PyTorch tensor of shape (n_points, 3) with q-vectors in Angstrom
+        xyz: PyTorch tensor of shape (n_atoms, 3) with atomic positions in Angstrom
+        ff_a: PyTorch tensor of shape (n_atoms, 4) with a coefficients
+        ff_b: PyTorch tensor of shape (n_atoms, 4) with b coefficients 
+        ff_c: PyTorch tensor of shape (n_atoms,) with c coefficients
+        U: Optional PyTorch tensor of shape (n_atoms,) with isotropic displacement parameters
+        compute_qF: If True, return structure factors times q-vectors
+        project_on_components: Optional projection matrix
+        sum_over_atoms: If True, sum over atoms; otherwise return per-atom values
+        
+    Returns:
+        PyTorch tensor containing structure factors
+        
+    References:
+        - Original implementation: eryx/scatter.py:structure_factors_batch
+    """
     # Determine the primary dtype to use (prefer float64 if any input is float64)
     dtype = torch.float32
     for tensor in [q_grid, xyz, ff_a, ff_b, ff_c]:
@@ -75,52 +117,33 @@ def structure_factors_batch(q_grid: torch.Tensor, xyz: torch.Tensor,
     
     if project_on_components is not None:
         project_on_components = project_on_components.to(dtype=dtype)
-    """
-    Compute structure factors for an atomic model at the given q-vectors using PyTorch.
+        
+    # Import ComplexTensorOps for optimized complex operations
+    from eryx.torch_utils import ComplexTensorOps
     
-    Args:
-        q_grid: PyTorch tensor of shape (n_points, 3) with q-vectors in Angstrom
-        xyz: PyTorch tensor of shape (n_atoms, 3) with atomic positions in Angstrom
-        ff_a: PyTorch tensor of shape (n_atoms, 4) with a coefficients
-        ff_b: PyTorch tensor of shape (n_atoms, 4) with b coefficients 
-        ff_c: PyTorch tensor of shape (n_atoms,) with c coefficients
-        U: Optional PyTorch tensor of shape (n_atoms,) with isotropic displacement parameters
-        compute_qF: If True, return structure factors times q-vectors
-        project_on_components: Optional projection matrix
-        sum_over_atoms: If True, sum over atoms; otherwise return per-atom values
-        
-    Returns:
-        PyTorch tensor containing structure factors
-        
-    References:
-        - Original implementation: eryx/scatter.py:structure_factors_batch
-    """
+    # Get dimensions
+    n_points = q_grid.shape[0]
+    n_atoms = xyz.shape[0]
+    
     # Handle None for U by creating zero tensor
     if U is None:
-        U = torch.zeros(xyz.shape[0], device=xyz.device)
+        U = torch.zeros(n_atoms, device=xyz.device, dtype=dtype)
     
-    # Compute form factors
-    fj = compute_form_factors(q_grid, ff_a, ff_b, ff_c)
+    # Compute form factors efficiently
+    fj = compute_form_factors(q_grid, ff_a, ff_b, ff_c)  # [n_points, n_atoms]
     
-    # Calculate q magnitudes
-    qmags = torch.norm(q_grid, dim=1)
+    # Compute q·r for all q-vectors and all atoms efficiently
+    # q_grid: [n_points, 3], xyz: [n_atoms, 3]
+    # Result: [n_points, n_atoms]
+    q_dot_r = torch.matmul(q_grid, xyz.transpose(0, 1))
+    
+    # Compute complex exponentials e^(i*q·r) efficiently
+    real_part, imag_part = ComplexTensorOps.complex_exp(q_dot_r)
     
     # Calculate Debye-Waller factors
     # qUq = |q|^2 * U
-    qUq = torch.square(qmags.unsqueeze(1)) * U
-    
-    # Import complex operations from torch_utils
-    from eryx.torch_utils import ComplexTensorOps
-    
-    # Calculate phases (q·r)
-    # q_grid: (n_points, 3), xyz.T: (3, n_atoms) -> phases: (n_points, n_atoms)
-    phases = torch.matmul(q_grid, xyz.T)
-    
-    # Compute complex exponentials e^(iq·r)
-    real_part, imag_part = ComplexTensorOps.complex_exp(phases)
-    
-    # Apply Debye-Waller factor
-    dwf = torch.exp(-0.5 * qUq)
+    q_squared = torch.sum(q_grid * q_grid, dim=1, keepdim=True)  # [n_points, 1]
+    dwf = torch.exp(-0.5 * q_squared * U.unsqueeze(0))
     
     # Combine form factors, phase factors, and DW factors
     # Form structure factors: f_j * e^(iq·r) * e^(-0.5*qUq)

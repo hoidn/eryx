@@ -155,6 +155,75 @@ class TestBatchedImplementation(TestBase):
         self.assertTrue(torch.all(k_computed == k_indices))
         self.assertTrue(torch.all(l_computed == l_indices))
         
+    def test_batched_structure_factors(self):
+        """
+        Test that batched structure factor calculation works correctly.
+        
+        This test verifies that the structure_factors function correctly handles
+        fully collapsed tensor format and produces correct results.
+        """
+        # Import necessary functions
+        from eryx.scatter_torch import structure_factors, structure_factors_batch
+        
+        # Create test inputs
+        # Define a small grid of q-vectors
+        q_grid = torch.tensor([
+            [0.1, 0.2, 0.3],
+            [0.2, 0.3, 0.4],
+            [0.3, 0.4, 0.5],
+            [0.4, 0.5, 0.6]
+        ], device=self.device)
+        
+        # Define a small set of atoms
+        xyz = torch.tensor([
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0]
+        ], device=self.device)
+        
+        # Define simple form factors
+        ff_a = torch.ones((3, 4), device=self.device)
+        ff_b = torch.ones((3, 4), device=self.device) * 0.1
+        ff_c = torch.zeros(3, device=self.device)
+        
+        # Define ADPs
+        U = torch.ones(3, device=self.device) * 0.5
+        
+        # Compute structure factors with and without batching
+        # Set batch_size to 2 to force multiple batches
+        sf_batched = structure_factors(q_grid, xyz, ff_a, ff_b, ff_c, U, batch_size=2)
+        
+        # Compute structure factors directly with structure_factors_batch
+        sf_direct = structure_factors_batch(q_grid, xyz, ff_a, ff_b, ff_c, U)
+        
+        # Verify results match
+        self.assertTrue(torch.allclose(sf_batched, sf_direct, rtol=1e-5, atol=1e-8),
+                      "Batched and direct structure factor calculations should match")
+        
+        # Test with q-weighted structure factors
+        # Create simple projection matrix
+        n_dof = 2
+        project_components = torch.zeros((3*3, n_dof), device=self.device)
+        project_components[0, 0] = 1.0  # First atom, x-component projects to first mode
+        project_components[4, 1] = 1.0  # Second atom, y-component projects to second mode
+        
+        # Compute q-weighted structure factors with and without batching
+        sf_qF_batched = structure_factors(
+            q_grid, xyz, ff_a, ff_b, ff_c, U, 
+            batch_size=2, compute_qF=True, 
+            project_on_components=project_components
+        )
+        
+        # Compute directly
+        sf_qF_direct = structure_factors_batch(
+            q_grid, xyz, ff_a, ff_b, ff_c, U,
+            compute_qF=True, project_on_components=project_components
+        )
+        
+        # Verify results match
+        self.assertTrue(torch.allclose(sf_qF_batched, sf_qF_direct, rtol=1e-5, atol=1e-8),
+                      "Batched and direct q-weighted structure factor calculations should match")
+        
     def test_batched_vs_nonbatched_compute_K(self):
         """Test that compute_K_batched produces equivalent results to compute_K."""
         # Import necessary components
@@ -759,6 +828,78 @@ class TestBatchedImplementation(TestBase):
         nan_mask_nonbatched = torch.isnan(intensity_nonbatched)
         nan_mask_batched = torch.isnan(intensity_batched_reshaped)
         self.assertTrue(torch.all(nan_mask_nonbatched == nan_mask_batched))
+        
+    def test_gradient_flow_through_structure_factors(self):
+        """
+        Test gradient flow through batched structure factor calculations.
+        
+        This test verifies that gradients properly flow through the structure_factors
+        function when using fully collapsed tensor format.
+        """
+        # Import necessary functions
+        from eryx.scatter_torch import structure_factors
+        
+        # Create test inputs that require gradients
+        # q_grid requires gradients for optimization
+        q_grid = torch.tensor([
+            [0.1, 0.2, 0.3],
+            [0.2, 0.3, 0.4],
+            [0.3, 0.4, 0.5],
+            [0.4, 0.5, 0.6]
+        ], device=self.device, requires_grad=True)
+        
+        # Atomic positions may also be optimized
+        xyz = torch.tensor([
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0]
+        ], device=self.device, requires_grad=True)
+        
+        # Form factors
+        ff_a = torch.ones((3, 4), device=self.device)
+        ff_b = torch.ones((3, 4), device=self.device) * 0.1
+        ff_c = torch.zeros(3, device=self.device)
+        
+        # ADPs may also be optimized
+        U = torch.ones(3, device=self.device, requires_grad=True) * 0.5
+        
+        # Compute structure factors with batch_size=2 to force multiple batches
+        sf = structure_factors(q_grid, xyz, ff_a, ff_b, ff_c, U, batch_size=2)
+        
+        # Create a simple scalar loss function
+        loss = torch.sum(torch.abs(sf))
+        
+        # Perform backward pass
+        loss.backward()
+        
+        # Verify gradients were computed
+        self.assertIsNotNone(q_grid.grad, "No gradients computed for q_grid")
+        self.assertIsNotNone(xyz.grad, "No gradients computed for xyz")
+        self.assertIsNotNone(U.grad, "No gradients computed for U")
+        
+        # Verify gradients are non-zero (computation actually happened)
+        self.assertFalse(torch.all(q_grid.grad == 0), "Zero gradients for q_grid")
+        self.assertFalse(torch.all(xyz.grad == 0), "Zero gradients for xyz")
+        self.assertFalse(torch.all(U.grad == 0), "Zero gradients for U")
+        
+        # Check gradient magnitudes are reasonable
+        q_grad_norm = torch.norm(q_grid.grad)
+        xyz_grad_norm = torch.norm(xyz.grad)
+        U_grad_norm = torch.norm(U.grad)
+        
+        self.assertGreater(q_grad_norm, 1e-6, "Gradient for q_grid too small")
+        self.assertLess(q_grad_norm, 1e6, "Gradient for q_grid too large")
+        
+        self.assertGreater(xyz_grad_norm, 1e-6, "Gradient for xyz too small")
+        self.assertLess(xyz_grad_norm, 1e6, "Gradient for xyz too large")
+        
+        self.assertGreater(U_grad_norm, 1e-6, "Gradient for U too small")
+        self.assertLess(U_grad_norm, 1e6, "Gradient for U too large")
+        
+        # Print gradient info for debugging
+        print(f"q_grid gradient norm: {q_grad_norm.item()}")
+        print(f"xyz gradient norm: {xyz_grad_norm.item()}")
+        print(f"U gradient norm: {U_grad_norm.item()}")
 
 if __name__ == '__main__':
     unittest.main()
