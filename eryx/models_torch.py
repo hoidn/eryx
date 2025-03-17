@@ -39,7 +39,7 @@ class OnePhonon:
                  res_limit: float = 0., model: str = 'gnm',
                  gnm_cutoff: float = 4., gamma_intra: float = 1., gamma_inter: float = 1.,
                  batch_size: int = 10000, n_processes: int = 8, device: Optional[torch.device] = None,
-                 use_batching: bool = True, phonon_batch_size: int = 1000, covar_batch_size: int = 1000):
+                 use_batching: bool = True, phonon_batch_size: int = 1000):
         """
         Initialize the OnePhonon model with PyTorch tensors.
         
@@ -69,7 +69,6 @@ class OnePhonon:
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.use_batching = use_batching
         self.phonon_batch_size = phonon_batch_size
-        self.covar_batch_size = covar_batch_size
         
         self._setup(pdb_path, expand_p1, res_limit, group_by)
         self._setup_phonons(pdb_path, model, gnm_cutoff, gamma_intra, gamma_inter)
@@ -1038,7 +1037,7 @@ class OnePhonon:
             
             # Determine batch size for processing k-vectors
             # Default to a reasonable batch size if not specified
-            batch_size = getattr(self, 'covar_batch_size', min(1000, total_points))
+            batch_size = getattr(self, 'phonon_batch_size', min(1000, total_points))
             
             # Process k-vectors in batches
             for batch_start in range(0, total_points, batch_size):
