@@ -191,56 +191,99 @@ def structure_factors(q_grid: torch.Tensor, xyz: torch.Tensor,
                      project_on_components: Optional[torch.Tensor] = None,
                      sum_over_atoms: bool = True) -> torch.Tensor:
     """
-    Batched version of structure factor calculation using PyTorch.
+    Calculate structure factors for a set of q-vectors.
+    
+    This function processes q-vectors in batches and supports both the original
+    3D tensor format and the fully collapsed format where q_grid has shape
+    [n_points, 3] with n_points = h_dim * k_dim * l_dim.
     
     Args:
-        q_grid: PyTorch tensor of shape (n_points, 3) with q-vectors in Angstrom
-        xyz: PyTorch tensor of shape (n_atoms, 3) with atomic positions in Angstrom
-        ff_a: PyTorch tensor of shape (n_atoms, 4) with a coefficients
-        ff_b: PyTorch tensor of shape (n_atoms, 4) with b coefficients 
-        ff_c: PyTorch tensor of shape (n_atoms,) with c coefficients
-        U: Optional PyTorch tensor of shape (n_atoms,) with isotropic displacement parameters
-        batch_size: Number of q-vectors to evaluate per batch
-        n_processes: Number of processes (ignored in PyTorch implementation)
-        compute_qF: If True, return structure factors times q-vectors
-        project_on_components: Optional projection matrix
-        sum_over_atoms: If True, sum over atoms; otherwise return per-atom values
+        q_grid: Q-vector tensor with shape [n_points, 3]
+        xyz: Atomic coordinates with shape [n_atoms, 3]
+        ff_a, ff_b: Form factor coefficients with shape [n_atoms, 4]
+        ff_c: Form factor coefficient with shape [n_atoms]
+        U: Atomic displacement parameters with shape [n_atoms] (optional)
+        batch_size: Size of batches for processing
+        n_processes: Number of processes for parallel computation (ignored for PyTorch)
+        compute_qF: If True, compute q-weighted structure factors
+        project_on_components: Optional projection matrix with shape [n_atoms*3, n_dof]
+        sum_over_atoms: If True, sum over atoms to get total structure factor
         
     Returns:
-        PyTorch tensor containing structure factors
-        
-    References:
-        - Original implementation: eryx/scatter.py:structure_factors
+        Structure factors tensor with shape [n_points] or [n_points, n_dof]
     """
-    # Calculate number of batches
-    n_batches = (q_grid.shape[0] + batch_size - 1) // batch_size  # Ceiling division
+    # Ensure all inputs are PyTorch tensors on the same device
+    device = q_grid.device
     
-    # If only one batch is needed, simply call the batch function
-    if n_batches <= 1:
+    if not isinstance(xyz, torch.Tensor):
+        xyz = torch.tensor(xyz, dtype=torch.float32, device=device)
+    if not isinstance(ff_a, torch.Tensor):
+        ff_a = torch.tensor(ff_a, dtype=torch.float32, device=device)
+    if not isinstance(ff_b, torch.Tensor):
+        ff_b = torch.tensor(ff_b, dtype=torch.float32, device=device)
+    if not isinstance(ff_c, torch.Tensor):
+        ff_c = torch.tensor(ff_c, dtype=torch.float32, device=device)
+    if U is not None and not isinstance(U, torch.Tensor):
+        U = torch.tensor(U, dtype=torch.float32, device=device)
+    if project_on_components is not None and not isinstance(project_on_components, torch.Tensor):
+        project_on_components = torch.tensor(project_on_components, dtype=torch.float32, device=device)
+    
+    # Get total number of q-vectors
+    n_points = q_grid.shape[0]
+    
+    # For small input sets, compute directly without batching
+    if n_points <= batch_size:
         return structure_factors_batch(
-            q_grid, xyz, ff_a, ff_b, ff_c, U=U,
-            compute_qF=compute_qF, project_on_components=project_on_components,
-            sum_over_atoms=sum_over_atoms
+            q_grid, xyz, ff_a, ff_b, ff_c, U,
+            compute_qF, project_on_components, sum_over_atoms
         )
     
-    # Process each batch
-    batch_results = []
-    for i in range(n_batches):
-        start_idx = i * batch_size
-        end_idx = min((i + 1) * batch_size, q_grid.shape[0])
+    # For large input sets, process in batches
+    # Determine output shape and dtype from a small test batch
+    with torch.no_grad():
+        # Use first point to determine output shape
+        sample_batch = q_grid[:1]
+        sample_output = structure_factors_batch(
+            sample_batch, xyz, ff_a, ff_b, ff_c, U,
+            compute_qF, project_on_components, sum_over_atoms
+        )
+        output_shape = list(sample_output.shape)
+        output_shape[0] = n_points
+        output_dtype = sample_output.dtype
+    
+    # Initialize output tensor
+    sf = torch.zeros(output_shape, dtype=output_dtype, device=device)
+    
+    # Process in batches with optional progress reporting
+    try:
+        from tqdm import tqdm
+        use_tqdm = True
+    except ImportError:
+        use_tqdm = False
+    
+    batch_range = range(0, n_points, batch_size)
+    if use_tqdm:
+        batch_range = tqdm(batch_range, desc="Computing structure factors")
+    
+    # Memory-efficient batch processing
+    for batch_start in batch_range:
+        batch_end = min(batch_start + batch_size, n_points)
+        current_batch_size = batch_end - batch_start
         
-        # Extract batch of q-vectors
-        q_batch = q_grid[start_idx:end_idx]
+        # Get batch of q-vectors
+        q_batch = q_grid[batch_start:batch_end]
         
-        # Calculate structure factors for this batch
-        batch_result = structure_factors_batch(
-            q_batch, xyz, ff_a, ff_b, ff_c, U=U,
-            compute_qF=compute_qF, project_on_components=project_on_components,
-            sum_over_atoms=sum_over_atoms
+        # Compute structure factors for this batch
+        batch_sf = structure_factors_batch(
+            q_batch, xyz, ff_a, ff_b, ff_c, U,
+            compute_qF, project_on_components, sum_over_atoms
         )
         
-        # Collect batch result
-        batch_results.append(batch_result)
+        # Store results
+        sf[batch_start:batch_end] = batch_sf
+        
+        # Optional memory cleanup for very large models
+        if current_batch_size * xyz.shape[0] > 1e7:  # Large batch × many atoms
+            torch.cuda.empty_cache()
     
-    # Concatenate batch results
-    return torch.cat(batch_results, dim=0)
+    return sf
