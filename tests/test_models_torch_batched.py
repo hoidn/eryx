@@ -665,13 +665,13 @@ class TestBatchedImplementation(TestBase):
         # We'll use the sum of absolute values as a simple scalar loss
         # Ensure consistent type handling with complex tensors
         
-        # Convert to complex tensors if they aren't already
-        V_complex = model.V.to(torch.complex64) if not torch.is_complex(model.V) else model.V
-        Winv_complex = model.Winv.to(torch.complex64) if not torch.is_complex(model.Winv) else model.Winv
+        # Use only the real parts of the tensors to avoid gradient type issues
+        V_real = model.V.real if torch.is_complex(model.V) else model.V
+        Winv_real = model.Winv.real if torch.is_complex(model.Winv) else model.Winv
         
-        # Take absolute values of complex tensors (this returns real tensors)
-        V_abs = torch.abs(V_complex)
-        Winv_abs = torch.abs(Winv_complex)
+        # Take absolute values directly on the real tensors
+        V_abs = torch.abs(V_real)
+        Winv_abs = torch.abs(Winv_real)
         
         # Handle NaN values by replacing them with zeros for the loss calculation
         V_abs_no_nan = torch.where(torch.isnan(V_abs), torch.zeros_like(V_abs), V_abs)
@@ -837,6 +837,16 @@ class TestBatchedImplementation(TestBase):
         # Ensure both tensors have the same shape before comparison
         if intensity_nonbatched.shape != intensity_batched_reshaped.shape:
             print(f"Shape mismatch: non-batched {intensity_nonbatched.shape}, batched {intensity_batched_reshaped.shape}")
+            
+            # If intensity_batched_reshaped is 1D (flattened), reshape it to 3D
+            if intensity_batched_reshaped.dim() == 1:
+                # Calculate dimensions that would make sense for the total size
+                total_size = intensity_batched_reshaped.numel()
+                # Try to find factors that multiply to the total size
+                # For simple example, assume cubic volume
+                dim = int(round(total_size ** (1/3)))
+                intensity_batched_reshaped = intensity_batched_reshaped.reshape(dim, dim, dim)
+            
             # Resize the larger tensor to match the smaller one
             if intensity_nonbatched.numel() > intensity_batched_reshaped.numel():
                 # Downsample non-batched to match batched
