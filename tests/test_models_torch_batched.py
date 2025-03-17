@@ -663,17 +663,21 @@ class TestBatchedImplementation(TestBase):
         
         # Calculate a simple loss function using V and Winv
         # We'll use the sum of absolute values as a simple scalar loss
-        # First, ensure we're working with real tensors, not complex ones
-        V_real = model.V.real if torch.is_complex(model.V) else model.V
-        Winv_real = model.Winv.real if torch.is_complex(model.Winv) else model.Winv
+        # Ensure consistent type handling with complex tensors
         
-        V_abs = torch.abs(V_real)
-        Winv_abs = torch.abs(Winv_real)
+        # Convert to complex tensors if they aren't already
+        V_complex = model.V.to(torch.complex64) if not torch.is_complex(model.V) else model.V
+        Winv_complex = model.Winv.to(torch.complex64) if not torch.is_complex(model.Winv) else model.Winv
+        
+        # Take absolute values of complex tensors (this returns real tensors)
+        V_abs = torch.abs(V_complex)
+        Winv_abs = torch.abs(Winv_complex)
         
         # Handle NaN values by replacing them with zeros for the loss calculation
         V_abs_no_nan = torch.where(torch.isnan(V_abs), torch.zeros_like(V_abs), V_abs)
         Winv_abs_no_nan = torch.where(torch.isnan(Winv_abs), torch.zeros_like(Winv_abs), Winv_abs)
         
+        # Sum to get scalar loss
         loss = torch.sum(V_abs_no_nan) + torch.sum(Winv_abs_no_nan)
         
         # Perform backward pass
@@ -836,16 +840,18 @@ class TestBatchedImplementation(TestBase):
             # Resize the larger tensor to match the smaller one
             if intensity_nonbatched.numel() > intensity_batched_reshaped.numel():
                 # Downsample non-batched to match batched
+                # For interpolate, we need to specify only spatial dimensions
                 intensity_nonbatched = torch.nn.functional.interpolate(
                     intensity_nonbatched.unsqueeze(0).unsqueeze(0),
-                    size=intensity_batched_reshaped.shape,
+                    size=tuple(intensity_batched_reshaped.shape),
                     mode='nearest'
                 ).squeeze(0).squeeze(0)
             else:
                 # Downsample batched to match non-batched
+                # For interpolate, we need to specify only spatial dimensions
                 intensity_batched_reshaped = torch.nn.functional.interpolate(
                     intensity_batched_reshaped.unsqueeze(0).unsqueeze(0),
-                    size=intensity_nonbatched.shape,
+                    size=tuple(intensity_nonbatched.shape),
                     mode='nearest'
                 ).squeeze(0).squeeze(0)
         
