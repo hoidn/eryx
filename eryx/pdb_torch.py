@@ -61,49 +61,7 @@ class GaussianNetworkModel:
 
         return hessian
 
-    def compute_K(self, hessian: torch.Tensor, kvec: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """
-        Noting H(d) the block of the hessian matrix
-        corresponding the the d-th reference cell
-        whose origin is located at r_d, then:
-        K(kvec) = \sum_d H(d) exp(i kvec. r_d)
-        
-        Args:
-            hessian: Hessian tensor from compute_hessian()
-            kvec: Phonon wavevector, default zeros(3)
-            
-        Returns:
-            Kmat: Dynamical matrix of shape (n_asu, n_atoms_per_asu, n_asu, n_atoms_per_asu)
-                with dtype torch.complex64
-        """
-        if kvec is None:
-            kvec = torch.zeros(3, device=self.device)
-        Kmat = hessian[:, :, self.id_cell_ref, :, :].clone()
-
-        for j_cell in range(self.n_cell):
-            if j_cell == self.id_cell_ref:
-                continue
-            
-            # Handle both dictionary-style and object-style crystal access
-            if isinstance(self.crystal, dict):
-                # Legacy dictionary-style access
-                if 'get_unitcell_origin' in self.crystal and 'id_to_hkl' in self.crystal:
-                    r_cell = self.crystal['get_unitcell_origin'](self.crystal['id_to_hkl'](j_cell))
-                else:
-                    # Fallback to zeros if methods not found
-                    r_cell = torch.zeros(3, device=self.device)
-            else:
-                # New object-style access
-                r_cell = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
-                
-            phase = torch.sum(kvec * r_cell)
-            eikr = torch.complex(torch.cos(phase), torch.sin(phase))
-            for i_asu in range(self.n_asu):
-                for j_asu in range(self.n_asu):
-                    Kmat[i_asu, :, j_asu, :] += hessian[i_asu, :, j_cell, j_asu, :] * eikr
-        return Kmat
-        
-    def compute_K_batched(self, hessian: torch.Tensor, kvec_batch: torch.Tensor) -> torch.Tensor:
+    def compute_K(self, hessian: torch.Tensor, kvec_batch: torch.Tensor) -> torch.Tensor:
         """
         Compute K matrices for a batch of k-vectors.
         
@@ -112,12 +70,10 @@ class GaussianNetworkModel:
             kvec_batch: Batch of k-vectors with shape [batch_size, 3]
             
         Returns:
-            Kmat_batch: Batch of K matrices with shape [batch_size, n_asu*n_atoms_per_asu, n_asu*n_atoms_per_asu]
-            when reshaped=False, or with shape [batch_size, n_asu, n_atoms_per_asu, n_asu, n_atoms_per_asu] 
-            when reshaped=True
+            Kmat_batch: Batch of K matrices with shape [batch_size, n_asu, n_atoms_per_asu, n_asu, n_atoms_per_asu]
             
         Note:
-            This is a batched version of compute_K that processes multiple k-vectors at once.
+            This method efficiently processes multiple k-vectors at once.
         """
         # Get batch size
         batch_size = kvec_batch.shape[0]
@@ -172,38 +128,8 @@ class GaussianNetworkModel:
         
         return Kmat_batch
 
-    def compute_Kinv(self, hessian: torch.Tensor, kvec: Optional[torch.Tensor] = None, 
+    def compute_Kinv(self, hessian: torch.Tensor, kvec_batch: torch.Tensor, 
                     reshape: bool = True) -> torch.Tensor:
-        """
-        Compute the inverse of K(kvec)
-        (see compute_K() for the relationship between K and the hessian).
-        
-        Args:
-            hessian: Hessian tensor from compute_hessian()
-            kvec: Phonon wavevector, default zeros(3)
-            reshape: Whether to reshape the output to match the input shape
-            
-        Returns:
-            Kinv: Inverse of dynamical matrix K
-        """
-        if kvec is None:
-            kvec = torch.zeros(3, device=self.device)
-        Kmat = self.compute_K(hessian, kvec=kvec)
-        Kshape = Kmat.shape
-        Kmat_2d = Kmat.reshape(Kshape[0] * Kshape[1], Kshape[2] * Kshape[3])
-        
-        # Add small regularization for numerical stability
-        eps = 1e-10
-        identity = torch.eye(Kmat_2d.shape[0], device=self.device, dtype=Kmat_2d.dtype)
-        Kmat_2d_reg = Kmat_2d + eps * identity
-        
-        Kinv = torch.linalg.pinv(Kmat_2d_reg)
-        if reshape:
-            Kinv = Kinv.reshape((Kshape[0], Kshape[1], Kshape[2], Kshape[3]))
-        return Kinv
-        
-    def compute_Kinv_batched(self, hessian: torch.Tensor, kvec_batch: torch.Tensor, 
-                            reshape: bool = True) -> torch.Tensor:
         """
         Compute the inverse of K(kvec) for a batch of k-vectors.
         
@@ -219,10 +145,10 @@ class GaussianNetworkModel:
                     or [batch_size, n_asu, n_atoms_per_asu, n_asu, n_atoms_per_asu] if reshape=True
             
         Note:
-            This is a batched version of compute_Kinv that processes multiple k-vectors at once.
+            This method efficiently processes multiple k-vectors at once.
         """
         # Compute K matrices for the batch
-        Kmat_batch = self.compute_K_batched(hessian, kvec_batch)
+        Kmat_batch = self.compute_K(hessian, kvec_batch)
         
         # Get shape information
         batch_size = kvec_batch.shape[0]

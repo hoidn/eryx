@@ -32,12 +32,11 @@ class TestBatchedImplementation(TestBase):
             'gamma_inter': 1.0
         }
     
-    def create_test_models(self, use_batching: bool = True) -> OnePhonon:
-        """Create a test model with specified batching setting."""
+    def create_test_models(self) -> OnePhonon:
+        """Create a test model for batched implementation testing."""
         return OnePhonon(
             **self.test_params,
-            device=self.device,
-            use_batching=use_batching
+            device=self.device
         )
         
     def _create_test_model(self):
@@ -224,8 +223,8 @@ class TestBatchedImplementation(TestBase):
         self.assertTrue(torch.allclose(sf_qF_batched, sf_qF_direct, rtol=1e-5, atol=1e-8),
                       "Batched and direct q-weighted structure factor calculations should match")
         
-    def test_batched_vs_nonbatched_compute_K(self):
-        """Test that compute_K_batched produces equivalent results to compute_K."""
+    def test_compute_K_performance(self):
+        """Test performance of compute_K with batched implementation."""
         # Import necessary components
         from eryx.pdb_torch import GaussianNetworkModel
         import time
@@ -326,51 +325,38 @@ class TestBatchedImplementation(TestBase):
             
             self.assertTrue(torch.allclose(K_list[i], K_batch_i, rtol=1e-5, atol=1e-7))
     
-    def test_batched_vs_nonbatched_kvec_brillouin(self):
-        """Test that batched k-vector generation matches non-batched results."""
-        # Create two models: one with batching, one without
+    def test_kvec_brillouin_shape_and_gradients(self):
+        """Test that k-vector generation produces correct shapes and maintains gradients."""
+        # Create model
         pdb_path = "tests/pdbs/5zck_p1.pdb"
-        model_batched = OnePhonon(
+        model = OnePhonon(
             pdb_path,
             [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],
             expand_p1=True,
-            use_batching=True,
             device=self.device
         )
         
-        model_nonbatched = OnePhonon(
-            pdb_path,
-            [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],
-            expand_p1=True,
-            use_batching=False,
-            device=self.device
-        )
-        
-        # Generate k-vectors with both implementations
-        model_batched._build_kvec_Brillouin()
-        model_nonbatched._build_kvec_Brillouin()
-        
-        # Convert batched result to original shape for comparison
-        kvec_batched_original = model_batched.to_original_shape(model_batched.kvec)
-        kvec_norm_batched_original = model_batched.to_original_shape(model_batched.kvec_norm)
-        
-        # Compare results
-        self.assertTrue(torch.allclose(kvec_batched_original, model_nonbatched.kvec, rtol=1e-5, atol=1e-8))
-        self.assertTrue(torch.allclose(kvec_norm_batched_original, model_nonbatched.kvec_norm, rtol=1e-5, atol=1e-8))
+        # Generate k-vectors
+        model._build_kvec_Brillouin()
         
         # Verify gradient requirements
-        self.assertTrue(model_batched.kvec.requires_grad)
-        self.assertTrue(model_batched.kvec_norm.requires_grad)
+        self.assertTrue(model.kvec.requires_grad)
+        self.assertTrue(model.kvec_norm.requires_grad)
         
         # Verify shapes
-        h_dim = int(model_batched.hsampling[2])
-        k_dim = int(model_batched.ksampling[2])
-        l_dim = int(model_batched.lsampling[2])
+        h_dim = int(model.hsampling[2])
+        k_dim = int(model.ksampling[2])
+        l_dim = int(model.lsampling[2])
         
-        self.assertEqual(model_batched.kvec.shape, (h_dim * k_dim * l_dim, 3))
-        self.assertEqual(model_batched.kvec_norm.shape, (h_dim * k_dim * l_dim, 1))
-        self.assertEqual(model_nonbatched.kvec.shape, (h_dim, k_dim, l_dim, 3))
-        self.assertEqual(model_nonbatched.kvec_norm.shape, (h_dim, k_dim, l_dim, 1))
+        self.assertEqual(model.kvec.shape, (h_dim * k_dim * l_dim, 3))
+        self.assertEqual(model.kvec_norm.shape, (h_dim * k_dim * l_dim, 1))
+        
+        # Test conversion to original shape
+        kvec_original = model.to_original_shape(model.kvec)
+        kvec_norm_original = model.to_original_shape(model.kvec_norm)
+        
+        self.assertEqual(kvec_original.shape, (h_dim, k_dim, l_dim, 3))
+        self.assertEqual(kvec_norm_original.shape, (h_dim, k_dim, l_dim, 1))
     
     def test_at_kvec_from_miller_points_fully_collapsed(self):
         """Test that _at_kvec_from_miller_points works with fully collapsed indices."""
@@ -427,8 +413,8 @@ class TestBatchedImplementation(TestBase):
             model_batched._at_kvec_from_miller_points(max_flat)
         ))
 
-    def test_batched_vs_nonbatched_compute_Kinv(self):
-        """Test that compute_Kinv_batched produces equivalent results to compute_Kinv."""
+    def test_compute_Kinv_performance(self):
+        """Test performance of compute_Kinv with batched implementation."""
         # Import necessary components
         from eryx.pdb_torch import GaussianNetworkModel
         import time
@@ -531,95 +517,48 @@ class TestBatchedImplementation(TestBase):
         self.assertEqual(Kinv_batch_flat.shape, expected_shape, 
                       f"Expected shape {expected_shape}, got {Kinv_batch_flat.shape}")
     
-    def test_batched_vs_nonbatched_phonon_calculation(self):
-        """Test that batched phonon calculation produces equivalent results to non-batched."""
+    def test_phonon_calculation_performance(self):
+        """Test performance of phonon calculation with batched implementation."""
         import time
         
-        # Create models with both batching modes
+        # Create model with batching
         pdb_path = "tests/pdbs/5zck_p1.pdb"
-        model_batched = OnePhonon(
+        model = OnePhonon(
             pdb_path,
             [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
             expand_p1=True,
-            use_batching=True,
-            device=self.device
+            device=self.device,
+            phonon_batch_size=10  # Small batch size for testing
         )
         
-        model_nonbatched = OnePhonon(
-            pdb_path,
-            [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
-            expand_p1=True,
-            use_batching=False,
-            device=self.device
-        )
-        
-        # Set a small batch size for testing batched processing
-        model_batched.phonon_batch_size = 2
-        
-        # Time the non-batched computation
+        # Time the computation
         start_time = time.time()
-        model_nonbatched.compute_gnm_phonons()
-        non_batched_time = time.time() - start_time
+        model.compute_gnm_phonons()
+        computation_time = time.time() - start_time
         
-        # Time the batched computation
-        start_time = time.time()
-        model_batched.compute_gnm_phonons()
-        batched_time = time.time() - start_time
+        # Print timing information
+        print(f"\nPhonon calculation timing:")
+        print(f"  Computation time: {computation_time:.6f} seconds")
         
-        # Print timing comparison
-        print(f"\nPhonon calculation timing comparison:")
-        print(f"  Non-batched: {non_batched_time:.6f} seconds")
-        print(f"  Batched:     {batched_time:.6f} seconds")
-        print(f"  Speedup:     {non_batched_time/batched_time:.2f}x")
+        # Verify tensor shapes
+        h_dim = int(model.hsampling[2])
+        k_dim = int(model.ksampling[2])
+        l_dim = int(model.lsampling[2])
+        total_points = h_dim * k_dim * l_dim
         
-        # Convert batched tensors to original shape for comparison
-        V_batched_original = model_batched.to_original_shape(model_batched.V)
-        Winv_batched_original = model_batched.to_original_shape(model_batched.Winv)
-        
-        # Compare V tensors
-        # Note: We need to handle NaN values specially
-        V_nonbatched_flat = model_nonbatched.V.flatten()
-        V_batched_flat = V_batched_original.flatten()
-        
-        # For non-NaN values, check they're close
-        non_nan_mask = ~torch.isnan(V_nonbatched_flat) & ~torch.isnan(V_batched_flat)
-        if non_nan_mask.any():
-            self.assertTrue(torch.allclose(
-                V_nonbatched_flat[non_nan_mask], 
-                V_batched_flat[non_nan_mask], 
-                rtol=1e-5, atol=1e-7
-            ))
-        
-        # For NaN values, check they're in the same positions
-        nan_mask_nonbatched = torch.isnan(V_nonbatched_flat)
-        nan_mask_batched = torch.isnan(V_batched_flat)
-        self.assertTrue(torch.all(nan_mask_nonbatched == nan_mask_batched))
-        
-        # Compare Winv tensors with similar NaN handling
-        Winv_nonbatched_flat = model_nonbatched.Winv.flatten()
-        Winv_batched_flat = Winv_batched_original.flatten()
-        
-        # For non-NaN values, check they're close
-        non_nan_mask = ~torch.isnan(Winv_nonbatched_flat) & ~torch.isnan(Winv_batched_flat)
-        if non_nan_mask.any():
-            self.assertTrue(torch.allclose(
-                Winv_nonbatched_flat[non_nan_mask], 
-                Winv_batched_flat[non_nan_mask], 
-                rtol=1e-5, atol=1e-7
-            ))
-        
-        # For NaN values, check they're in the same positions
-        nan_mask_nonbatched = torch.isnan(Winv_nonbatched_flat)
-        nan_mask_batched = torch.isnan(Winv_batched_flat)
-        self.assertTrue(torch.all(nan_mask_nonbatched == nan_mask_batched))
-        
-        # Verify shapes match
-        self.assertEqual(V_batched_original.shape, model_nonbatched.V.shape)
-        self.assertEqual(Winv_batched_original.shape, model_nonbatched.Winv.shape)
+        self.assertEqual(model.V.shape, (total_points, model.n_asu * model.n_dof_per_asu, model.n_asu * model.n_dof_per_asu))
+        self.assertEqual(model.Winv.shape, (total_points, model.n_asu * model.n_dof_per_asu))
         
         # Verify gradient requirements
-        self.assertTrue(model_batched.V.requires_grad)
-        self.assertTrue(model_batched.Winv.requires_grad)
+        self.assertTrue(model.V.requires_grad)
+        self.assertTrue(model.Winv.requires_grad)
+        
+        # Test conversion to original shape
+        V_original = model.to_original_shape(model.V)
+        Winv_original = model.to_original_shape(model.Winv)
+        
+        self.assertEqual(V_original.shape, (h_dim, k_dim, l_dim, model.n_asu * model.n_dof_per_asu, model.n_asu * model.n_dof_per_asu))
+        self.assertEqual(Winv_original.shape, (h_dim, k_dim, l_dim, model.n_asu * model.n_dof_per_asu))
     
     def test_gradient_flow_through_phonon_calculation(self):
         """Test that gradients flow properly through batched phonon calculation."""
@@ -678,80 +617,42 @@ class TestBatchedImplementation(TestBase):
         self.assertGreater(torch.abs(model.gamma_inter.grad).item(), 1e-10)
         self.assertLess(torch.abs(model.gamma_inter.grad).item(), 1e6)
 
-    def test_batched_vs_nonbatched_covariance_matrix(self):
-        """Test that batched covariance matrix calculation produces equivalent results to non-batched."""
+    def test_covariance_matrix_calculation(self):
+        """Test covariance matrix calculation with batched implementation."""
         import time
         
-        # Create models with both batching modes
+        # Create model
         pdb_path = "tests/pdbs/5zck_p1.pdb"
-        model_batched = OnePhonon(
+        model = OnePhonon(
             pdb_path,
             [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],
             expand_p1=True,
-            use_batching=True,
             device=self.device,
-            batch_size=2  # Small batch size for testing
+            phonon_batch_size=10  # Small batch size for testing
         )
         
-        model_nonbatched = OnePhonon(
-            pdb_path,
-            [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],
-            expand_p1=True,
-            use_batching=False,
-            device=self.device
-        )
+        # Compute hessian
+        hessian = model.compute_hessian()
         
-        # Compute hessian for both models
-        hessian_batched = model_batched.compute_hessian()
-        hessian_nonbatched = model_nonbatched.compute_hessian()
-        
-        # Time the non-batched computation
+        # Time the computation
         start_time = time.time()
-        model_nonbatched.compute_covariance_matrix()
-        non_batched_time = time.time() - start_time
+        model.compute_covariance_matrix()
+        computation_time = time.time() - start_time
         
-        # Time the batched computation
-        start_time = time.time()
-        model_batched.compute_covariance_matrix()
-        batched_time = time.time() - start_time
+        # Print timing information
+        print(f"\nCovariance matrix calculation timing:")
+        print(f"  Computation time: {computation_time:.6f} seconds")
         
-        # Print timing comparison
-        print(f"\nCovariance matrix calculation timing comparison:")
-        print(f"  Non-batched: {non_batched_time:.6f} seconds")
-        print(f"  Batched:     {batched_time:.6f} seconds")
-        print(f"  Speedup:     {non_batched_time/batched_time:.2f}x")
+        # Verify tensor shapes
+        expected_covar_shape = (model.n_asu, model.n_dof_per_asu, model.n_cell, model.n_asu, model.n_dof_per_asu)
+        self.assertEqual(model.covar.shape, expected_covar_shape)
         
-        # Convert batched covar to original shape for comparison if needed
-        if model_batched.covar.shape != model_nonbatched.covar.shape:
-            print(f"Warning: Shape mismatch - batched: {model_batched.covar.shape}, non-batched: {model_nonbatched.covar.shape}")
-        
-        # Compare covariance matrices
-        # For non-NaN values, check they're close
-        covar_batched_flat = model_batched.covar.flatten()
-        covar_nonbatched_flat = model_nonbatched.covar.flatten()
-        
-        non_nan_mask = ~torch.isnan(covar_batched_flat) & ~torch.isnan(covar_nonbatched_flat)
-        if non_nan_mask.any():
-            self.assertTrue(torch.allclose(
-                covar_batched_flat[non_nan_mask], 
-                covar_nonbatched_flat[non_nan_mask], 
-                rtol=1e-5, atol=1e-7
-            ))
-        
-        # For NaN values, check they're in the same positions
-        nan_mask_batched = torch.isnan(covar_batched_flat)
-        nan_mask_nonbatched = torch.isnan(covar_nonbatched_flat)
-        self.assertTrue(torch.all(nan_mask_batched == nan_mask_nonbatched))
-        
-        # Compare ADP values
-        self.assertTrue(torch.allclose(
-            model_batched.ADP, 
-            model_nonbatched.ADP, 
-            rtol=1e-5, atol=1e-7
-        ))
+        # Verify ADP tensor
+        self.assertIsNotNone(model.ADP)
+        self.assertTrue(torch.all(torch.isfinite(model.ADP)))
         
     def test_full_pipeline_timing(self):
-        """Test timing comparison for the full pipeline including initialization and disorder application."""
+        """Test timing for the full pipeline including initialization and disorder application."""
         import time
         
         # Parameters for a small test case
@@ -760,99 +661,47 @@ class TestBatchedImplementation(TestBase):
         k_sampling = [-2, 2, 2]
         l_sampling = [-2, 2, 2]
         
-        # Time the non-batched implementation
-        start_time = time.time()
-        model_nonbatched = OnePhonon(
-            pdb_path,
-            h_sampling, k_sampling, l_sampling,
-            expand_p1=True,
-            use_batching=False,
-            device=self.device
-        )
-        # Apply disorder to get diffuse intensity
-        intensity_nonbatched = model_nonbatched.apply_disorder(use_data_adp=True)
-        nonbatched_time = time.time() - start_time
+        # Time the implementation with different batch sizes
+        batch_sizes = [10, 100, 1000]
+        timings = {}
         
-        # Time the batched implementation
-        start_time = time.time()
-        model_batched = OnePhonon(
-            pdb_path,
-            h_sampling, k_sampling, l_sampling,
-            expand_p1=True,
-            use_batching=True,
-            device=self.device
-        )
-        # Apply disorder to get diffuse intensity
-        intensity_batched = model_batched.apply_disorder(use_data_adp=True)
-        batched_time = time.time() - start_time
+        for batch_size in batch_sizes:
+            start_time = time.time()
+            model = OnePhonon(
+                pdb_path,
+                h_sampling, k_sampling, l_sampling,
+                expand_p1=True,
+                device=self.device,
+                batch_size=batch_size,
+                phonon_batch_size=batch_size
+            )
+            # Apply disorder to get diffuse intensity
+            intensity = model.apply_disorder(use_data_adp=True)
+            elapsed_time = time.time() - start_time
+            timings[batch_size] = elapsed_time
         
         # Print timing comparison
-        print(f"\nFull pipeline timing comparison (initialization + apply_disorder):")
-        print(f"  Non-batched: {nonbatched_time:.6f} seconds")
-        print(f"  Batched:     {batched_time:.6f} seconds")
-        print(f"  Speedup:     {nonbatched_time/batched_time:.2f}x")
+        print(f"\nFull pipeline timing with different batch sizes:")
+        for batch_size, elapsed_time in timings.items():
+            print(f"  Batch size {batch_size}: {elapsed_time:.6f} seconds")
         
-        # Verify results are equivalent
-        # Convert batched result to original shape for comparison
-        if intensity_batched.dim() == 1:
-            # Get the actual dimensions from the tensor size
-            total_size = intensity_batched.numel()
-            # Calculate dimensions that would make sense for the total size
-            h_dim = int(model_batched.hsampling[2])
-            k_dim = int(model_batched.ksampling[2])
-            l_dim = int(model_batched.lsampling[2])
-            
-            # Check if the dimensions match the tensor size
-            if h_dim * k_dim * l_dim != total_size:
-                print(f"Warning: Tensor size {total_size} doesn't match expected dimensions {h_dim}x{k_dim}x{l_dim}")
-                # Use the actual dimensions from the model
-                h_dim = model_batched.h_dim if hasattr(model_batched, 'h_dim') else h_dim
-                k_dim = model_batched.k_dim if hasattr(model_batched, 'k_dim') else k_dim
-                l_dim = model_batched.l_dim if hasattr(model_batched, 'l_dim') else l_dim
-                
-                # If still doesn't match, use a cubic approximation
-                if h_dim * k_dim * l_dim != total_size:
-                    dim = int(round(total_size ** (1/3)))
-                    h_dim = k_dim = l_dim = dim
-            
-            intensity_batched_reshaped = intensity_batched.reshape(h_dim, k_dim, l_dim)
-        else:
-            intensity_batched_reshaped = intensity_batched
-            
-        # Ensure both tensors have the same shape before comparison
-        if intensity_nonbatched.shape != intensity_batched_reshaped.shape:
-            print(f"Shape mismatch: non-batched {intensity_nonbatched.shape}, batched {intensity_batched_reshaped.shape}")
-            
-            # Skip the interpolation approach completely and simply compare the tensors 
-            # where they're both finite (not NaN)
-            
-            # Convert both to flat arrays for comparison
-            nonbatched_flat = intensity_nonbatched.reshape(-1)
-            batched_flat = intensity_batched_reshaped.reshape(-1)
-            
-            # Use the smaller length for comparison
-            min_length = min(nonbatched_flat.numel(), batched_flat.numel())
-            nonbatched_flat = nonbatched_flat[:min_length]
-            batched_flat = batched_flat[:min_length]
-            
-            # Replace the original tensors with these flattened versions for comparison
-            intensity_nonbatched = nonbatched_flat
-            intensity_batched_reshaped = batched_flat
+        # Find optimal batch size
+        optimal_batch_size = min(timings, key=timings.get)
+        print(f"  Optimal batch size: {optimal_batch_size} ({timings[optimal_batch_size]:.6f} seconds)")
         
-        # Compare results, handling NaN values
-        # For non-NaN values, check they're close
-        non_nan_mask = ~torch.isnan(intensity_nonbatched) & ~torch.isnan(intensity_batched_reshaped)
-        if non_nan_mask.any():
-            self.assertTrue(torch.allclose(
-                intensity_nonbatched[non_nan_mask], 
-                intensity_batched_reshaped[non_nan_mask], 
-                rtol=1e-5, atol=1e-7
-            ))
+        # Verify result shape and content
+        h_dim = int(h_sampling[2])
+        k_dim = int(k_sampling[2])
+        l_dim = int(l_sampling[2])
         
-        # For NaN values, check they're in the same positions
-        nan_mask_nonbatched = torch.isnan(intensity_nonbatched)
-        nan_mask_batched = torch.isnan(intensity_batched_reshaped)
-        self.assertTrue(torch.all(nan_mask_nonbatched == nan_mask_batched))
+        # Check if intensity is in collapsed format
+        if intensity.dim() == 1:
+            # Reshape to 3D for visualization
+            intensity_reshaped = model.to_original_shape(intensity)
+            self.assertEqual(intensity_reshaped.shape, (h_dim, k_dim, l_dim))
+        
+        # Verify tensor has finite values (not all NaN)
+        self.assertTrue(torch.any(torch.isfinite(intensity)))
         
     def test_gradient_flow_through_structure_factors(self):
         """

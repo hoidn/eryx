@@ -71,7 +71,7 @@ def run_torch(device: Optional[torch.device] = None):
         # Same parameters as NumPy version
         pdb_path = "tests/pdbs/5zck_p1.pdb"
         
-        # Create OnePhonon instance with parameters
+        # Create OnePhonon instance with optimized parameters
         onephonon_torch = OnePhonon(
             pdb_path,
             [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
@@ -80,7 +80,9 @@ def run_torch(device: Optional[torch.device] = None):
             gnm_cutoff=4.0,
             gamma_intra=1.0,
             gamma_inter=1.0,
-            device=device
+            device=device,
+            batch_size=10000,         # Optimize for structure factors
+            phonon_batch_size=1000    # Optimize for phonon calculations
         )
         
         # Apply disorder model

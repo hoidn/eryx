@@ -193,9 +193,8 @@ def structure_factors(q_grid: torch.Tensor, xyz: torch.Tensor,
     """
     Calculate structure factors for a set of q-vectors.
     
-    This function processes q-vectors in batches and supports both the original
-    3D tensor format and the fully collapsed format where q_grid has shape
-    [n_points, 3] with n_points = h_dim * k_dim * l_dim.
+    This function processes q-vectors in batches using the fully collapsed format
+    where q_grid has shape [n_points, 3] with n_points = h_dim * k_dim * l_dim.
     
     Args:
         q_grid: Q-vector tensor with shape [n_points, 3]
