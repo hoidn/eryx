@@ -80,7 +80,10 @@ def run_torch():
             gnm_cutoff=4.0,
             gamma_intra=1.0,
             gamma_inter=1.0,
-            device=device
+            device=device,
+            use_batching=True,        # Explicitly enable batching
+            batch_size=10000,         # Optimize for structure factors
+            phonon_batch_size=1000    # Optimize for phonon calculations
         )
         
         # Apply disorder
