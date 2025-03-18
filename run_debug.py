@@ -67,7 +67,8 @@ def run_torch():
         from eryx.models_torch import OnePhonon
         
         # Get the device (use CUDA if available)
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = torch.device('cpu')
         logging.info(f"Starting PyTorch branch computation on {device}")
         
         # Use the same parameters as in run_np
