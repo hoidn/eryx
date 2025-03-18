@@ -721,7 +721,7 @@ class OnePhonon:
         through the eigenvalues while avoiding problematic backpropagation through
         complex singular vectors.
         
-        For batched mode, this method processes multiple k-vectors simultaneously
+        This method processes multiple k-vectors simultaneously using batched operations
         to improve computational efficiency.
         """
         hessian = self.compute_hessian()
@@ -753,15 +753,13 @@ class OnePhonon:
             # Copy neighbor list structure
             gnm_torch.asu_neighbors = self.gnm.asu_neighbors
         
-        # Initialize V and Winv with appropriate shapes based on batching mode
-        if self.use_batching:
-            # For fully collapsed batching, we need to reshape V and Winv
-            total_points = h_dim * k_dim * l_dim
-            self.V = torch.zeros((total_points, self.n_asu * self.n_dof_per_asu, 
-                                  self.n_asu * self.n_dof_per_asu),
-                                dtype=torch.complex64, device=self.device)
-            self.Winv = torch.zeros((total_points, self.n_asu * self.n_dof_per_asu),
-                                   dtype=torch.complex64, device=self.device)
+        # Initialize V and Winv with fully collapsed batching
+        total_points = h_dim * k_dim * l_dim
+        self.V = torch.zeros((total_points, self.n_asu * self.n_dof_per_asu, 
+                              self.n_asu * self.n_dof_per_asu),
+                            dtype=torch.complex64, device=self.device)
+        self.Winv = torch.zeros((total_points, self.n_asu * self.n_dof_per_asu),
+                               dtype=torch.complex64, device=self.device)
         
         # Optimized fully collapsed batching implementation
         total_points = h_dim * k_dim * l_dim
