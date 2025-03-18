@@ -224,7 +224,7 @@ class TestBatchedImplementation(TestBase):
                       "Batched and direct q-weighted structure factor calculations should match")
         
     def test_compute_K_performance(self):
-        """Test performance of compute_K with batched implementation."""
+        """Test performance of compute_K with single-batch implementation."""
         # Import necessary components
         from eryx.pdb_torch import GaussianNetworkModel
         import time
@@ -275,8 +275,8 @@ class TestBatchedImplementation(TestBase):
         # Compute K matrix using original method
         K_single = gnm.compute_K(hessian, kvec=k_vec[0])
         
-        # Compute using batched method
-        K_batch = gnm.compute_K_batched(hessian, k_vec)
+        # Compute using single-batch method
+        K_batch = gnm.compute_K(hessian, k_vec)
         
         # Get the first matrix from batch result
         if K_batch.dim() > 4:  # If reshaped output
@@ -304,16 +304,16 @@ class TestBatchedImplementation(TestBase):
             K_list.append(gnm.compute_K(hessian, kvec=k_vecs[i]))
         non_batched_time = time.time() - start_time
         
-        # Time the batched computation
+        # Time the single-batch computation
         start_time = time.time()
-        # Compute K matrices in batch using batched method
-        K_batched = gnm.compute_K_batched(hessian, k_vecs)
+        # Compute K matrices in a single batch
+        K_batched = gnm.compute_K(hessian, k_vecs)
         batched_time = time.time() - start_time
         
         # Print timing comparison
         print(f"\nCompute_K timing comparison (3 k-vectors):")
         print(f"  Non-batched: {non_batched_time:.6f} seconds")
-        print(f"  Batched:     {batched_time:.6f} seconds")
+        print(f"  Single-batch: {batched_time:.6f} seconds")
         print(f"  Speedup:     {non_batched_time/batched_time:.2f}x")
         
         # Compare results for each k-vector
@@ -414,7 +414,7 @@ class TestBatchedImplementation(TestBase):
         ))
 
     def test_compute_Kinv_performance(self):
-        """Test performance of compute_Kinv with batched implementation."""
+        """Test performance of compute_Kinv with single-batch implementation."""
         # Import necessary components
         from eryx.pdb_torch import GaussianNetworkModel
         import time
@@ -465,8 +465,8 @@ class TestBatchedImplementation(TestBase):
         # Compute Kinv using original method with reshape=True
         Kinv_single = gnm.compute_Kinv(hessian, kvec=k_vec[0], reshape=True)
         
-        # Compute using batched method with reshape=True
-        Kinv_batch = gnm.compute_Kinv_batched(hessian, k_vec, reshape=True)
+        # Compute using single-batch method with reshape=True
+        Kinv_batch = gnm.compute_Kinv(hessian, k_vec, reshape=True)
         
         # Get the first matrix from batch result
         Kinv_batch_single = Kinv_batch[0]
@@ -489,16 +489,16 @@ class TestBatchedImplementation(TestBase):
             Kinv_list.append(gnm.compute_Kinv(hessian, kvec=k_vecs[i], reshape=True))
         non_batched_time = time.time() - start_time
         
-        # Time the batched computation
+        # Time the single-batch computation
         start_time = time.time()
-        # Compute Kinv matrices in batch using batched method
-        Kinv_batched = gnm.compute_Kinv_batched(hessian, k_vecs, reshape=True)
+        # Compute Kinv matrices in a single batch
+        Kinv_batched = gnm.compute_Kinv(hessian, k_vecs, reshape=True)
         batched_time = time.time() - start_time
         
         # Print timing comparison
         print(f"\nCompute_Kinv timing comparison (3 k-vectors):")
         print(f"  Non-batched: {non_batched_time:.6f} seconds")
-        print(f"  Batched:     {batched_time:.6f} seconds")
+        print(f"  Single-batch: {batched_time:.6f} seconds")
         print(f"  Speedup:     {non_batched_time/batched_time:.2f}x")
         
         # Compare results for each k-vector
@@ -511,24 +511,23 @@ class TestBatchedImplementation(TestBase):
         n_atoms = gnm.n_atoms_per_asu
         total_size = n_asu * n_atoms
         
-        Kinv_batch_flat = gnm.compute_Kinv_batched(hessian, k_vecs, reshape=False)
+        Kinv_batch_flat = gnm.compute_Kinv(hessian, k_vecs, reshape=False)
         expected_shape = (k_vecs.shape[0], total_size, total_size)
         
         self.assertEqual(Kinv_batch_flat.shape, expected_shape, 
                       f"Expected shape {expected_shape}, got {Kinv_batch_flat.shape}")
     
     def test_phonon_calculation_performance(self):
-        """Test performance of phonon calculation with batched implementation."""
+        """Test performance of phonon calculation with single-batch implementation."""
         import time
         
-        # Create model with batching
+        # Create model with single-batch processing
         pdb_path = "tests/pdbs/5zck_p1.pdb"
         model = OnePhonon(
             pdb_path,
             [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
             expand_p1=True,
-            device=self.device,
-            phonon_batch_size=10  # Small batch size for testing
+            device=self.device
         )
         
         # Time the computation
@@ -661,33 +660,21 @@ class TestBatchedImplementation(TestBase):
         k_sampling = [-2, 2, 2]
         l_sampling = [-2, 2, 2]
         
-        # Time the implementation with different batch sizes
-        batch_sizes = [10, 100, 1000]
-        timings = {}
+        # Time the single-batch implementation
+        start_time = time.time()
+        model = OnePhonon(
+            pdb_path,
+            h_sampling, k_sampling, l_sampling,
+            expand_p1=True,
+            device=self.device
+        )
+        # Apply disorder to get diffuse intensity
+        intensity = model.apply_disorder(use_data_adp=True)
+        elapsed_time = time.time() - start_time
         
-        for batch_size in batch_sizes:
-            start_time = time.time()
-            model = OnePhonon(
-                pdb_path,
-                h_sampling, k_sampling, l_sampling,
-                expand_p1=True,
-                device=self.device,
-                batch_size=batch_size,
-                phonon_batch_size=batch_size
-            )
-            # Apply disorder to get diffuse intensity
-            intensity = model.apply_disorder(use_data_adp=True)
-            elapsed_time = time.time() - start_time
-            timings[batch_size] = elapsed_time
-        
-        # Print timing comparison
-        print(f"\nFull pipeline timing with different batch sizes:")
-        for batch_size, elapsed_time in timings.items():
-            print(f"  Batch size {batch_size}: {elapsed_time:.6f} seconds")
-        
-        # Find optimal batch size
-        optimal_batch_size = min(timings, key=timings.get)
-        print(f"  Optimal batch size: {optimal_batch_size} ({timings[optimal_batch_size]:.6f} seconds)")
+        # Print timing information
+        print(f"\nFull pipeline timing with single-batch processing:")
+        print(f"  Elapsed time: {elapsed_time:.6f} seconds")
         
         # Verify result shape and content
         h_dim = int(h_sampling[2])
@@ -705,7 +692,7 @@ class TestBatchedImplementation(TestBase):
         
     def test_gradient_flow_through_structure_factors(self):
         """
-        Test gradient flow through batched structure factor calculations.
+        Test gradient flow through single-batch structure factor calculations.
         
         This test verifies that gradients properly flow through the structure_factors
         function when using fully collapsed tensor format.
@@ -738,8 +725,8 @@ class TestBatchedImplementation(TestBase):
         U = torch.ones(3, device=self.device) * 0.5
         U = U.clone().detach().requires_grad_(True)
         
-        # Compute structure factors with batch_size=2 to force multiple batches
-        sf = structure_factors(q_grid, xyz, ff_a, ff_b, ff_c, U, batch_size=2)
+        # Compute structure factors in a single batch
+        sf = structure_factors(q_grid, xyz, ff_a, ff_b, ff_c, U)
         
         # Create a simple scalar loss function
         loss = torch.sum(torch.abs(sf))

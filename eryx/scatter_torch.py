@@ -186,14 +186,14 @@ def structure_factors_batch(q_grid: torch.Tensor, xyz: torch.Tensor,
 def structure_factors(q_grid: torch.Tensor, xyz: torch.Tensor, 
                      ff_a: torch.Tensor, ff_b: torch.Tensor, ff_c: torch.Tensor, 
                      U: Optional[torch.Tensor] = None,
-                     batch_size: int = 100000, n_processes: int = 1,
+                     n_processes: int = 1,
                      compute_qF: bool = False, 
                      project_on_components: Optional[torch.Tensor] = None,
                      sum_over_atoms: bool = True) -> torch.Tensor:
     """
     Calculate structure factors for a set of q-vectors.
     
-    This function processes q-vectors in batches using the fully collapsed format
+    This function processes all q-vectors in a single operation using the fully collapsed format
     where q_grid has shape [n_points, 3] with n_points = h_dim * k_dim * l_dim.
     
     Args:
@@ -202,7 +202,6 @@ def structure_factors(q_grid: torch.Tensor, xyz: torch.Tensor,
         ff_a, ff_b: Form factor coefficients with shape [n_atoms, 4]
         ff_c: Form factor coefficient with shape [n_atoms]
         U: Atomic displacement parameters with shape [n_atoms] (optional)
-        batch_size: Size of batches for processing
         n_processes: Number of processes for parallel computation (ignored for PyTorch)
         compute_qF: If True, compute q-weighted structure factors
         project_on_components: Optional projection matrix with shape [n_atoms*3, n_dof]
@@ -211,78 +210,35 @@ def structure_factors(q_grid: torch.Tensor, xyz: torch.Tensor,
     Returns:
         Structure factors tensor with shape [n_points] or [n_points, n_dof]
     """
-    # Ensure all inputs are PyTorch tensors on the same device
-    device = q_grid.device
-    
-    if not isinstance(xyz, torch.Tensor):
-        xyz = torch.tensor(xyz, dtype=torch.float32, device=device)
-    if not isinstance(ff_a, torch.Tensor):
-        ff_a = torch.tensor(ff_a, dtype=torch.float32, device=device)
-    if not isinstance(ff_b, torch.Tensor):
-        ff_b = torch.tensor(ff_b, dtype=torch.float32, device=device)
-    if not isinstance(ff_c, torch.Tensor):
-        ff_c = torch.tensor(ff_c, dtype=torch.float32, device=device)
-    if U is not None and not isinstance(U, torch.Tensor):
-        U = torch.tensor(U, dtype=torch.float32, device=device)
-    if project_on_components is not None and not isinstance(project_on_components, torch.Tensor):
-        project_on_components = torch.tensor(project_on_components, dtype=torch.float32, device=device)
-    
-    # Get total number of q-vectors
-    n_points = q_grid.shape[0]
-    
-    # For small input sets, compute directly without batching
-    if n_points <= batch_size:
+    try:
+        # Ensure all inputs are PyTorch tensors on the same device
+        device = q_grid.device
+        
+        if not isinstance(xyz, torch.Tensor):
+            xyz = torch.tensor(xyz, dtype=torch.float32, device=device)
+        if not isinstance(ff_a, torch.Tensor):
+            ff_a = torch.tensor(ff_a, dtype=torch.float32, device=device)
+        if not isinstance(ff_b, torch.Tensor):
+            ff_b = torch.tensor(ff_b, dtype=torch.float32, device=device)
+        if not isinstance(ff_c, torch.Tensor):
+            ff_c = torch.tensor(ff_c, dtype=torch.float32, device=device)
+        if U is not None and not isinstance(U, torch.Tensor):
+            U = torch.tensor(U, dtype=torch.float32, device=device)
+        if project_on_components is not None and not isinstance(project_on_components, torch.Tensor):
+            project_on_components = torch.tensor(project_on_components, dtype=torch.float32, device=device)
+        
+        # Process all q-vectors in a single operation
         return structure_factors_batch(
             q_grid, xyz, ff_a, ff_b, ff_c, U,
             compute_qF, project_on_components, sum_over_atoms
         )
     
-    # For large input sets, process in batches
-    # Determine output shape and dtype from a small test batch
-    with torch.no_grad():
-        # Use first point to determine output shape
-        sample_batch = q_grid[:1]
-        sample_output = structure_factors_batch(
-            sample_batch, xyz, ff_a, ff_b, ff_c, U,
-            compute_qF, project_on_components, sum_over_atoms
-        )
-        output_shape = list(sample_output.shape)
-        output_shape[0] = n_points
-        output_dtype = sample_output.dtype
-    
-    # Initialize output tensor
-    sf = torch.zeros(output_shape, dtype=output_dtype, device=device)
-    
-    # Process in batches with optional progress reporting
-    try:
-        from tqdm import tqdm
-        use_tqdm = True
-    except ImportError:
-        use_tqdm = False
-    
-    batch_range = range(0, n_points, batch_size)
-    if use_tqdm:
-        batch_range = tqdm(batch_range, desc="Computing structure factors")
-    
-    # Memory-efficient batch processing
-    for batch_start in batch_range:
-        batch_end = min(batch_start + batch_size, n_points)
-        current_batch_size = batch_end - batch_start
-        
-        # Get batch of q-vectors
-        q_batch = q_grid[batch_start:batch_end]
-        
-        # Compute structure factors for this batch
-        batch_sf = structure_factors_batch(
-            q_batch, xyz, ff_a, ff_b, ff_c, U,
-            compute_qF, project_on_components, sum_over_atoms
-        )
-        
-        # Store results
-        sf[batch_start:batch_end] = batch_sf
-        
-        # Optional memory cleanup for very large models
-        if current_batch_size * xyz.shape[0] > 1e7:  # Large batch × many atoms
-            torch.cuda.empty_cache()
-    
-    return sf
+    except RuntimeError as e:
+        if 'CUDA out of memory' in str(e):
+            raise RuntimeError(
+                f"CUDA out of memory in structure_factors. The dataset is too large to process in a single batch. "
+                f"Error: {e}\n"
+                f"Consider using a smaller grid size or a GPU with more memory."
+            ) from e
+        else:
+            raise
