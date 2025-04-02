@@ -54,20 +54,46 @@ def setup_minimal_test():
         device=device
     )
     
-    # Extract q-vectors from grid model
-    q_vectors = grid_model.q_grid.clone().detach()
-    logger.info(f"Extracted {q_vectors.shape[0]} q-vectors from grid model")
+    # Extract q-vectors directly from hkl grid
+    from eryx.pdb import AtomicModel
+    model = AtomicModel(pdb_path, expand_p1=True)
     
-    # Create model with explicit q-vectors
+    # Create q-grid directly using map_utils
+    from eryx.map_utils import generate_grid
+    logger.info(f"Generating q-vectors directly from hkl grid")
+    hsampling = [-1, 1, h_dim]
+    ksampling = [-1, 1, k_dim]
+    lsampling = [-1, 1, l_dim]
+    
+    hkl_grid, map_shape = generate_grid(model.A_inv, 
+                                      hsampling,
+                                      ksampling,
+                                      lsampling,
+                                      return_hkl=True)
+    
+    # Convert to tensor
+    hkl_grid_tensor = torch.tensor(hkl_grid, dtype=torch.float32, device=device)
+    
+    # Compute q-grid directly: q_grid = 2π * A_inv^T * hkl_grid^T
+    A_inv_tensor = torch.tensor(model.A_inv, dtype=torch.float32, device=device)
+    q_vectors = 2 * torch.pi * torch.matmul(A_inv_tensor.T, hkl_grid_tensor.T).T
+    
+    logger.info(f"Extracted {q_vectors.shape[0]} q-vectors directly from hkl grid")
+    
+    # Create model with explicit q-vectors - use exact same parameters
     logger.info("Creating model with explicit q-vectors...")
+    gnm_cutoff = 4.0
+    gamma_intra = 1.0
+    gamma_inter = 1.0
+    
     explicit_model = OnePhonon(
         pdb_path=pdb_path,
         q_vectors=q_vectors,
         expand_p1=True,
         res_limit=0.0,
-        gnm_cutoff=4.0,
-        gamma_intra=1.0,
-        gamma_inter=1.0,
+        gnm_cutoff=gnm_cutoff,
+        gamma_intra=gamma_intra,
+        gamma_inter=gamma_inter,
         device=device
     )
     

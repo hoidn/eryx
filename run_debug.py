@@ -145,7 +145,7 @@ def run_torch_with_explicit_q():
         ksampling = [-17, 17, 3]
         lsampling = [-29, 29, 3]
         
-        # Extract q-vectors from grid-based approach
+        # Extract q-vectors directly without phonon computation
         q_vectors = extract_q_vectors(
             pdb_path=pdb_path,
             hsampling=hsampling,
@@ -157,15 +157,20 @@ def run_torch_with_explicit_q():
         # Save exact q-vectors for comparison
         np.save("torch_explicit_q_vectors.npy", q_vectors.detach().cpu().numpy())
         
+        # Use the EXACT same parameters as the grid-based mode
+        gnm_cutoff = 4.0
+        gamma_intra = 1.0
+        gamma_inter = 1.0
+        
         # Create OnePhonon instance with explicit q-vectors
         onephonon_torch = OnePhonon(
             pdb_path=pdb_path,
             q_vectors=q_vectors,  # Pass extracted q-vectors
             expand_p1=True,
             res_limit=0.0,
-            gnm_cutoff=4.0,
-            gamma_intra=1.0,
-            gamma_inter=1.0,
+            gnm_cutoff=gnm_cutoff,
+            gamma_intra=gamma_intra,
+            gamma_inter=gamma_inter,
             device=device
         )
         
@@ -197,7 +202,8 @@ def run_torch_with_explicit_q():
 
 def extract_q_vectors(pdb_path, hsampling, ksampling, lsampling, device=None):
     """
-    Extract q-vectors from a grid-based model without computing phonons.
+    Extract q-vectors directly from an hkl grid without creating a full OnePhonon model.
+    This avoids any potential issues from phonon calculations affecting subsequent steps.
     
     Args:
         pdb_path: Path to the PDB file
@@ -209,32 +215,34 @@ def extract_q_vectors(pdb_path, hsampling, ksampling, lsampling, device=None):
     """
     # Import here to avoid circular imports
     import torch
-    from eryx.models_torch import OnePhonon
+    import numpy as np
+    import logging
     
     if device is None:
         device = torch.device('cpu')
     
-    # Create OnePhonon model with params to skip phonon computation
-    model = OnePhonon(
-        pdb_path=pdb_path,
-        hsampling=hsampling,
-        ksampling=ksampling,
-        lsampling=lsampling,
-        expand_p1=True,
-        # Skip phonon computation by using these params
-        model="gnm",  # Use GNM as it's faster
-        res_limit=0.0,
-        gnm_cutoff=0.0,  # Set to zero to minimize computation
-        gamma_intra=0.0,
-        gamma_inter=0.0,
-        device=device
-    )
+    # Load the model to get cell parameters
+    from eryx.pdb import AtomicModel
+    model = AtomicModel(pdb_path, expand_p1=True)
     
-    # Get q_grid and make a copy to ensure it's detached
-    q_vectors = model.q_grid.clone().detach()
+    # Create q-grid directly using map_utils
+    from eryx.map_utils import generate_grid
+    logging.info(f"Generating q-vectors directly from hkl grid")
+    hkl_grid, map_shape = generate_grid(model.A_inv, 
+                                      hsampling,
+                                      ksampling,
+                                      lsampling,
+                                      return_hkl=True)
+    
+    # Convert to tensor
+    hkl_grid_tensor = torch.tensor(hkl_grid, dtype=torch.float32, device=device)
+    
+    # Compute q-grid directly: q_grid = 2π * A_inv^T * hkl_grid^T
+    A_inv_tensor = torch.tensor(model.A_inv, dtype=torch.float32, device=device)
+    q_vectors = 2 * torch.pi * torch.matmul(A_inv_tensor.T, hkl_grid_tensor.T).T
     
     # Log information about the extracted q-vectors
-    logging.info(f"Extracted {q_vectors.shape[0]} q-vectors from grid-based model")
+    logging.info(f"Extracted {q_vectors.shape[0]} q-vectors directly from hkl grid")
     logging.info(f"q-vector range: [{q_vectors.min().item():.2f}, {q_vectors.max().item():.2f}]")
     
     return q_vectors

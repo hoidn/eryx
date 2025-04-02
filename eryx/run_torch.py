@@ -68,20 +68,26 @@ def run_torch(device: Optional[torch.device] = None):
         # Import the PyTorch OnePhonon implementation
         from eryx.models_torch import OnePhonon
         
-        # Same parameters as NumPy version
+        # Same parameters as NumPy version - define explicitly for clarity
         pdb_path = "tests/pdbs/5zck_p1.pdb"
+        hsampling = [-4, 4, 3]
+        ksampling = [-17, 17, 3]
+        lsampling = [-29, 29, 3]
+        gnm_cutoff = 4.0
+        gamma_intra = 1.0
+        gamma_inter = 1.0
         
-        # Create OnePhonon instance with optimized parameters
+        # Create OnePhonon instance with explicit parameters
         onephonon_torch = OnePhonon(
             pdb_path=pdb_path,
-            hsampling=[-4, 4, 3],
-            ksampling=[-17, 17, 3],
-            lsampling=[-29, 29, 3],
+            hsampling=hsampling,
+            ksampling=ksampling,
+            lsampling=lsampling,
             expand_p1=True,
             res_limit=0.0,
-            gnm_cutoff=4.0,
-            gamma_intra=1.0,
-            gamma_inter=1.0,
+            gnm_cutoff=gnm_cutoff,
+            gamma_intra=gamma_intra,
+            gamma_inter=gamma_inter,
             device=device
         )
         
