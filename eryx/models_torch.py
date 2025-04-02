@@ -1036,9 +1036,19 @@ class OnePhonon:
         self.covar = torch.zeros((self.n_asu * self.n_dof_per_asu,
                                 self.n_cell, self.n_asu * self.n_dof_per_asu),
                                 dtype=torch.complex64, device=self.device)
-        h_dim = int(self.hsampling[2])
-        k_dim = int(self.ksampling[2])
-        l_dim = int(self.lsampling[2])
+        
+        # Check if we're using explicit q-vectors
+        using_arbitrary_q = hasattr(self, 'q_vectors_input') and self.q_vectors_input is not None
+        
+        if using_arbitrary_q:
+            # For explicit q-vectors, use the number of q-vectors as total_points
+            total_points = self.q_grid.shape[0]
+        else:
+            # Original grid-based approach
+            h_dim = int(self.hsampling[2])
+            k_dim = int(self.ksampling[2])
+            l_dim = int(self.lsampling[2])
+            
         from eryx.torch_utils import ComplexTensorOps
         
         # Create a GaussianNetworkModelTorch instance for Kinv calculations
@@ -1052,7 +1062,10 @@ class OnePhonon:
         hessian = self.compute_hessian()
         
         # Process all k-vectors at once
-        total_points = h_dim * k_dim * l_dim
+        if using_arbitrary_q:
+            total_points = self.q_grid.shape[0]
+        else:
+            total_points = h_dim * k_dim * l_dim
         
         # Get all k-vectors
         kvec_all = self.kvec
