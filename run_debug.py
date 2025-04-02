@@ -106,9 +106,11 @@ def run_torch():
         logging.debug(f"  Dimension 2: min = {onephonon_torch.hkl_grid[:,2].min().item()}, max = {onephonon_torch.hkl_grid[:,2].max().item()}")
         logging.debug(f"PyTorch: q_grid range: min = {onephonon_torch.q_grid.min().item()}, max = {onephonon_torch.q_grid.max().item()}")
         
-        # Save for later comparison
+        # Save q-vectors for comparison
+        np.save("torch_grid_q_vectors.npy", onephonon_torch.q_grid.detach().cpu().numpy())
+        
+        # Save intensity results for comparison
         torch.save(Id_torch, "torch_diffuse_intensity.pt")
-        # Also save as NumPy array for easier comparison
         np.save("torch_diffuse_intensity.npy", Id_torch.detach().cpu().numpy())
         
         return Id_torch
@@ -151,6 +153,9 @@ def run_torch_with_explicit_q():
             lsampling=lsampling,
             device=device
         )
+        
+        # Save exact q-vectors for comparison
+        np.save("torch_explicit_q_vectors.npy", q_vectors.detach().cpu().numpy())
         
         # Create OnePhonon instance with explicit q-vectors
         onephonon_torch = OnePhonon(
@@ -247,6 +252,39 @@ def validate_q_vector_consistency():
         torch_grid_result = np.load("torch_diffuse_intensity.npy")
         torch_explicit_result = np.load("torch_explicit_q_diffuse_intensity.npy")
         
+        # Check q-vector consistency by loading the raw tensors (create these in run functions)
+        if os.path.exists("torch_grid_q_vectors.npy") and os.path.exists("torch_explicit_q_vectors.npy"):
+            grid_q_vectors = np.load("torch_grid_q_vectors.npy")
+            explicit_q_vectors = np.load("torch_explicit_q_vectors.npy")
+            
+            # Check if shapes match
+            logging.info(f"Grid q-vectors shape: {grid_q_vectors.shape}, Explicit q-vectors shape: {explicit_q_vectors.shape}")
+            
+            # Compute absolute difference between vectors
+            if grid_q_vectors.shape == explicit_q_vectors.shape:
+                q_vector_diff = np.abs(grid_q_vectors - explicit_q_vectors)
+                max_diff = np.max(q_vector_diff)
+                mean_diff = np.mean(q_vector_diff)
+                logging.info(f"Q-vector max difference: {max_diff:.8e}, mean difference: {mean_diff:.8e}")
+                
+                # Check if close enough (should be nearly identical)
+                q_vectors_match = max_diff < 1e-5
+                logging.info(f"Q-vectors are {'identical' if q_vectors_match else 'DIFFERENT'}")
+                
+                # Print a few examples
+                logging.info("Sample q-vectors comparison (first 3 points):")
+                for i in range(min(3, len(grid_q_vectors))):
+                    logging.info(f"  Point {i}:")
+                    logging.info(f"    Grid: {grid_q_vectors[i]}")
+                    logging.info(f"    Explicit: {explicit_q_vectors[i]}")
+                    logging.info(f"    Diff: {q_vector_diff[i]}")
+            else:
+                logging.error("Q-vector shapes do not match, cannot compare directly")
+                q_vectors_match = False
+        else:
+            logging.warning("Q-vector files not found, cannot validate q-vector consistency")
+            q_vectors_match = None
+        
         # Create masks for non-NaN values in all arrays
         valid_mask_np = ~np.isnan(np_result)
         valid_mask_torch_grid = ~np.isnan(torch_grid_result)
@@ -267,6 +305,18 @@ def validate_q_vector_consistency():
         torch_grid_values = torch_grid_result[common_valid_mask]
         torch_explicit_values = torch_explicit_result[common_valid_mask]
         
+        # Print some example values for direct comparison
+        logging.info("Sample intensity values (first 5 common valid points):")
+        sample_indices = np.where(common_valid_mask)[0][:5]
+        for idx, i in enumerate(sample_indices):
+            logging.info(f"  Point {idx} (index {i}):")
+            logging.info(f"    NumPy: {np_result.flat[i]:.4f}")
+            logging.info(f"    PyTorch Grid: {torch_grid_result.flat[i]:.4f}")
+            logging.info(f"    PyTorch Explicit: {torch_explicit_result.flat[i]:.4f}")
+            if torch_grid_result.flat[i] != 0:
+                ratio = torch_explicit_result.flat[i] / torch_grid_result.flat[i]
+                logging.info(f"    Explicit/Grid Ratio: {ratio:.4f}")
+        
         # Compute correlation between PyTorch grid and explicit modes
         corr_grid_explicit, _ = pearsonr(torch_grid_values, torch_explicit_values)
         
@@ -284,6 +334,13 @@ def validate_q_vector_consistency():
             logging.info("VALIDATION PASSED: q-vector consistency confirmed across simulation modes")
         else:
             logging.warning("VALIDATION FAILED: q-vector consistency issues detected")
+            
+            # Additional diagnostic: Distribution comparison
+            logging.info("Statistical comparison:")
+            for name, values in [("NumPy", np_values), ("PyTorch Grid", torch_grid_values), 
+                                ("PyTorch Explicit", torch_explicit_values)]:
+                logging.info(f"  {name}: min={np.min(values):.4f}, max={np.max(values):.4f}, "
+                           f"mean={np.mean(values):.4f}, std={np.std(values):.4f}")
         
         return is_consistent
         

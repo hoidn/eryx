@@ -595,25 +595,38 @@ class OnePhonon:
         
         Tensors will have shape [n_points, 3] for kvec and [n_points, 1] for kvec_norm.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         # Handle case when explicit q-vectors are provided
-        if hasattr(self, 'q_vectors_input') and self.q_vectors_input is not None:
-            print(f"DEBUG kvec_brillouin: self.kvec shape = {self.kvec.shape}, type = {type(self.kvec)}")
-            print(f"DEBUG kvec_brillouin: self.q_vectors_input = {self.q_vectors_input is not None}")
-            
+        using_arbitrary_q = hasattr(self, 'q_vectors_input') and self.q_vectors_input is not None
+        logger.info(f"_build_kvec_Brillouin: Using {'explicit q-vectors' if using_arbitrary_q else 'grid-based'} mode")
+        
+        if using_arbitrary_q:
             # For explicit q-vectors, k-vectors are simply q/(2π)
+            logger.info(f"Q-vectors input shape: {self.q_vectors_input.shape}")
             self.kvec = self.q_grid / (2 * torch.pi)
-            self.kvec_norm = torch.norm(self.kvec, dim=1, keepdim=True)
+            logger.info(f"Computed k-vectors from q-vectors: shape={self.kvec.shape}")
+            
+            # Sample of kvec values for debugging
+            logger.info("Sample k-vectors (first 3):")
+            for i in range(min(3, self.kvec.shape[0])):
+                logger.info(f"  k-vector {i}: {self.kvec[i].detach().cpu().numpy()}")
+            
+            # Calculate norms with appropriate dimensionality
+            self.kvec_norm = torch.norm(self.kvec, dim=-1, keepdim=True)
+            logger.info(f"Computed k-vector norms: shape={self.kvec_norm.shape}")
             
             # Set requires_grad for gradient flow
             self.kvec.requires_grad_(True)
             self.kvec_norm.requires_grad_(True)
             return
-        # Initialize dimensions
+        # Initialize dimensions for grid-based approach
         h_dim = int(self.hsampling[2])
         k_dim = int(self.ksampling[2])
         l_dim = int(self.lsampling[2])
         
-        print(f"DEBUG kvec creation: shape parameters = {h_dim}, {k_dim}, {l_dim}")
+        logger.info(f"Grid-based k-vector dimensions: {h_dim}x{k_dim}x{l_dim}")
         
         # Convert A_inv to tensor properly using clone().detach() to avoid warning
         if isinstance(self.model.A_inv, torch.Tensor):
@@ -623,14 +636,11 @@ class OnePhonon:
         
         # Fully collapsed batching implementation
         total_points = h_dim * k_dim * l_dim
-        
-        print(f"DEBUG kvec creation: total_points = {total_points}")
+        logger.info(f"Total points: {total_points}")
         
         # Create tensors with fully collapsed shape
         self.kvec = torch.zeros((total_points, 3), device=self.device)
         self.kvec_norm = torch.zeros((total_points, 1), device=self.device)
-        
-        print(f"DEBUG kvec creation: initializing self.kvec with shape = {self.kvec.shape}")
         
         # Generate all indices at once
         flat_indices = torch.arange(total_points, device=self.device)
@@ -659,11 +669,17 @@ class OnePhonon:
         
         # Calculate k-vectors for all points at once
         self.kvec = torch.matmul(hkl_tensor, A_inv_tensor)
+        logger.info(f"Computed k-vectors: shape={self.kvec.shape}")
+        logger.info("DEBUG after reshape: self.kvec shape = {self.kvec.shape}")
         
-        print(f"DEBUG after reshape: self.kvec shape = {self.kvec.shape}")
+        # Sample of kvec values for debugging
+        logger.info("Sample k-vectors (first 3):")
+        for i in range(min(3, self.kvec.shape[0])):
+            logger.info(f"  k-vector {i}: {self.kvec[i].detach().cpu().numpy()}")
         
-        # Calculate norms
+        # Calculate norms with appropriate dimensionality
         self.kvec_norm = torch.norm(self.kvec, dim=1, keepdim=True)
+        logger.info(f"Computed k-vector norms: shape={self.kvec_norm.shape}")
         
         # Set requires_grad after construction
         self.kvec.requires_grad_(True)
@@ -876,20 +892,28 @@ class OnePhonon:
         for maximum computational efficiency. Note that this requires sufficient GPU memory
         to hold all tensors at once.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Log the mode we're using
+        using_arbitrary_q = hasattr(self, 'q_vectors_input') and self.q_vectors_input is not None
+        logger.info(f"compute_gnm_phonons: Using {'explicit q-vectors' if using_arbitrary_q else 'grid-based'} mode")
+        
         hessian = self.compute_hessian()
+        logger.info(f"Hessian shape: {hessian.shape}, min: {torch.min(hessian).item():.4e}, max: {torch.max(hessian).item():.4e}")
         
         # Check if we're using explicit q-vectors
-        using_arbitrary_q = hasattr(self, 'q_vectors_input') and self.q_vectors_input is not None
-        
         if using_arbitrary_q:
             # For explicit q-vectors, use the number of q-vectors as total_points
             total_points = self.q_grid.shape[0]
+            logger.info(f"Explicit q-vectors mode: {total_points} points")
         else:
             # Original grid-based approach
             h_dim = int(self.hsampling[2])
             k_dim = int(self.ksampling[2])
             l_dim = int(self.lsampling[2])
             total_points = h_dim * k_dim * l_dim
+            logger.info(f"Grid-based mode: {h_dim}x{k_dim}x{l_dim} = {total_points} points")
         
         # Create a GaussianNetworkModel instance for K matrix calculations
         from eryx.pdb_torch import GaussianNetworkModel as GaussianNetworkModelTorch
@@ -928,9 +952,45 @@ class OnePhonon:
         
         # Get all k-vectors
         kvec_all = self.kvec
+        logger.info(f"kvec_all shape: {kvec_all.shape}, min: {torch.min(kvec_all).item():.4e}, max: {torch.max(kvec_all).item():.4e}")
+        
+        # Compare first few k-vectors in both modes to debug 
+        if using_arbitrary_q:
+            logger.info("Sample k-vectors (first 3):")
+            for i in range(min(3, kvec_all.shape[0])):
+                logger.info(f"  k-vector {i}: {kvec_all[i].detach().cpu().numpy()}")
         
         # Compute K matrices for all k-vectors at once
+        # Create a GaussianNetworkModel instance for K matrix calculations
+        from eryx.pdb_torch import GaussianNetworkModel as GaussianNetworkModelTorch
+        gnm_torch = GaussianNetworkModelTorch()
+        gnm_torch.n_asu = self.n_asu
+        gnm_torch.n_atoms_per_asu = self.n_atoms_per_asu
+        gnm_torch.n_cell = self.n_cell
+        gnm_torch.id_cell_ref = self.id_cell_ref
+        gnm_torch.device = self.device
+        
+        # Ensure crystal is properly set
+        if hasattr(self, 'crystal'):
+            gnm_torch.crystal = self.crystal
+        else:
+            logger.warning("No crystal object found in OnePhonon model")
+            
+        # Use our differentiable gamma tensor instead of the NumPy GNM gamma
+        if hasattr(self, 'gamma_tensor'):
+            gnm_torch.gamma = self.gamma_tensor
+        # Fallback to NumPy GNM gamma if needed
+        elif hasattr(self.gnm, 'gamma'):
+            from eryx.adapters import PDBToTensor
+            adapter = PDBToTensor(device=self.device)
+            gnm_torch.gamma = adapter.array_to_tensor(self.gnm.gamma, dtype=torch.float32)
+            
+        # Copy neighbor list structure
+        gnm_torch.asu_neighbors = self.gnm.asu_neighbors
+        
+        logger.info("Computing K matrices...")
         Kmat_all = gnm_torch.compute_K(hessian, kvec_all)
+        logger.info(f"K matrices shape: {Kmat_all.shape}")
         
         # Reshape each K matrix to 2D
         Kmat_all_2d = Kmat_all.reshape(total_points, 
@@ -939,6 +999,7 @@ class OnePhonon:
         
         # Compute D matrices for all k-vectors
         # D = Linv * K * Linv^T for each k-vector
+        logger.info("Computing D matrices...")
         Dmat_all = torch.matmul(
             Linv_complex.unsqueeze(0).expand(total_points, -1, -1),
             torch.matmul(
@@ -947,15 +1008,32 @@ class OnePhonon:
             )
         )
         
+        # Check for NaN or inf values
+        has_nan = torch.isnan(Dmat_all).any().item()
+        has_inf = torch.isinf(Dmat_all).any().item()
+        logger.info(f"D matrices contain NaN: {has_nan}, Inf: {has_inf}")
+        
         # Process all D matrices at once
         # Extract eigenvalues and eigenvectors without tracking phase gradients
+        logger.info("Computing eigenvalues and eigenvectors...")
         with torch.no_grad():
             # Batched SVD - processes all matrices at once
-            U, S, _ = torch.linalg.svd(Dmat_all, full_matrices=False)
-            
-            # Reverse the order so that eigenvalues are descending
-            S = torch.flip(S, dims=[1])
-            U = torch.flip(U, dims=[2])
+            try:
+                U, S, _ = torch.linalg.svd(Dmat_all, full_matrices=False)
+                
+                # Reverse the order so that eigenvalues are descending
+                S = torch.flip(S, dims=[1])
+                U = torch.flip(U, dims=[2])
+                
+                logger.info(f"SVD successful, S shape: {S.shape}, min: {torch.min(S).item():.4e}, max: {torch.max(S).item():.4e}")
+                
+                # Log a few eigenvalues for comparison
+                logger.info("Sample eigenvalues (first 3 points, first 5 values):")
+                for i in range(min(3, S.shape[0])):
+                    logger.info(f"  Point {i}: {S[i, :5].detach().cpu().numpy()}")
+            except Exception as e:
+                logger.error(f"SVD computation failed: {e}")
+                raise
         
         # Extract eigenvalues directly from U^H D U for all matrices
         # Since Dmat_all is diagonalizable, we can use:
@@ -982,6 +1060,10 @@ class OnePhonon:
                                         torch.tensor(float('nan'), dtype=torch.float32, device=eigenvalues_all.device),
                                         eigenvalues_real)
         
+        # Count NaN values after thresholding
+        nan_count = torch.isnan(eigenvalues_clamped).sum().item()
+        logger.info(f"NaN count after thresholding: {nan_count} out of {eigenvalues_clamped.numel()}")
+        
         # Compute inverses with stability controls for all matrices at once
         # Ensure we're working with float32 for consistent gradient flow
         eigenvalues_clamped = eigenvalues_clamped.to(dtype=torch.float32)
@@ -992,9 +1074,20 @@ class OnePhonon:
                             torch.tensor(float('nan'), dtype=torch.float32, device=winv_all.device),
                             winv_all)
         
+        # Log statistics about winv_all
+        valid_winv = winv_all[~torch.isnan(winv_all)]
+        if valid_winv.numel() > 0:
+            logger.info(f"Winv statistics: min={torch.min(valid_winv).item():.4e}, max={torch.max(valid_winv).item():.4e}, mean={torch.mean(valid_winv).item():.4e}")
+        else:
+            logger.warning("All Winv values are NaN!")
+        
         # Store results directly
         self.Winv = winv_all
         self.V = v_all_transformed
+        
+        # Log shapes of final outputs
+        logger.info(f"Final Winv shape: {self.Winv.shape}")
+        logger.info(f"Final V shape: {self.V.shape}")
     
     #@debug
     def compute_gnm_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
@@ -1165,10 +1258,12 @@ class OnePhonon:
             Diffuse intensity tensor
         """
         import logging
-        logging.info(f"apply_disorder: rank={rank}, use_data_adp={use_data_adp}")
+        logger = logging.getLogger(__name__)
+        logger.info(f"apply_disorder: rank={rank}, use_data_adp={use_data_adp}")
         
         # Check if we're using explicit q-vectors
         using_arbitrary_q = hasattr(self, 'q_vectors_input') and self.q_vectors_input is not None
+        logger.info(f"Using {'explicit q-vectors' if using_arbitrary_q else 'grid-based'} mode")
         
         # Prepare ADPs
         if use_data_adp:
@@ -1176,12 +1271,15 @@ class OnePhonon:
         else:
             ADP = self.ADP.to(dtype=torch.float32, device=self.device)
         
+        logger.info(f"ADP shape: {ADP.shape}, min: {torch.min(ADP).item():.4e}, max: {torch.max(ADP).item():.4e}")
+        
         # Initialize intensity tensor
         Id = torch.zeros(self.q_grid.shape[0], dtype=torch.float32, device=self.device)
         
         # Get total number of vectors to process
         if using_arbitrary_q:
             total_points = self.q_grid.shape[0]
+            logger.info(f"Processing {total_points} explicit q-vectors")
             # For arbitrary q-vectors, we need to handle the indices differently
             all_indices = torch.arange(total_points, device=self.device)
         else:
@@ -1190,8 +1288,17 @@ class OnePhonon:
             k_dim = int(self.ksampling[2])
             l_dim = int(self.lsampling[2])
             total_points = h_dim * k_dim * l_dim
+            logger.info(f"Processing {total_points} grid-based points ({h_dim}x{k_dim}x{l_dim})")
             all_indices = torch.arange(total_points, device=self.device)
             h_indices, k_indices, l_indices = self._flat_to_3d_indices(all_indices)
+            
+            # Log a sample of indices for debugging
+            logger.info("Sample index mapping (first 3 points):")
+            for i in range(min(3, len(all_indices))):
+                if using_arbitrary_q:
+                    logger.info(f"  Index {i}: flat={i}")
+                else:
+                    logger.info(f"  Index {i}: flat={i}, 3D=({h_indices[i]},{k_indices[i]},{l_indices[i]})")
         
         # Import structure_factors function
         from eryx.scatter_torch import structure_factors
@@ -1207,19 +1314,40 @@ class OnePhonon:
                 'project': self.Amat[i_asu]
             })
         
-        # Process all k-vectors at once for maximum parallelism
-        print(f"Processing all {total_points} k-vectors at once")
+        # Import structure_factors function
+        from eryx.scatter_torch import structure_factors
         
-        # Get all indices
-        all_indices = torch.arange(total_points, device=self.device)
-        h_indices, k_indices, l_indices = self._flat_to_3d_indices(all_indices)
+        # Pre-compute all ASU data to avoid repeated tensor creation
+        asu_data = []
+        for i_asu in range(self.n_asu):
+            asu_data.append({
+                'xyz': torch.tensor(self.crystal.get_asu_xyz(i_asu), dtype=torch.float32, device=self.device),
+                'ff_a': torch.tensor(self.model.ff_a[i_asu], dtype=torch.float32, device=self.device),
+                'ff_b': torch.tensor(self.model.ff_b[i_asu], dtype=torch.float32, device=self.device),
+                'ff_c': torch.tensor(self.model.ff_c[i_asu], dtype=torch.float32, device=self.device),
+                'project': self.Amat[i_asu]
+            })
         
         # Process all points in parallel using vectorized operations where possible
-        # We'll use a more efficient approach that processes points in parallel
-        print(f"Processing all {total_points} k-vectors using vectorized operations")
+        logger.info(f"Processing all {total_points} k-vectors using vectorized operations")
+        
+        # Log V and Winv statistics for debugging
+        valid_winv = self.Winv[~torch.isnan(self.Winv)]
+        if valid_winv.numel() > 0:
+            logger.info(f"Winv stats in apply_disorder: min={torch.min(valid_winv).item():.4e}, max={torch.max(valid_winv).item():.4e}, mean={torch.mean(valid_winv).item():.4e}")
+        else:
+            logger.warning("All Winv values are NaN in apply_disorder!")
+        
+        # Log first few eigenvalues for comparison
+        logger.info("Sample eigenvalues in apply_disorder (first 3 points, first 5 values):")
+        for i in range(min(3, self.Winv.shape[0])):
+            logger.info(f"  Point {i}: {self.Winv[i, :5].detach().cpu().numpy()}")
         
         # Process each point
         for idx in range(total_points):
+            if idx % 100000 == 0 and idx > 0:
+                logger.info(f"Processed {idx}/{total_points} points...")
+                
             if using_arbitrary_q:
                 # For arbitrary q-vectors, we process each vector directly
                 # Check if this q-vector is within resolution limit
@@ -1261,6 +1389,23 @@ class OnePhonon:
             # Reshape for matrix operations
             F = F.reshape((valid_indices.numel(), self.n_asu * self.n_dof_per_asu))
             
+            # Debug first point of first batch in detail
+            if idx == 0:
+                logger.info(f"First point F shape: {F.shape}")
+                logger.info(f"First point F stats: min_abs={torch.min(torch.abs(F)).item():.4e}, max_abs={torch.max(torch.abs(F)).item():.4e}")
+                
+                # Debug V shape and values
+                logger.info(f"V shape at idx={idx}: {self.V[idx].shape}")
+                logger.info(f"V stats at idx={idx}: min_abs={torch.min(torch.abs(self.V[idx])).item():.4e}, max_abs={torch.max(torch.abs(self.V[idx])).item():.4e}")
+                
+                # Debug Winv values
+                logger.info(f"Winv at idx={idx}: shape={self.Winv[idx].shape}")
+                non_nan_winv = self.Winv[idx][~torch.isnan(self.Winv[idx])]
+                if non_nan_winv.numel() > 0:
+                    logger.info(f"Winv stats at idx={idx}: min={torch.min(non_nan_winv).item():.4e}, max={torch.max(non_nan_winv).item():.4e}")
+                else:
+                    logger.warning(f"All Winv values at idx={idx} are NaN!")
+            
             # Apply disorder model depending on rank parameter
             if rank == -1:
                 # Get eigenvectors and eigenvalues for this k-vector
@@ -1289,6 +1434,18 @@ class OnePhonon:
                 
                 # Weight by eigenvalues and sum - ensure real output
                 weighted_intensity = torch.matmul(FV_abs_squared, real_winv.to(dtype=torch.float32))
+                
+                # Debug first point output
+                if idx == 0:
+                    logger.info(f"First point FV shape: {FV.shape}")
+                    logger.info(f"First point FV_abs_squared shape: {FV_abs_squared.shape}")
+                    logger.info(f"First point FV_abs_squared stats: min={torch.min(FV_abs_squared).item():.4e}, max={torch.max(FV_abs_squared).item():.4e}")
+                    logger.info(f"First point weighted_intensity shape: {weighted_intensity.shape}")
+                    logger.info(f"First point weighted_intensity stats: min={torch.min(weighted_intensity).item():.4e}, max={torch.max(weighted_intensity).item():.4e}")
+                    
+                    # Check the valid_indices values
+                    logger.info(f"First point valid_indices: {valid_indices[:5].detach().cpu().numpy()}")
+                
                 Id.index_add_(0, valid_indices, weighted_intensity)
             else:
                 # Process single mode
@@ -1313,6 +1470,13 @@ class OnePhonon:
         # Apply resolution mask
         Id_masked = Id.clone()
         Id_masked[~self.res_mask] = float('nan')
+        
+        # Log final intensity statistics
+        valid_id = Id_masked[~torch.isnan(Id_masked)]
+        if valid_id.numel() > 0:
+            logger.info(f"Final intensity stats: min={torch.min(valid_id).item():.4e}, max={torch.max(valid_id).item():.4e}, mean={torch.mean(valid_id).item():.4e}")
+        else:
+            logger.warning("All final intensity values are NaN!")
         
         # Save results if outdir is provided
         if outdir is not None:
