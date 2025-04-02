@@ -117,43 +117,20 @@ def run_torch():
         raise
 
 def run_torch_with_explicit_q():
-    """Run PyTorch version of the diffuse scattering simulation with explicit q-vectors."""
+    """Run PyTorch version with explicit q-vectors extracted from the grid-based approach."""
     try:
         import torch
         from eryx.models_torch import OnePhonon
         
-        # Get the device (use CUDA if available)
+        # Get the device
         device = torch.device('cpu')
         logging.info(f"Starting PyTorch branch with explicit q-vectors on {device}")
         
-        # Define a set of custom q-vectors - here we create a simple grid for comparison
-        # In practice, you could use any arbitrary set of q-vectors
-        
-        # Create a small grid of q-vectors in a spherical pattern
-        n_points = 1000  # Number of q-vectors
-        q_magnitude = torch.linspace(0.1, 5.0, 10)  # Different magnitudes
-        theta = torch.linspace(0, torch.pi, 10)     # Different polar angles
-        phi = torch.linspace(0, 2*torch.pi, 10)     # Different azimuthal angles
-        
-        # Create meshgrid
-        q_mag, t, p = torch.meshgrid(q_magnitude, theta, phi, indexing='ij')
-        
-        # Convert spherical to Cartesian coordinates
-        qx = q_mag * torch.sin(t) * torch.cos(p)
-        qy = q_mag * torch.sin(t) * torch.sin(p)
-        qz = q_mag * torch.cos(t)
-        
-        # Reshape into [n_points, 3]
-        q_vectors = torch.stack([qx.flatten(), qy.flatten(), qz.flatten()], dim=1)
-        
-        # Truncate to desired number of points
-        q_vectors = q_vectors[:n_points]
-        
-        # Create OnePhonon instance with explicit q-vectors
-        pdb_path = "tests/pdbs/5zck_p1.pdb"
-        onephonon_torch = OnePhonon(
-            pdb_path,
-            q_vectors=q_vectors,  # Pass explicit q-vectors
+        # First, run the grid-based approach to extract q-vectors
+        logging.info("Running grid-based approach first to extract q-vectors")
+        grid_onephonon = OnePhonon(
+            "tests/pdbs/5zck_p1.pdb",
+            [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
             expand_p1=True,
             res_limit=0.0,
             gnm_cutoff=4.0,
@@ -162,28 +139,64 @@ def run_torch_with_explicit_q():
             device=device
         )
         
-        # Apply disorder
-        Id_torch = onephonon_torch.apply_disorder(use_data_adp=True)
+        # Extract q-vectors from the grid-based approach
+        q_vectors = grid_onephonon.q_grid.clone().detach()
+        logging.info(f"Extracted {q_vectors.shape[0]} q-vectors from grid-based approach")
+        
+        # Save q-vectors for visualization
+        np.save("grid_q_vectors.npy", q_vectors.cpu().numpy())
+        
+        # Now run with explicit q-vectors
+        logging.info("Running with explicit q-vectors")
+        explicit_onephonon = OnePhonon(
+            "tests/pdbs/5zck_p1.pdb",
+            q_vectors=q_vectors,
+            expand_p1=True,
+            res_limit=0.0,
+            gnm_cutoff=4.0,
+            gamma_intra=1.0,
+            gamma_inter=1.0,
+            device=device
+        )
+        
+        # Apply disorder using the explicit q-vectors
+        Id_explicit = explicit_onephonon.apply_disorder(use_data_adp=True)
         
         # Log debug information
         logging.debug(f"PyTorch with explicit q: q_vectors shape = {q_vectors.shape}")
-        logging.debug(f"PyTorch with explicit q: q_grid shape = {onephonon_torch.q_grid.shape}")
-        logging.debug(f"PyTorch with explicit q: q_grid range: min = {onephonon_torch.q_grid.min().item()}, max = {onephonon_torch.q_grid.max().item()}")
+        logging.debug(f"PyTorch with explicit q: q_grid shape = {explicit_onephonon.q_grid.shape}")
+        logging.debug(f"PyTorch with explicit q: q_grid min = {explicit_onephonon.q_grid.min().item()}, max = {explicit_onephonon.q_grid.max().item()}")
         
-        # Save for later comparison
-        torch.save(Id_torch, "torch_explicit_q_diffuse_intensity.pt")
-        # Also save as NumPy array for easier comparison
-        np.save("torch_explicit_q_diffuse_intensity.npy", Id_torch.detach().cpu().numpy())
+        # Save results
+        torch.save(Id_explicit, "torch_explicit_q_diffuse_intensity.pt")
+        np.save("torch_explicit_q_diffuse_intensity.npy", Id_explicit.detach().cpu().numpy())
         
-        return Id_torch
+        # Run grid-based approach for comparison
+        Id_grid = grid_onephonon.apply_disorder(use_data_adp=True)
+        
+        # Compare results
+        grid_np = Id_grid.detach().cpu().numpy()
+        explicit_np = Id_explicit.detach().cpu().numpy()
+        
+        # Calculate differences
+        abs_diff = np.abs(grid_np - explicit_np)
+        rel_diff = abs_diff / (np.abs(grid_np) + 1e-10)  # Avoid division by zero
+        
+        # Log comparison statistics
+        logging.info("Comparison between grid-based and explicit q-vector approaches:")
+        logging.info(f"  Mean absolute difference: {np.nanmean(abs_diff)}")
+        logging.info(f"  Max absolute difference: {np.nanmax(abs_diff)}")
+        logging.info(f"  Mean relative difference: {np.nanmean(rel_diff) * 100:.6f}%")
+        logging.info(f"  Identical outputs: {np.allclose(grid_np, explicit_np, equal_nan=True)}")
+        
+        return Id_explicit
         
     except RuntimeError as e:
         # Handle CUDA errors by falling back to CPU
         if 'CUDA' in str(e):
             logging.error(f"CUDA error with explicit q-vectors: {e}. Attempting to run on CPU instead.")
-            # Modify the environment to force CPU usage and retry
             os.environ["CUDA_VISIBLE_DEVICES"] = ""
-            return run_torch_with_explicit_q()  # Recursive call will use CPU now
+            return run_torch_with_explicit_q()
         else:
             logging.error(f"Error in PyTorch computation with explicit q-vectors: {e}")
             raise
