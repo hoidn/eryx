@@ -153,9 +153,15 @@ class OnePhonon:
             
             # Create a resolution mask if needed
             if res_limit > 0:
-                from eryx.map_utils import compute_resolution
-                res_map = compute_resolution(torch.tensor(self.model.cell), self.hkl_grid)
-                self.res_mask = res_map > res_limit
+                # Use the same function as the grid-based approach for consistency
+                from eryx.map_utils import get_resolution_mask
+                
+                # Convert tensors to NumPy for the original function
+                hkl_grid_np = self.hkl_grid.detach().cpu().numpy()
+                res_mask, _ = get_resolution_mask(self.model.cell, hkl_grid_np, res_limit)
+                
+                # Convert result back to tensor
+                self.res_mask = torch.tensor(res_mask, dtype=torch.bool, device=self.device)
             else:
                 # If no resolution limit, all points are valid
                 self.res_mask = torch.ones(self.q_grid.shape[0], dtype=torch.bool, device=self.device)
