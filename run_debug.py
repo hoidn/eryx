@@ -116,10 +116,95 @@ def run_torch():
         logging.error(f"Unexpected error in PyTorch computation: {e}")
         raise
 
+def run_torch_with_explicit_q():
+    """Run PyTorch version of the diffuse scattering simulation with explicit q-vectors."""
+    try:
+        import torch
+        from eryx.models_torch import OnePhonon
+        
+        # Get the device (use CUDA if available)
+        device = torch.device('cpu')
+        logging.info(f"Starting PyTorch branch with explicit q-vectors on {device}")
+        
+        # Define a set of custom q-vectors - here we create a simple grid for comparison
+        # In practice, you could use any arbitrary set of q-vectors
+        
+        # Create a small grid of q-vectors in a spherical pattern
+        n_points = 1000  # Number of q-vectors
+        q_magnitude = torch.linspace(0.1, 5.0, 10)  # Different magnitudes
+        theta = torch.linspace(0, torch.pi, 10)     # Different polar angles
+        phi = torch.linspace(0, 2*torch.pi, 10)     # Different azimuthal angles
+        
+        # Create meshgrid
+        q_mag, t, p = torch.meshgrid(q_magnitude, theta, phi, indexing='ij')
+        
+        # Convert spherical to Cartesian coordinates
+        qx = q_mag * torch.sin(t) * torch.cos(p)
+        qy = q_mag * torch.sin(t) * torch.sin(p)
+        qz = q_mag * torch.cos(t)
+        
+        # Reshape into [n_points, 3]
+        q_vectors = torch.stack([qx.flatten(), qy.flatten(), qz.flatten()], dim=1)
+        
+        # Truncate to desired number of points
+        q_vectors = q_vectors[:n_points]
+        
+        # Create OnePhonon instance with explicit q-vectors
+        pdb_path = "tests/pdbs/5zck_p1.pdb"
+        onephonon_torch = OnePhonon(
+            pdb_path,
+            q_vectors=q_vectors,  # Pass explicit q-vectors
+            expand_p1=True,
+            res_limit=0.0,
+            gnm_cutoff=4.0,
+            gamma_intra=1.0,
+            gamma_inter=1.0,
+            device=device
+        )
+        
+        # Apply disorder
+        Id_torch = onephonon_torch.apply_disorder(use_data_adp=True)
+        
+        # Log debug information
+        logging.debug(f"PyTorch with explicit q: q_vectors shape = {q_vectors.shape}")
+        logging.debug(f"PyTorch with explicit q: q_grid shape = {onephonon_torch.q_grid.shape}")
+        logging.debug(f"PyTorch with explicit q: q_grid range: min = {onephonon_torch.q_grid.min().item()}, max = {onephonon_torch.q_grid.max().item()}")
+        
+        # Save for later comparison
+        torch.save(Id_torch, "torch_explicit_q_diffuse_intensity.pt")
+        # Also save as NumPy array for easier comparison
+        np.save("torch_explicit_q_diffuse_intensity.npy", Id_torch.detach().cpu().numpy())
+        
+        return Id_torch
+        
+    except RuntimeError as e:
+        # Handle CUDA errors by falling back to CPU
+        if 'CUDA' in str(e):
+            logging.error(f"CUDA error with explicit q-vectors: {e}. Attempting to run on CPU instead.")
+            # Modify the environment to force CPU usage and retry
+            os.environ["CUDA_VISIBLE_DEVICES"] = ""
+            return run_torch_with_explicit_q()  # Recursive call will use CPU now
+        else:
+            logging.error(f"Error in PyTorch computation with explicit q-vectors: {e}")
+            raise
+
 if __name__ == "__main__":
     setup_logging()
     
-    # After setting up, call the run routines.
-    run_np()
-    run_torch()
-    logging.info("Completed debug run. Please check debug_output.log, np_diffuse_intensity.npy and torch_diffuse_intensity.npy")
+    import argparse
+    parser = argparse.ArgumentParser(description='Run diffuse scattering simulations')
+    parser.add_argument('--run-mode', choices=['all', 'np', 'torch', 'torch-explicit-q'], default='all',
+                       help='Specify which implementation to run (default: all)')
+    args = parser.parse_args()
+    
+    # Run the specified implementation(s)
+    if args.run_mode in ['all', 'np']:
+        run_np()
+    
+    if args.run_mode in ['all', 'torch']:
+        run_torch()
+    
+    if args.run_mode in ['all', 'torch-explicit-q']:
+        run_torch_with_explicit_q()
+    
+    logging.info("Completed debug run. Please check debug_output.log and the generated .npy files")

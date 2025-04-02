@@ -5,6 +5,10 @@ This module contains PyTorch versions of the disorder models defined in
 eryx/models.py. All implementations maintain the same API as the NumPy versions
 but use PyTorch tensors and operations to enable gradient flow.
 
+The implementation supports both regular grid-based sampling and arbitrary 
+q-vector (momentum transfer) inputs, allowing flexible momentum space sampling
+patterns and gradient-based optimization.
+
 References:
     - Original NumPy implementation in eryx/models.py
 """
@@ -28,13 +32,37 @@ class OnePhonon:
     approximation (a.k.a small-coupling regime) using PyTorch tensors and operations
     to enable gradient flow.
     
+    The implementation supports two modes of operation:
+    1. Grid-based sampling: Traditional approach with hsampling, ksampling, lsampling parameters
+    2. Arbitrary q-vectors: Direct specification of q-vectors (momentum transfer) for custom sampling
+    
+    Example usage with grid-based sampling:
+        >>> onephonon = OnePhonon(
+        ...     pdb_path="structure.pdb",
+        ...     hsampling=[-4, 4, 3],
+        ...     ksampling=[-17, 17, 3],
+        ...     lsampling=[-29, 29, 3],
+        ...     expand_p1=True
+        ... )
+    
+    Example usage with explicit q-vectors:
+        >>> q_vectors = torch.tensor([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])  # Custom q-vectors
+        >>> onephonon = OnePhonon(
+        ...     pdb_path="structure.pdb",
+        ...     q_vectors=q_vectors,
+        ...     expand_p1=True
+        ... )
+    
     References:
         - Original NumPy implementation in eryx/models.py:OnePhonon
     """
     
     #@debug
-    def __init__(self, pdb_path: str, hsampling: Tuple[float, float, float], 
-                 ksampling: Tuple[float, float, float], lsampling: Tuple[float, float, float],
+    def __init__(self, pdb_path: str, 
+                 q_vectors: Optional[torch.Tensor] = None,  # New parameter for explicit q-vectors
+                 hsampling: Optional[Tuple[float, float, float]] = None, 
+                 ksampling: Optional[Tuple[float, float, float]] = None, 
+                 lsampling: Optional[Tuple[float, float, float]] = None,
                  expand_p1: bool = True, group_by: str = 'asu',
                  res_limit: float = 0., model: str = 'gnm',
                  gnm_cutoff: float = 4., gamma_intra: float = 1., gamma_inter: float = 1.,
@@ -44,9 +72,11 @@ class OnePhonon:
         
         Args:
             pdb_path: Path to coordinates file.
-            hsampling: Tuple (hmin, hmax, oversampling) for h dimension.
-            ksampling: Tuple (kmin, kmax, oversampling) for k dimension.
-            lsampling: Tuple (lmin, lmax, oversampling) for l dimension.
+            q_vectors: Optional tensor of shape [n_points, 3] with explicit q-vectors (momentum transfer in Å⁻¹).
+                      If provided, hsampling/ksampling/lsampling are ignored.
+            hsampling: Optional tuple (hmin, hmax, oversampling) for h dimension. Required if q_vectors is None.
+            ksampling: Optional tuple (kmin, kmax, oversampling) for k dimension. Required if q_vectors is None.
+            lsampling: Optional tuple (lmin, lmax, oversampling) for l dimension. Required if q_vectors is None.
             expand_p1: If True, expand to p1 (if PDB is asymmetric unit).
             group_by: Level of rigid-body assembly ('asu' or None).
             res_limit: High-resolution limit in Angstrom.
@@ -57,9 +87,18 @@ class OnePhonon:
             n_processes: Number of processes for parallel computation.
             device: PyTorch device to use (default: CUDA if available, else CPU).
         """
-        self.hsampling = hsampling
-        self.ksampling = ksampling
-        self.lsampling = lsampling
+        self.q_vectors_input = q_vectors
+        # Store sampling parameters only if q_vectors is None
+        if q_vectors is None:
+            if hsampling is None or ksampling is None or lsampling is None:
+                raise ValueError("When q_vectors is None, hsampling, ksampling, and lsampling must be provided")
+            self.hsampling = hsampling
+            self.ksampling = ksampling
+            self.lsampling = lsampling
+        else:
+            self.hsampling = None
+            self.ksampling = None
+            self.lsampling = None
         self.n_processes = n_processes
         self.model_type = model
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -71,6 +110,8 @@ class OnePhonon:
     def _setup(self, pdb_path: str, expand_p1: bool, res_limit: float, group_by: str):
         """
         Compute q-vectors to evaluate and build the unit cell and its neighbors.
+        
+        This method handles both grid-based sampling and explicit q-vector inputs.
         
         Parameters:
             pdb_path: Path to coordinates file of asymmetric unit.
@@ -91,25 +132,53 @@ class OnePhonon:
         self.model.element_weights = element_weights
         print(f"Extracted {len(element_weights)} element weights using PDBToTensor adapter")
         
-        # Build the grid of hkl indices using the NP generate_grid.
-        from eryx.map_utils import generate_grid, get_resolution_mask
-        hkl_grid, self.map_shape = generate_grid(self.model.A_inv, 
-                                                 self.hsampling,
-                                                 self.ksampling,
-                                                 self.lsampling,
-                                                 return_hkl=True)
-        # Convert the hkl grid to a torch tensor.
-        self.hkl_grid = torch.tensor(hkl_grid, dtype=torch.float32, device=self.device)
-        
-        # Obtain resolution mask (converted to a torch bool tensor).
-        res_mask, _ = get_resolution_mask(self.model.cell, hkl_grid, res_limit)
-        self.res_mask = torch.tensor(res_mask, dtype=torch.bool, device=self.device)
-        
-        # Compute q-grid as: 2π * A_inv^T * hkl_grid^T.
-        self.q_grid = 2 * torch.pi * torch.matmul(
-            torch.tensor(self.model.A_inv, dtype=torch.float32, device=self.device).T,
-            self.hkl_grid.T
-        ).T
+        # Handle case when explicit q-vectors are provided
+        if self.q_vectors_input is not None:
+            print("Using explicit q-vectors instead of grid-based sampling")
+            
+            # Ensure q_vectors is a tensor on the correct device with appropriate dtype
+            if not isinstance(self.q_vectors_input, torch.Tensor):
+                self.q_grid = torch.tensor(self.q_vectors_input, dtype=torch.float32, device=self.device)
+            else:
+                self.q_grid = self.q_vectors_input.to(device=self.device, dtype=torch.float32)
+            
+            # Convert q-vectors to hkl indices for compatibility
+            A_inv_tensor = torch.tensor(self.model.A_inv, dtype=torch.float32, device=self.device)
+            # q = 2π * A_inv^T * hkl  =>  hkl = (2π * A_inv^T)^-1 * q
+            self.hkl_grid = torch.matmul(self.q_grid, torch.inverse(2 * torch.pi * A_inv_tensor.T))
+            
+            # Set map_shape to a default value for compatibility with grid-based code
+            # Use first dimension as the total number of q-vectors
+            self.map_shape = (self.q_grid.shape[0], 1, 1)
+            
+            # Create a resolution mask if needed
+            if res_limit > 0:
+                from eryx.map_utils import compute_resolution
+                res_map = compute_resolution(torch.tensor(self.model.cell), self.hkl_grid)
+                self.res_mask = res_map > res_limit
+            else:
+                # If no resolution limit, all points are valid
+                self.res_mask = torch.ones(self.q_grid.shape[0], dtype=torch.bool, device=self.device)
+        else:
+            # Original code for grid generation
+            from eryx.map_utils import generate_grid, get_resolution_mask
+            hkl_grid, self.map_shape = generate_grid(self.model.A_inv, 
+                                                     self.hsampling,
+                                                     self.ksampling,
+                                                     self.lsampling,
+                                                     return_hkl=True)
+            # Convert the hkl grid to a torch tensor.
+            self.hkl_grid = torch.tensor(hkl_grid, dtype=torch.float32, device=self.device)
+            
+            # Obtain resolution mask (converted to a torch bool tensor).
+            res_mask, _ = get_resolution_mask(self.model.cell, hkl_grid, res_limit)
+            self.res_mask = torch.tensor(res_mask, dtype=torch.bool, device=self.device)
+            
+            # Compute q-grid as: 2π * A_inv^T * hkl_grid^T.
+            self.q_grid = 2 * torch.pi * torch.matmul(
+                torch.tensor(self.model.A_inv, dtype=torch.float32, device=self.device).T,
+                self.hkl_grid.T
+            ).T
         
         # Setup Crystal
         self.crystal = Crystal(self.model)
@@ -493,12 +562,21 @@ class OnePhonon:
         """
         Compute all k-vectors and their norm in the first Brillouin zone.
         
-        This implementation matches the NumPy version by regularly sampling
-        [-0.5, 0.5[ for h, k and l using the sampling parameters.
+        For explicit q-vectors: sets k-vectors as q/(2π)
+        For grid-based approach: regularly samples [-0.5, 0.5[ for h, k and l
         
-        Tensors will have shape [h_dim*k_dim*l_dim, 3] for kvec
-        and [h_dim*k_dim*l_dim, 1] for kvec_norm using fully collapsed format.
+        Tensors will have shape [n_points, 3] for kvec and [n_points, 1] for kvec_norm.
         """
+        # Handle case when explicit q-vectors are provided
+        if hasattr(self, 'q_vectors_input') and self.q_vectors_input is not None:
+            # For explicit q-vectors, k-vectors are simply q/(2π)
+            self.kvec = self.q_grid / (2 * torch.pi)
+            self.kvec_norm = torch.norm(self.kvec, dim=1, keepdim=True)
+            
+            # Set requires_grad for gradient flow
+            self.kvec.requires_grad_(True)
+            self.kvec_norm.requires_grad_(True)
+            return
         # Initialize dimensions
         h_dim = int(self.hsampling[2])
         k_dim = int(self.ksampling[2])
@@ -571,6 +649,9 @@ class OnePhonon:
         """
         Return the indices of all q-vectors that are k-vector away from given Miller indices.
         
+        For explicit q-vectors: returns a direct mapping (each point to itself)
+        For grid-based approach: returns Miller indices based on the sampling grid
+        
         This method supports three input formats:
         1. Traditional format: (h, k, l) tuple with 3 elements
         2. Fully collapsed format: a single flat index
@@ -582,6 +663,21 @@ class OnePhonon:
         Returns:
             Torch tensor of raveled indices, or list of tensors for batched input
         """
+        # Handle case when explicit q-vectors are provided
+        if hasattr(self, 'q_vectors_input') and self.q_vectors_input is not None:
+            # With explicit q-vectors, we use a direct mapping
+            total_points = self.q_grid.shape[0]
+            
+            # Check input format and return appropriately
+            if isinstance(indices_or_batch, torch.Tensor) and indices_or_batch.dim() == 1 and indices_or_batch.numel() > 1:
+                # Batched format: return list of integer indices
+                return [torch.tensor([i], device=self.device) for i in range(total_points)]
+            elif isinstance(indices_or_batch, (tuple, list)) and len(indices_or_batch) == 3:
+                # Traditional (h,k,l) format: return all indices
+                return torch.arange(total_points, device=self.device)
+            else:
+                # Single flat index: return all indices
+                return torch.arange(total_points, device=self.device)
         # Check if input is a batch tensor
         is_batch = isinstance(indices_or_batch, torch.Tensor) and indices_or_batch.dim() == 1 and indices_or_batch.numel() > 1
         
@@ -1010,6 +1106,9 @@ class OnePhonon:
         import logging
         logging.info(f"apply_disorder: rank={rank}, use_data_adp={use_data_adp}")
         
+        # Check if we're using explicit q-vectors
+        using_arbitrary_q = hasattr(self, 'q_vectors_input') and self.q_vectors_input is not None
+        
         # Prepare ADPs
         if use_data_adp:
             ADP = torch.tensor(self.model.adp[0], dtype=torch.float32, device=self.device) / (8 * torch.pi * torch.pi)
@@ -1019,11 +1118,19 @@ class OnePhonon:
         # Initialize intensity tensor
         Id = torch.zeros(self.q_grid.shape[0], dtype=torch.float32, device=self.device)
         
-        # Get total number of k-vectors
-        h_dim = int(self.hsampling[2])
-        k_dim = int(self.ksampling[2])
-        l_dim = int(self.lsampling[2])
-        total_points = h_dim * k_dim * l_dim
+        # Get total number of vectors to process
+        if using_arbitrary_q:
+            total_points = self.q_grid.shape[0]
+            # For arbitrary q-vectors, we need to handle the indices differently
+            all_indices = torch.arange(total_points, device=self.device)
+        else:
+            # Original grid-based approach
+            h_dim = int(self.hsampling[2])
+            k_dim = int(self.ksampling[2])
+            l_dim = int(self.lsampling[2])
+            total_points = h_dim * k_dim * l_dim
+            all_indices = torch.arange(total_points, device=self.device)
+            h_indices, k_indices, l_indices = self._flat_to_3d_indices(all_indices)
         
         # Import structure_factors function
         from eryx.scatter_torch import structure_factors
@@ -1050,14 +1157,22 @@ class OnePhonon:
         # We'll use a more efficient approach that processes points in parallel
         print(f"Processing all {total_points} k-vectors using vectorized operations")
         
-        # Process each k-vector point in parallel
+        # Process each point
         for idx in range(total_points):
-            h_idx, k_idx, l_idx = h_indices[idx].item(), k_indices[idx].item(), l_indices[idx].item()
-            
-            # Get q-indices for this k-vector point
-            q_indices = self._at_kvec_from_miller_points((h_idx, k_idx, l_idx))
-            valid_mask = self.res_mask[q_indices]
-            valid_indices = q_indices[valid_mask]
+            if using_arbitrary_q:
+                # For arbitrary q-vectors, we process each vector directly
+                # Check if this q-vector is within resolution limit
+                if not self.res_mask[idx]:
+                    continue
+                valid_indices = torch.tensor([idx], device=self.device)
+            else:
+                # Original grid-based approach
+                h_idx, k_idx, l_idx = h_indices[idx].item(), k_indices[idx].item(), l_indices[idx].item()
+                
+                # Get q-indices for this k-vector point
+                q_indices = self._at_kvec_from_miller_points((h_idx, k_idx, l_idx))
+                valid_mask = self.res_mask[q_indices]
+                valid_indices = q_indices[valid_mask]
             
             if valid_indices.numel() == 0:
                 continue
@@ -1289,6 +1404,9 @@ class OnePhonon:
         """
         Convert h,k,l indices to fully collapsed flat indices.
         
+        For explicit q-vectors: returns h_indices directly (assuming they are flat indices)
+        For grid-based approach: calculates proper flat indices
+        
         Args:
             h_indices: Tensor of h indices with shape [N]
             k_indices: Tensor of k indices with shape [N]
@@ -1297,7 +1415,12 @@ class OnePhonon:
         Returns:
             Tensor of fully collapsed flat indices with shape [N]
         """
-        # Calculate dimensions from sampling parameters
+        # Handle case when explicit q-vectors are provided
+        if hasattr(self, 'q_vectors_input') and self.q_vectors_input is not None:
+            # For explicit q-vectors, return h_indices directly
+            return h_indices
+            
+        # For grid-based approach, calculate dimensions from sampling parameters
         k_dim = int(self.ksampling[2])
         l_dim = int(self.lsampling[2])
         k_l_size = k_dim * l_dim
