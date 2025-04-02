@@ -588,6 +588,9 @@ class OnePhonon:
         """
         # Handle case when explicit q-vectors are provided
         if hasattr(self, 'q_vectors_input') and self.q_vectors_input is not None:
+            print(f"DEBUG kvec_brillouin: self.kvec shape = {self.kvec.shape}, type = {type(self.kvec)}")
+            print(f"DEBUG kvec_brillouin: self.q_vectors_input = {self.q_vectors_input is not None}")
+            
             # For explicit q-vectors, k-vectors are simply q/(2π)
             self.kvec = self.q_grid / (2 * torch.pi)
             self.kvec_norm = torch.norm(self.kvec, dim=1, keepdim=True)
@@ -601,6 +604,8 @@ class OnePhonon:
         k_dim = int(self.ksampling[2])
         l_dim = int(self.lsampling[2])
         
+        print(f"DEBUG kvec creation: shape parameters = {h_dim}, {k_dim}, {l_dim}")
+        
         # Convert A_inv to tensor properly using clone().detach() to avoid warning
         if isinstance(self.model.A_inv, torch.Tensor):
             A_inv_tensor = self.model.A_inv.clone().detach().to(dtype=torch.float32, device=self.device)
@@ -610,9 +615,13 @@ class OnePhonon:
         # Fully collapsed batching implementation
         total_points = h_dim * k_dim * l_dim
         
+        print(f"DEBUG kvec creation: total_points = {total_points}")
+        
         # Create tensors with fully collapsed shape
         self.kvec = torch.zeros((total_points, 3), device=self.device)
         self.kvec_norm = torch.zeros((total_points, 1), device=self.device)
+        
+        print(f"DEBUG kvec creation: initializing self.kvec with shape = {self.kvec.shape}")
         
         # Generate all indices at once
         flat_indices = torch.arange(total_points, device=self.device)
@@ -641,6 +650,8 @@ class OnePhonon:
         
         # Calculate k-vectors for all points at once
         self.kvec = torch.matmul(hkl_tensor, A_inv_tensor)
+        
+        print(f"DEBUG after reshape: self.kvec shape = {self.kvec.shape}")
         
         # Calculate norms
         self.kvec_norm = torch.norm(self.kvec, dim=1, keepdim=True)
