@@ -935,10 +935,15 @@ class OnePhonon:
             total_points = self.q_grid.shape[0]
             logger.info(f"Explicit q-vectors mode: {total_points} points")
         else:
-            # Original grid-based approach
-            h_dim = int(self.hsampling[2])
-            k_dim = int(self.ksampling[2])
-            l_dim = int(self.lsampling[2])
+            # Use map_shape dimensions instead of reinterpreting sampling parameters
+            if hasattr(self, 'map_shape') and self.map_shape is not None:
+                h_dim, k_dim, l_dim = self.map_shape
+                logger.info(f"Using map_shape dimensions for reshape: {h_dim}x{k_dim}x{l_dim}")
+            else:
+                h_dim = int(self.hsampling[2])
+                k_dim = int(self.ksampling[2])
+                l_dim = int(self.lsampling[2])
+                logger.info(f"Using direct dimensions for reshape: {h_dim}x{k_dim}x{l_dim}")
             total_points = h_dim * k_dim * l_dim
             logger.info(f"Grid-based mode: {h_dim}x{k_dim}x{l_dim} = {total_points} points")
         
