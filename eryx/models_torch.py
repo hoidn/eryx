@@ -1349,13 +1349,21 @@ class OnePhonon:
         """
         Convert fully collapsed flat indices to h,k,l indices.
         
+        For explicit q-vectors: returns dummy indices
+        For grid-based approach: calculates proper h,k,l indices
+        
         Args:
             flat_indices: Tensor of flat indices with shape [N]
             
         Returns:
             Tuple of (h_indices, k_indices, l_indices) tensors with shape [N]
         """
-        # Calculate dimensions from sampling parameters
+        # Handle case when explicit q-vectors are provided
+        if hasattr(self, 'q_vectors_input') and self.q_vectors_input is not None:
+            # For explicit q-vectors, return dummy indices that are the same as flat_indices
+            return flat_indices, flat_indices, flat_indices
+            
+        # For grid-based approach, calculate dimensions from sampling parameters
         k_dim = int(self.ksampling[2])
         l_dim = int(self.lsampling[2])
         k_l_size = k_dim * l_dim
