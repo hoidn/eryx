@@ -119,6 +119,8 @@ class OnePhonon:
             res_limit: High-resolution limit in Angstrom.
             group_by: Level of rigid-body assembly ('asu' or None).
         """
+        print(f"DEBUG _setup: q_vectors_input = {self.q_vectors_input}")
+        print(f"DEBUG _setup: hsampling = {self.hsampling}, ksampling = {self.ksampling}, lsampling = {self.lsampling}")
         # Create an AtomicModel instance from the NP implementation.
         self.model = AtomicModel(pdb_path, expand_p1)
         

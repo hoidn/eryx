@@ -73,6 +73,15 @@ def run_torch():
         
         # Use the same parameters as in run_np
         pdb_path = "tests/pdbs/5zck_p1.pdb"
+        
+        print(f"DEBUG run_torch: Creating OnePhonon with parameters:")
+        print(f"  pdb_path = {pdb_path}")
+        print(f"  hsampling = {[-4, 4, 3]}")
+        print(f"  ksampling = {[-17, 17, 3]}")
+        print(f"  lsampling = {[-29, 29, 3]}")
+        print(f"  q_vectors = None (should use grid-based sampling)")
+        print(f"DEBUG: In run_torch, OnePhonon class has q_vectors_input attribute: {'q_vectors_input' in dir(OnePhonon)}")
+        
         onephonon_torch = OnePhonon(
             pdb_path,
             [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
