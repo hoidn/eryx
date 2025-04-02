@@ -622,6 +622,8 @@ class OnePhonon:
             direct_l_dim = int(self.lsampling[2]) if self.lsampling else 0
             logger.info(f"Direct dimensions would be: {direct_h_dim}x{direct_k_dim}x{direct_l_dim} = {direct_h_dim*direct_k_dim*direct_l_dim} points")
         else:
+            # Empty block to satisfy syntax
+            pass
         
         if using_arbitrary_q:
             # For explicit q-vectors, k-vectors are simply q/(2π)
