@@ -13,6 +13,11 @@ import numpy as np
 import torch
 from typing import Optional, Tuple, Dict, Any
 
+# Note on sampling parameters:
+# The sampling parameters (hsampling, ksampling, lsampling) are interpreted as follows:
+# [min, max, oversampling] --> int(oversampling * (max - min) + 1) steps
+# For example, [-4, 4, 3] gives 3*(4-(-4))+1 = 25 steps
+
 # Set default PyTorch dtype for consistency across the application
 torch.set_default_dtype(torch.float32)
 

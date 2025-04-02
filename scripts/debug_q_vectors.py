@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 def extract_q_vectors(pdb_path, hsampling, ksampling, lsampling, device=None):
     """
-    Extract q-vectors directly using the same approach as OnePhonon's grid-based implementation.
+    Extract q-vectors directly using the same approach as OnePhonon's _setup method.
     This ensures exact consistency between grid-based and explicit q-vector modes.
     
     Args:
@@ -46,25 +46,24 @@ def extract_q_vectors(pdb_path, hsampling, ksampling, lsampling, device=None):
     from eryx.pdb import AtomicModel
     model = AtomicModel(pdb_path, expand_p1=True)
     
-    # Use the EXACT same approach as OnePhonon's grid-based implementation
-    # h_dim = int(self.hsampling[2]) in OnePhonon, not the formula from map_utils
-    h_dim = int(hsampling[2])
-    k_dim = int(ksampling[2])
-    l_dim = int(lsampling[2])
-    total_points = h_dim * k_dim * l_dim
+    # Use exactly the same approach as OnePhonon._setup
+    from eryx.map_utils import generate_grid
     
-    logger.info(f"Creating q-vectors grid with dimensions {h_dim}x{k_dim}x{l_dim} = {total_points} points")
+    # Generate grid using map_utils - this is what OnePhonon._setup uses
+    hkl_grid, map_shape = generate_grid(
+        model.A_inv, 
+        hsampling, ksampling, lsampling,
+        return_hkl=True
+    )
     
-    # Create linspace for each dimension
-    h_grid = np.linspace(hsampling[0], hsampling[1], h_dim)
-    k_grid = np.linspace(ksampling[0], ksampling[1], k_dim)
-    l_grid = np.linspace(lsampling[0], lsampling[1], l_dim)
+    logger.info(f"Generated grid using map_utils with shape {hkl_grid.shape}")
+    logger.info(f"Map shape from generate_grid: {map_shape}")
     
-    # Create meshgrid - using indexing='ij' to match NumPy's default behavior
-    h_mesh, k_mesh, l_mesh = np.meshgrid(h_grid, k_grid, l_grid, indexing='ij')
-    
-    # Reshape and stack
-    hkl_grid = np.stack([h_mesh.flatten(), k_mesh.flatten(), l_mesh.flatten()], axis=1)
+    # Calculate steps based on map_utils formula for comparison
+    hsteps = int(hsampling[2] * (hsampling[1] - hsampling[0]) + 1)
+    ksteps = int(ksampling[2] * (ksampling[1] - ksampling[0]) + 1)
+    lsteps = int(lsampling[2] * (lsampling[1] - lsampling[0]) + 1)
+    logger.info(f"Calculated dimensions from formula: {hsteps}x{ksteps}x{lsteps} = {hsteps*ksteps*lsteps} points")
     
     # Convert to tensor
     hkl_grid_tensor = torch.tensor(hkl_grid, dtype=torch.float32, device=device)
@@ -74,7 +73,7 @@ def extract_q_vectors(pdb_path, hsampling, ksampling, lsampling, device=None):
     q_vectors = 2 * torch.pi * torch.matmul(A_inv_tensor.T, hkl_grid_tensor.T).T
     
     # Log information about the extracted q-vectors
-    logger.info(f"Extracted {q_vectors.shape[0]} q-vectors matching grid-based dimensions")
+    logger.info(f"Extracted {q_vectors.shape[0]} q-vectors using map_utils.generate_grid")
     logger.info(f"q-vector range: [{q_vectors.min().item():.2f}, {q_vectors.max().item():.2f}]")
     
     return q_vectors
@@ -120,6 +119,25 @@ def setup_minimal_test():
         lsampling=[-1, 1, l_dim],
         device=device
     )
+    
+    # Do quick validation to confirm dimensions match
+    grid_shape = grid_model.map_shape
+    q_vector_count = q_vectors.shape[0]
+    expected_count = grid_shape[0] * grid_shape[1] * grid_shape[2]
+    
+    if q_vector_count != expected_count:
+        logger.warning(f"!!! CONSISTENCY ERROR !!! Q-vector count ({q_vector_count}) does not match "
+                       f"expected count from grid model ({expected_count})")
+        logger.warning(f"Grid model map_shape: {grid_shape}, which should give {expected_count} points")
+        logger.warning(f"Original sampling parameters: h=[-1, 1, {h_dim}], k=[-1, 1, {k_dim}], l=[-1, 1, {l_dim}]")
+        
+        # Calculate what the dimensions would be using the generate_grid formula
+        hsteps = int(3 * (1 - (-1)) + 1)  # Using hsampling[2] * (max - min) + 1
+        ksteps = int(3 * (1 - (-1)) + 1)
+        lsteps = int(3 * (1 - (-1)) + 1)
+        logger.warning(f"Using generate_grid formula would give: {hsteps}x{ksteps}x{lsteps} = {hsteps*ksteps*lsteps} points")
+    else:
+        logger.info(f"✓ Consistency confirmed: {q_vector_count} q-vectors matches grid model dimensions {grid_shape}")
     
     # Verify q-vector shape matches grid model
     grid_q = grid_model.q_grid.detach().cpu().numpy()
