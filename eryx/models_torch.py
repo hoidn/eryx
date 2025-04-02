@@ -900,7 +900,9 @@ class OnePhonon:
         logger.info(f"compute_gnm_phonons: Using {'explicit q-vectors' if using_arbitrary_q else 'grid-based'} mode")
         
         hessian = self.compute_hessian()
-        logger.info(f"Hessian shape: {hessian.shape}, min: {torch.min(hessian).item():.4e}, max: {torch.max(hessian).item():.4e}")
+        # Complex tensors don't support min/max directly, use absolute values
+        hessian_abs = torch.abs(hessian)
+        logger.info(f"Hessian shape: {hessian.shape}, min abs: {torch.min(hessian_abs).item():.4e}, max abs: {torch.max(hessian_abs).item():.4e}")
         
         # Check if we're using explicit q-vectors
         if using_arbitrary_q:
@@ -1008,10 +1010,12 @@ class OnePhonon:
             )
         )
         
-        # Check for NaN or inf values
-        has_nan = torch.isnan(Dmat_all).any().item()
-        has_inf = torch.isinf(Dmat_all).any().item()
-        logger.info(f"D matrices contain NaN: {has_nan}, Inf: {has_inf}")
+        # Check for NaN or inf values - for complex tensors, check real and imaginary parts
+        has_nan_real = torch.isnan(torch.real(Dmat_all)).any().item()
+        has_nan_imag = torch.isnan(torch.imag(Dmat_all)).any().item()
+        has_inf_real = torch.isinf(torch.real(Dmat_all)).any().item()
+        has_inf_imag = torch.isinf(torch.imag(Dmat_all)).any().item()
+        logger.info(f"D matrices contain NaN: {has_nan_real or has_nan_imag}, Inf: {has_inf_real or has_inf_imag}")
         
         # Process all D matrices at once
         # Extract eigenvalues and eigenvectors without tracking phase gradients
@@ -1341,7 +1345,12 @@ class OnePhonon:
         # Log first few eigenvalues for comparison
         logger.info("Sample eigenvalues in apply_disorder (first 3 points, first 5 values):")
         for i in range(min(3, self.Winv.shape[0])):
-            logger.info(f"  Point {i}: {self.Winv[i, :5].detach().cpu().numpy()}")
+            # Handle complex tensors by showing real part
+            if torch.is_complex(self.Winv):
+                values = torch.real(self.Winv[i, :5]).detach().cpu().numpy()
+                logger.info(f"  Point {i}: {values} (real part)")
+            else:
+                logger.info(f"  Point {i}: {self.Winv[i, :5].detach().cpu().numpy()}")
         
         # Process each point
         for idx in range(total_points):
