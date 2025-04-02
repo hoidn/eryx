@@ -202,8 +202,8 @@ def run_torch_with_explicit_q():
 
 def extract_q_vectors(pdb_path, hsampling, ksampling, lsampling, device=None):
     """
-    Extract q-vectors directly from an hkl grid without creating a full OnePhonon model.
-    This avoids any potential issues from phonon calculations affecting subsequent steps.
+    Extract q-vectors directly using the same approach as OnePhonon's grid-based implementation.
+    This ensures exact consistency between grid-based and explicit q-vector modes.
     
     Args:
         pdb_path: Path to the PDB file
@@ -225,14 +225,25 @@ def extract_q_vectors(pdb_path, hsampling, ksampling, lsampling, device=None):
     from eryx.pdb import AtomicModel
     model = AtomicModel(pdb_path, expand_p1=True)
     
-    # Create q-grid directly using map_utils
-    from eryx.map_utils import generate_grid
-    logging.info(f"Generating q-vectors directly from hkl grid")
-    hkl_grid, map_shape = generate_grid(model.A_inv, 
-                                      hsampling,
-                                      ksampling,
-                                      lsampling,
-                                      return_hkl=True)
+    # Use the EXACT same approach as OnePhonon's grid-based implementation
+    # h_dim = int(self.hsampling[2]) in OnePhonon, not the formula from map_utils
+    h_dim = int(hsampling[2])
+    k_dim = int(ksampling[2])
+    l_dim = int(lsampling[2])
+    total_points = h_dim * k_dim * l_dim
+    
+    logging.info(f"Creating q-vectors grid with dimensions {h_dim}x{k_dim}x{l_dim} = {total_points} points")
+    
+    # Create linspace for each dimension
+    h_grid = np.linspace(hsampling[0], hsampling[1], h_dim)
+    k_grid = np.linspace(ksampling[0], ksampling[1], k_dim)
+    l_grid = np.linspace(lsampling[0], lsampling[1], l_dim)
+    
+    # Create meshgrid - using indexing='ij' to match NumPy's default behavior
+    h_mesh, k_mesh, l_mesh = np.meshgrid(h_grid, k_grid, l_grid, indexing='ij')
+    
+    # Reshape and stack
+    hkl_grid = np.stack([h_mesh.flatten(), k_mesh.flatten(), l_mesh.flatten()], axis=1)
     
     # Convert to tensor
     hkl_grid_tensor = torch.tensor(hkl_grid, dtype=torch.float32, device=device)
@@ -242,7 +253,7 @@ def extract_q_vectors(pdb_path, hsampling, ksampling, lsampling, device=None):
     q_vectors = 2 * torch.pi * torch.matmul(A_inv_tensor.T, hkl_grid_tensor.T).T
     
     # Log information about the extracted q-vectors
-    logging.info(f"Extracted {q_vectors.shape[0]} q-vectors directly from hkl grid")
+    logging.info(f"Extracted {q_vectors.shape[0]} q-vectors matching grid-based dimensions")
     logging.info(f"q-vector range: [{q_vectors.min().item():.2f}, {q_vectors.max().item():.2f}]")
     
     return q_vectors
