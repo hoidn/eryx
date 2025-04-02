@@ -88,10 +88,17 @@ class OnePhonon:
             device: PyTorch device to use (default: CUDA if available, else CPU).
         """
         self.q_vectors_input = q_vectors
+        # Parameter validation to catch common errors
+        self.q_vectors_input = q_vectors
+    
         # Store sampling parameters only if q_vectors is None
         if q_vectors is None:
             if hsampling is None or ksampling is None or lsampling is None:
-                raise ValueError("When q_vectors is None, hsampling, ksampling, and lsampling must be provided")
+                raise ValueError(
+                    "When q_vectors is None, hsampling, ksampling, and lsampling must be provided.\n"
+                    "Use named parameters to avoid positional parameter confusion, for example:\n"
+                    "OnePhonon(pdb_path='file.pdb', hsampling=[-4, 4, 3], ksampling=[-17, 17, 3], lsampling=[-29, 29, 3])"
+                )
             self.hsampling = hsampling
             self.ksampling = ksampling
             self.lsampling = lsampling

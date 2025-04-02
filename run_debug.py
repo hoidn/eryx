@@ -83,8 +83,10 @@ def run_torch():
         print(f"DEBUG: In run_torch, OnePhonon class has q_vectors_input attribute: {'q_vectors_input' in dir(OnePhonon)}")
         
         onephonon_torch = OnePhonon(
-            pdb_path,
-            [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
+            pdb_path=pdb_path,
+            hsampling=[-4, 4, 3],
+            ksampling=[-17, 17, 3],
+            lsampling=[-29, 29, 3],
             expand_p1=True,
             res_limit=0.0,
             gnm_cutoff=4.0,
@@ -152,7 +154,7 @@ def run_torch_with_explicit_q():
         
         # Create OnePhonon instance with explicit q-vectors
         onephonon_torch = OnePhonon(
-            pdb_path,
+            pdb_path=pdb_path,
             q_vectors=q_vectors,  # Pass extracted q-vectors
             expand_p1=True,
             res_limit=0.0,

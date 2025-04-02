@@ -73,8 +73,10 @@ def run_torch(device: Optional[torch.device] = None):
         
         # Create OnePhonon instance with optimized parameters
         onephonon_torch = OnePhonon(
-            pdb_path,
-            [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
+            pdb_path=pdb_path,
+            hsampling=[-4, 4, 3],
+            ksampling=[-17, 17, 3],
+            lsampling=[-29, 29, 3],
             expand_p1=True,
             res_limit=0.0,
             gnm_cutoff=4.0,
@@ -289,7 +291,19 @@ def benchmark_performance(pdb_path: str, runs: int = 3) -> Dict[str, Dict[str, f
         
         start_time = time.time()
         
-        model_torch_cpu = TorchOnePhonon(**params, device=torch.device('cpu'))
+        # Use named parameters to avoid parameter order confusion
+        model_torch_cpu = TorchOnePhonon(
+            pdb_path=params['pdb_path'],
+            hsampling=params['hsampling'],
+            ksampling=params['ksampling'],
+            lsampling=params['lsampling'],
+            expand_p1=params['expand_p1'],
+            res_limit=params['res_limit'],
+            gnm_cutoff=params['gnm_cutoff'],
+            gamma_intra=params['gamma_intra'],
+            gamma_inter=params['gamma_inter'],
+            device=torch.device('cpu')
+        )
         Id_torch_cpu = model_torch_cpu.apply_disorder(use_data_adp=True)
         
         end_time = time.time()
@@ -313,7 +327,19 @@ def benchmark_performance(pdb_path: str, runs: int = 3) -> Dict[str, Dict[str, f
             
             start_time = time.time()
             
-            model_torch_gpu = TorchOnePhonon(**params, device=torch.device('cuda'))
+            # Use named parameters to avoid parameter order confusion
+            model_torch_gpu = TorchOnePhonon(
+                pdb_path=params['pdb_path'],
+                hsampling=params['hsampling'],
+                ksampling=params['ksampling'],
+                lsampling=params['lsampling'],
+                expand_p1=params['expand_p1'],
+                res_limit=params['res_limit'],
+                gnm_cutoff=params['gnm_cutoff'],
+                gamma_intra=params['gamma_intra'],
+                gamma_inter=params['gamma_inter'],
+                device=torch.device('cuda')
+            )
             Id_torch_gpu = model_torch_gpu.apply_disorder(use_data_adp=True)
             
             # Synchronize CUDA for accurate timing
