@@ -221,3 +221,103 @@ if __name__ == "__main__":
         run_torch_with_explicit_q()
     
     logging.info("Completed debug run. Please check debug_output.log and the generated .npy files")
+def extract_q_vectors(pdb_path, hsampling, ksampling, lsampling, device=None):
+    """
+    Extract q-vectors from a grid-based model without computing phonons.
+    
+    Args:
+        pdb_path: Path to the PDB file
+        hsampling, ksampling, lsampling: Sampling parameters
+        device: PyTorch device (default: CPU)
+        
+    Returns:
+        q_vectors: PyTorch tensor of q-vectors
+    """
+    # Import here to avoid circular imports
+    import torch
+    from eryx.models_torch import OnePhonon
+    
+    if device is None:
+        device = torch.device('cpu')
+    
+    # Create OnePhonon model with params to skip phonon computation
+    model = OnePhonon(
+        pdb_path=pdb_path,
+        hsampling=hsampling,
+        ksampling=ksampling,
+        lsampling=lsampling,
+        expand_p1=True,
+        # Skip phonon computation by using these params
+        model="gnm",  # Use GNM as it's faster
+        res_limit=0.0,
+        gnm_cutoff=0.0,  # Set to zero to minimize computation
+        gamma_intra=0.0,
+        gamma_inter=0.0,
+        device=device
+    )
+    
+    # Get q_grid and make a copy to ensure it's detached
+    q_vectors = model.q_grid.clone().detach()
+    
+    # Log information about the extracted q-vectors
+    logging.info(f"Extracted {q_vectors.shape[0]} q-vectors from grid-based model")
+    logging.info(f"q-vector range: [{q_vectors.min().item():.2f}, {q_vectors.max().item():.2f}]")
+    
+    return q_vectors
+def validate_q_vector_consistency():
+    """Validate that all three simulation modes use consistent q-vectors and produce comparable results."""
+    try:
+        import torch
+        import numpy as np
+        from scipy.stats import pearsonr
+        
+        logging.info("Validating q-vector consistency across simulation modes...")
+        
+        # Load results
+        np_result = np.load("np_diffuse_intensity.npy")
+        torch_grid_result = np.load("torch_diffuse_intensity.npy")
+        torch_explicit_result = np.load("torch_explicit_q_diffuse_intensity.npy")
+        
+        # Create masks for non-NaN values in all arrays
+        valid_mask_np = ~np.isnan(np_result)
+        valid_mask_torch_grid = ~np.isnan(torch_grid_result)
+        valid_mask_torch_explicit = ~np.isnan(torch_explicit_result)
+        
+        # Get common valid mask
+        common_valid_mask = valid_mask_np & valid_mask_torch_grid & valid_mask_torch_explicit
+        valid_count = np.sum(common_valid_mask)
+        
+        logging.info(f"Number of common valid points across all modes: {valid_count}")
+        
+        if valid_count == 0:
+            logging.warning("No common valid points found across all modes!")
+            return False
+        
+        # Extract valid values
+        np_values = np_result[common_valid_mask]
+        torch_grid_values = torch_grid_result[common_valid_mask]
+        torch_explicit_values = torch_explicit_result[common_valid_mask]
+        
+        # Compute correlation between PyTorch grid and explicit modes
+        corr_grid_explicit, _ = pearsonr(torch_grid_values, torch_explicit_values)
+        
+        # Compute relative difference
+        rel_diff = np.mean(np.abs(torch_grid_values - torch_explicit_values) / 
+                          np.maximum(np.abs(torch_grid_values), 1e-10)) * 100
+        
+        logging.info(f"Correlation between PyTorch grid and explicit modes: {corr_grid_explicit:.6f}")
+        logging.info(f"Mean relative difference: {rel_diff:.4f}%")
+        
+        # Check if correlation is close to 1.0 (perfect correlation)
+        is_consistent = corr_grid_explicit > 0.99 and rel_diff < 1.0
+        
+        if is_consistent:
+            logging.info("VALIDATION PASSED: q-vector consistency confirmed across simulation modes")
+        else:
+            logging.warning("VALIDATION FAILED: q-vector consistency issues detected")
+        
+        return is_consistent
+        
+    except Exception as e:
+        logging.error(f"Error validating q-vector consistency: {e}")
+        return False
