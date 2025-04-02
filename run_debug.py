@@ -179,32 +179,6 @@ def run_torch_with_explicit_q():
             logging.error(f"Error in PyTorch computation with explicit q-vectors: {e}")
             raise
 
-if __name__ == "__main__":
-    setup_logging()
-    
-    import argparse
-    parser = argparse.ArgumentParser(description='Run diffuse scattering simulations')
-    parser.add_argument('--run-mode', choices=['all', 'np', 'torch', 'torch-explicit-q'], default='all',
-                       help='Specify which implementation to run (default: all)')
-    parser.add_argument('--validate', action='store_true',
-                       help='Validate q-vector consistency across modes')
-    args = parser.parse_args()
-    
-    # Run the specified implementation(s)
-    if args.run_mode in ['all', 'np']:
-        run_np()
-    
-    if args.run_mode in ['all', 'torch']:
-        run_torch()
-    
-    if args.run_mode in ['all', 'torch-explicit-q']:
-        run_torch_with_explicit_q()
-    
-    # Run validation if requested
-    if args.validate and args.run_mode == 'all':
-        validate_q_vector_consistency()
-    
-    logging.info("Completed debug run. Please check debug_output.log and the generated .npy files")
 def extract_q_vectors(pdb_path, hsampling, ksampling, lsampling, device=None):
     """
     Extract q-vectors from a grid-based model without computing phonons.
@@ -305,3 +279,30 @@ def validate_q_vector_consistency():
     except Exception as e:
         logging.error(f"Error validating q-vector consistency: {e}")
         return False
+
+if __name__ == "__main__":
+    setup_logging()
+    
+    import argparse
+    parser = argparse.ArgumentParser(description='Run diffuse scattering simulations')
+    parser.add_argument('--run-mode', choices=['all', 'np', 'torch', 'torch-explicit-q'], default='all',
+                       help='Specify which implementation to run (default: all)')
+    parser.add_argument('--validate', action='store_true',
+                       help='Validate q-vector consistency across modes')
+    args = parser.parse_args()
+    
+    # Run the specified implementation(s)
+    if args.run_mode in ['all', 'np']:
+        run_np()
+    
+    if args.run_mode in ['all', 'torch']:
+        run_torch()
+    
+    if args.run_mode in ['all', 'torch-explicit-q']:
+        run_torch_with_explicit_q()
+    
+    # Run validation if requested
+    if args.validate and args.run_mode == 'all':
+        validate_q_vector_consistency()
+    
+    logging.info("Completed debug run. Please check debug_output.log and the generated .npy files")
