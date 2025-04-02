@@ -215,16 +215,29 @@ class OnePhonon:
             gamma_intra: Spring constant for intra-asu interactions.
             gamma_inter: Spring constant for inter-asu interactions.
         """
-        # Use the sampling parameters directly.
-        h_dim = int(self.hsampling[2])
-        k_dim = int(self.ksampling[2])
-        l_dim = int(self.lsampling[2])
+        # Check if we're using explicit q-vectors
+        using_arbitrary_q = hasattr(self, 'q_vectors_input') and self.q_vectors_input is not None
         
-        self.kvec = torch.zeros((h_dim, k_dim, l_dim, 3), device=self.device)
-        self.kvec_norm = torch.zeros((h_dim, k_dim, l_dim, 1), device=self.device)
-        
-        # Initialize tensors for phonon calculations with fully collapsed shape
-        total_points = h_dim * k_dim * l_dim
+        if using_arbitrary_q:
+            # For explicit q-vectors, use the number of q-vectors as total_points
+            total_points = self.q_grid.shape[0]
+            
+            # Initialize tensors directly with the appropriate shape for q-vectors
+            # No need for 3D tensors since we're using a flat list of q-vectors
+            self.kvec = torch.zeros((total_points, 3), device=self.device)
+            self.kvec_norm = torch.zeros((total_points, 1), device=self.device)
+        else:
+            # Use the sampling parameters for grid-based approach
+            h_dim = int(self.hsampling[2])
+            k_dim = int(self.ksampling[2])
+            l_dim = int(self.lsampling[2])
+            
+            self.kvec = torch.zeros((h_dim, k_dim, l_dim, 3), device=self.device)
+            self.kvec_norm = torch.zeros((h_dim, k_dim, l_dim, 1), device=self.device)
+            
+            # Initialize tensors for phonon calculations with fully collapsed shape
+            total_points = h_dim * k_dim * l_dim
+        # Initialize V and Winv tensors with the same shape regardless of input mode
         self.V = torch.zeros((total_points,
                               self.n_asu * self.n_dof_per_asu,
                               self.n_asu * self.n_dof_per_asu),
