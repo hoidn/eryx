@@ -186,11 +186,22 @@ def run_torch_with_explicit_q():
         logging.debug(f"PyTorch with explicit q: q_vectors shape = {q_vectors.shape}")
         logging.debug(f"PyTorch with explicit q: q_grid shape = {onephonon_torch.q_grid.shape}")
         logging.debug(f"PyTorch with explicit q: q_grid range: min = {onephonon_torch.q_grid.min().item()}, max = {onephonon_torch.q_grid.max().item()}")
+        logging.info(f"PyTorch explicit-q branch diffuse intensity stats: min={torch.nanmin(Id_torch).item()}, max={torch.nanmax(Id_torch).item()}")
         
         # Save for later comparison
         torch.save(Id_torch, "torch_explicit_q_diffuse_intensity.pt")
         # Also save as NumPy array for easier comparison
         np.save("torch_explicit_q_diffuse_intensity.npy", Id_torch.detach().cpu().numpy())
+        
+        # Also save q-vectors and mask for visualization
+        from eryx.visualization import save_q_vectors
+        save_q_vectors(
+            q_vectors=onephonon_torch.q_grid,
+            mask=onephonon_torch.res_mask,
+            output_dir=".",
+            q_vectors_file="explicit_q_vectors.npy",
+            mask_file="explicit_resolution_mask.npy"
+        )
         
         return Id_torch
         
@@ -271,15 +282,33 @@ def validate_q_vector_consistency():
         
         logging.info("Validating q-vector consistency across simulation modes...")
         
+        # Check if all required files exist
+        required_files = [
+            "np_diffuse_intensity.npy",
+            "torch_diffuse_intensity.npy",
+            "torch_explicit_q_diffuse_intensity.npy"
+        ]
+        
+        missing_files = [f for f in required_files if not os.path.exists(f)]
+        if missing_files:
+            logging.error(f"Missing required files for validation: {missing_files}")
+            logging.error("Please run all simulation modes first with --run-mode all")
+            return False
+        
         # Load results
         np_result = np.load("np_diffuse_intensity.npy")
         torch_grid_result = np.load("torch_diffuse_intensity.npy")
         torch_explicit_result = np.load("torch_explicit_q_diffuse_intensity.npy")
         
-        # Check q-vector consistency by loading the raw tensors (create these in run functions)
-        if os.path.exists("torch_grid_q_vectors.npy") and os.path.exists("torch_explicit_q_vectors.npy"):
-            grid_q_vectors = np.load("torch_grid_q_vectors.npy")
-            explicit_q_vectors = np.load("torch_explicit_q_vectors.npy")
+        # Check q-vector consistency by loading the raw tensors
+        q_vector_files = {
+            "grid": "q_vectors.npy",  # From save_simulation_outputs in run_torch
+            "explicit": "torch_explicit_q_vectors.npy"  # From run_torch_with_explicit_q
+        }
+        
+        if all(os.path.exists(f) for f in q_vector_files.values()):
+            grid_q_vectors = np.load(q_vector_files["grid"])
+            explicit_q_vectors = np.load(q_vector_files["explicit"])
             
             # Check if shapes match
             logging.info(f"Grid q-vectors shape: {grid_q_vectors.shape}, Explicit q-vectors shape: {explicit_q_vectors.shape}")
@@ -394,7 +423,12 @@ if __name__ == "__main__":
         run_torch_with_explicit_q()
     
     # Run validation if requested
-    if args.validate and args.run_mode == 'all':
+    if args.validate:
+        # If not running all modes but validation is requested, check if files exist
+        if args.run_mode != 'all':
+            logging.warning("Validation requested but not all modes were run.")
+            logging.warning("Validation will proceed with existing output files.")
+        
         validate_q_vector_consistency()
     
     logging.info("Completed debug run. Please check debug_output.log and the generated .npy files")
