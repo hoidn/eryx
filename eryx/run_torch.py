@@ -113,6 +113,9 @@ def run_torch(device: Optional[torch.device] = None):
         torch.save(Id_torch, "torch_diffuse_intensity.pt")
         np.save("torch_diffuse_intensity.npy", Id_torch.detach().cpu().numpy())
         
+        # Save q-vectors and mask for visualization
+        save_simulation_outputs(Id_torch, onephonon_torch)
+        
         return Id_torch
         
     except RuntimeError as e:
@@ -152,6 +155,36 @@ def run_np():
     logging.debug(f"NP: q_grid range: min = {onephonon_np.q_grid.min()}, max = {onephonon_np.q_grid.max()}")
     logging.info("NP branch diffuse intensity stats: min=%s, max=%s", np.nanmin(Id_np), np.nanmax(Id_np))
     np.save("np_diffuse_intensity.npy", Id_np)
+
+def save_simulation_outputs(Id_torch, model, output_dir="."):
+    """
+    Save simulation outputs and q-vectors for consistent visualization.
+    
+    Args:
+        Id_torch: Diffuse intensity tensor
+        model: OnePhonon model instance
+        output_dir: Directory to save outputs
+    """
+    import os
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Save intensity results
+    torch.save(Id_torch, os.path.join(output_dir, "torch_diffuse_intensity.pt"))
+    np.save(os.path.join(output_dir, "torch_diffuse_intensity.npy"), Id_torch.detach().cpu().numpy())
+    
+    # Save q-vectors and mask for visualization
+    q_vectors = model.q_grid.detach().cpu().numpy()
+    mask = model.res_mask.detach().cpu().numpy()
+    
+    np.save(os.path.join(output_dir, "q_vectors.npy"), q_vectors)
+    np.save(os.path.join(output_dir, "resolution_mask.npy"), mask)
+    
+    logging.info(f"Saved intensity results and q-vectors to {output_dir}")
+    logging.info(f"Q-vectors shape: {q_vectors.shape}, valid points: {np.sum(mask)}")
+    
+    return os.path.join(output_dir, "torch_diffuse_intensity.npy")
 
 def compare_results(rtol: float = 1e-5, atol: float = 1e-8) -> Dict[str, float]:
     """
