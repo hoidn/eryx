@@ -222,7 +222,7 @@ def run_torch_with_explicit_q():
 
 def extract_q_vectors(pdb_path, hsampling, ksampling, lsampling, device=None):
     """
-    Extract q-vectors directly using the same approach as OnePhonon's grid-based implementation.
+    Extract q-vectors directly using the same approach as map_utils.generate_grid.
     This ensures exact consistency between grid-based and explicit q-vector modes.
     
     Args:
@@ -245,11 +245,11 @@ def extract_q_vectors(pdb_path, hsampling, ksampling, lsampling, device=None):
     from eryx.pdb import AtomicModel
     model = AtomicModel(pdb_path, expand_p1=True)
     
-    # Use the EXACT same approach as OnePhonon's grid-based implementation
-    # h_dim = int(self.hsampling[2]) in OnePhonon, not the formula from map_utils
-    h_dim = int(hsampling[2])
-    k_dim = int(ksampling[2])
-    l_dim = int(lsampling[2])
+    # Use the EXACT same formula as map_utils.generate_grid
+    # Calculate steps for each dimension using the formula: int(sampling[2] * (sampling[1] - sampling[0]) + 1)
+    h_dim = int(hsampling[2] * (hsampling[1] - hsampling[0]) + 1)
+    k_dim = int(ksampling[2] * (ksampling[1] - ksampling[0]) + 1)
+    l_dim = int(lsampling[2] * (lsampling[1] - lsampling[0]) + 1)
     total_points = h_dim * k_dim * l_dim
     
     logging.info(f"Creating q-vectors grid with dimensions {h_dim}x{k_dim}x{l_dim} = {total_points} points")
