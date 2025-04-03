@@ -106,8 +106,11 @@ def run_torch(device: Optional[torch.device] = None):
         logging.debug(f"  Dimension 1: min = {onephonon_torch.hkl_grid[:,1].min().item()}, max = {onephonon_torch.hkl_grid[:,1].max().item()}")
         logging.debug(f"  Dimension 2: min = {onephonon_torch.hkl_grid[:,2].min().item()}, max = {onephonon_torch.hkl_grid[:,2].max().item()}")
         logging.debug(f"PyTorch: q_grid range: min = {onephonon_torch.q_grid.min().item()}, max = {onephonon_torch.q_grid.max().item()}")
-        logging.info("PyTorch branch diffuse intensity stats: min=%s, max=%s", 
-                    torch.nanmin(Id_torch).item(), torch.nanmax(Id_torch).item())
+        # Handle NaN values properly for PyTorch versions that don't have torch.nanmin/nanmax
+        valid_values = Id_torch[~torch.isnan(Id_torch)]
+        min_val = valid_values.min().item() if valid_values.numel() > 0 else float('nan')
+        max_val = valid_values.max().item() if valid_values.numel() > 0 else float('nan')
+        logging.info("PyTorch branch diffuse intensity stats: min=%s, max=%s", min_val, max_val)
         
         # Save results for comparison
         torch.save(Id_torch, "torch_diffuse_intensity.pt")
