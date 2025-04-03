@@ -186,7 +186,11 @@ def run_torch_with_explicit_q():
         logging.debug(f"PyTorch with explicit q: q_vectors shape = {q_vectors.shape}")
         logging.debug(f"PyTorch with explicit q: q_grid shape = {onephonon_torch.q_grid.shape}")
         logging.debug(f"PyTorch with explicit q: q_grid range: min = {onephonon_torch.q_grid.min().item()}, max = {onephonon_torch.q_grid.max().item()}")
-        logging.info(f"PyTorch explicit-q branch diffuse intensity stats: min={torch.nanmin(Id_torch).item()}, max={torch.nanmax(Id_torch).item()}")
+        # Handle NaN values properly for PyTorch versions that don't have torch.nanmin/nanmax
+        valid_values = Id_torch[~torch.isnan(Id_torch)]
+        min_val = valid_values.min().item() if valid_values.numel() > 0 else float('nan')
+        max_val = valid_values.max().item() if valid_values.numel() > 0 else float('nan')
+        logging.info(f"PyTorch explicit-q branch diffuse intensity stats: min={min_val}, max={max_val}")
         
         # Save for later comparison
         torch.save(Id_torch, "torch_explicit_q_diffuse_intensity.pt")
