@@ -33,8 +33,10 @@ class OnePhonon:
     """
     
     #@debug
-    def __init__(self, pdb_path: str, hsampling: Tuple[float, float, float], 
-                 ksampling: Tuple[float, float, float], lsampling: Tuple[float, float, float],
+    def __init__(self, pdb_path: str, hsampling: Optional[Tuple[float, float, float]] = None, 
+                 ksampling: Optional[Tuple[float, float, float]] = None, 
+                 lsampling: Optional[Tuple[float, float, float]] = None,
+                 q_vectors: Optional[torch.Tensor] = None,
                  expand_p1: bool = True, group_by: str = 'asu',
                  res_limit: float = 0., model: str = 'gnm',
                  gnm_cutoff: float = 4., gamma_intra: float = 1., gamma_inter: float = 1.,
@@ -44,9 +46,11 @@ class OnePhonon:
         
         Args:
             pdb_path: Path to coordinates file.
-            hsampling: Tuple (hmin, hmax, oversampling) for h dimension.
-            ksampling: Tuple (kmin, kmax, oversampling) for k dimension.
-            lsampling: Tuple (lmin, lmax, oversampling) for l dimension.
+            hsampling: Tuple (hmin, hmax, oversampling) for h dimension. Required if q_vectors not provided.
+            ksampling: Tuple (kmin, kmax, oversampling) for k dimension. Required if q_vectors not provided.
+            lsampling: Tuple (lmin, lmax, oversampling) for l dimension. Required if q_vectors not provided.
+            q_vectors: Tensor of arbitrary q-vectors with shape [n_points, 3] in Å⁻¹. If provided, 
+                       sampling parameters are ignored.
             expand_p1: If True, expand to p1 (if PDB is asymmetric unit).
             group_by: Level of rigid-body assembly ('asu' or None).
             res_limit: High-resolution limit in Angstrom.
@@ -56,13 +60,45 @@ class OnePhonon:
             gamma_inter: Spring constant for inter-asu interactions.
             n_processes: Number of processes for parallel computation.
             device: PyTorch device to use (default: CUDA if available, else CPU).
+        
+        Raises:
+            ValueError: If neither q_vectors nor all three sampling parameters are provided,
+                       or if q_vectors has incorrect shape.
         """
-        self.hsampling = hsampling
-        self.ksampling = ksampling
-        self.lsampling = lsampling
+        # Set device first so we can place tensors correctly
+        self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Validate input parameters
+        self.use_arbitrary_q = q_vectors is not None
+        
+        if self.use_arbitrary_q:
+            # Validate q_vectors
+            if not isinstance(q_vectors, torch.Tensor):
+                raise ValueError("q_vectors must be a PyTorch tensor")
+            if q_vectors.dim() != 2 or q_vectors.shape[1] != 3:
+                raise ValueError(f"q_vectors must have shape [n_points, 3], got {q_vectors.shape}")
+            
+            # Ensure q_vectors is on the correct device and has requires_grad=True
+            self.q_vectors = q_vectors.to(device=self.device)
+            if self.q_vectors.dtype.is_floating_point:
+                self.q_vectors.requires_grad_(True)
+                
+            # Set placeholder values for sampling parameters
+            self.hsampling = (0, 0, 1)
+            self.ksampling = (0, 0, 1)
+            self.lsampling = (0, 0, 1)
+        else:
+            # Validate sampling parameters
+            if hsampling is None or ksampling is None or lsampling is None:
+                raise ValueError("Either q_vectors or all three sampling parameters (hsampling, ksampling, lsampling) must be provided")
+            
+            self.hsampling = hsampling
+            self.ksampling = ksampling
+            self.lsampling = lsampling
+            self.q_vectors = None
+        
         self.n_processes = n_processes
         self.model_type = model
-        self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         self._setup(pdb_path, expand_p1, res_limit, group_by)
         self._setup_phonons(pdb_path, model, gnm_cutoff, gamma_intra, gamma_inter)
