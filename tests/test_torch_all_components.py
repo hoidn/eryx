@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 import torch
-from torch_test_base import TorchComponentTestCase
+from tests.test_base import TestBase as TorchComponentTestCase
 
 class TestTorchAllComponents(TorchComponentTestCase):
     """Test suite that runs basic tests for all components to identify failing components."""

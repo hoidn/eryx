@@ -312,6 +312,19 @@ class MockModelTest(TorchComponentTestCase):
         """Set up test environment."""
         super().setUp()
         
+        # Add default test parameters
+        self.default_test_params = {
+            'pdb_path': 'tests/pdbs/5zck_p1.pdb',
+            'hsampling': [-2, 2, 2],
+            'ksampling': [-2, 2, 2],
+            'lsampling': [-2, 2, 2],
+            'expand_p1': True,
+            'res_limit': 0.0,
+            'gnm_cutoff': 4.0,
+            'gamma_intra': 1.0,
+            'gamma_inter': 1.0
+        }
+        
         # Create mock models
         class MockNumpyModel:
             def __init__(self, **kwargs):
