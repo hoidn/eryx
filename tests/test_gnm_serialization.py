@@ -308,38 +308,38 @@ class TestGNMSerialization(unittest.TestCase):
         
         # Check crystal
         self.assertIn('crystal', state, "Missing crystal")
-    
+
     def _verify_torch_gnm(self, gnm: TorchGNM) -> None:
         """Verify the structure of the PyTorch GNM instance."""
         # Check required attributes
         required_attrs = ['n_asu', 'n_atoms_per_asu', 'n_cell', 'id_cell_ref', 'device']
         for attr in required_attrs:
             self.assertTrue(hasattr(gnm, attr), f"Missing required attribute: {attr}")
-        
+
         # Check gamma tensor
         self.assertTrue(hasattr(gnm, 'gamma'), "Missing gamma tensor")
         if hasattr(gnm, 'gamma'):
             self.assertIsInstance(gnm.gamma, torch.Tensor, "gamma is not a tensor")
-        
+
         # Check asu_neighbors
         self.assertTrue(hasattr(gnm, 'asu_neighbors'), "Missing asu_neighbors")
-        
+
         # Check crystal
         self.assertTrue(hasattr(gnm, 'crystal'), "Missing crystal")
-        
+
         # Check methods
-        self.assertTrue(callable(getattr(gnm, 'compute_hessian', None)), 
+        self.assertTrue(callable(getattr(gnm, 'compute_hessian', None)),
                        "compute_hessian method not found")
-        self.assertTrue(callable(getattr(gnm, 'compute_K', None)), 
+        self.assertTrue(callable(getattr(gnm, 'compute_K', None)),
                        "compute_K method not found")
-        self.assertTrue(callable(getattr(gnm, 'compute_Kinv', None)), 
+        self.assertTrue(callable(getattr(gnm, 'compute_Kinv', None)),
                        "compute_Kinv method not found")
-    
+
     def _print_state_structure(self, state: Dict[str, Any], indent: int = 0) -> None:
         """Print the structure of the state dictionary."""
         prefix = "  " * indent
         print(f"\nState Structure:")
-        
+
         for key, value in state.items():
             if isinstance(value, dict):
                 print(f"{prefix}{key}: Dict with {len(value)} keys")
@@ -352,17 +352,17 @@ class TestGNMSerialization(unittest.TestCase):
                 print(f"{prefix}{key}: NumPy array with shape {value.shape} and dtype {value.dtype}")
             else:
                 print(f"{prefix}{key}: {type(value).__name__}")
-    
+
     def _print_dict_structure(self, d: Dict[str, Any], indent: int = 0) -> None:
         """Print the structure of a dictionary."""
         prefix = "  " * indent
-        
+
         # Handle non-string keys
         if any(not isinstance(k, str) for k in d.keys()):
             key_types = set(type(k).__name__ for k in d.keys())
             print(f"{prefix}Keys are of types: {', '.join(key_types)}")
             return
-        
+
         # Print a sample of keys
         keys = list(d.keys())
         if len(keys) > 5:
