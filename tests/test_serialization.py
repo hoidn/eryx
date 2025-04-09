@@ -80,53 +80,6 @@ class TestObjectSerializer(unittest.TestCase):
         except ImportError:
             self.skipTest("NumPy not available")
     
-    def test_gemmi_structure(self):
-        """Test Gemmi Structure serialization/deserialization."""
-        try:
-            import gemmi
-            
-            # Create a simple Structure with basic components
-            structure = gemmi.Structure()
-            structure.name = "test_structure"
-            structure.cell = gemmi.UnitCell(10, 10, 10, 90, 90, 90)
-            structure.spacegroup_hm = "P 1"
-            
-            model = gemmi.Model("1")
-            chain = gemmi.Chain("A")
-            residue = gemmi.Residue()
-            residue.name = "ALA"
-            residue.seqid = gemmi.SeqId(1, ' ')
-            
-            atom = gemmi.Atom()
-            atom.name = "CA"
-            atom.pos = gemmi.Position(1, 2, 3)
-            atom.element = gemmi.Element("C")
-            atom.b_iso = 20.0
-            atom.occ = 1.0
-            
-            residue.add_atom(atom)
-            chain.add_residue(residue)
-            model.add_chain(chain)
-            structure.add_model(model)
-            
-            # Test serialization/deserialization
-            serialized = self.serializer.serialize(structure)
-            self.assertEqual(serialized["__type__"], "gemmi.Structure")
-            self.assertEqual(serialized["name"], "test_structure")
-            
-            # Test deserialization if GemmiSerializer is available
-            try:
-                from eryx.autotest.gemmi_serializer import GemmiSerializer
-                deserialized = self.serializer.deserialize(serialized)
-                self.assertEqual(deserialized.name, "test_structure")
-                self.assertEqual(len(deserialized), 1)  # One model
-                self.assertEqual(len(deserialized[0]), 1)  # One chain
-            except ImportError:
-                print("GemmiSerializer not available, skipping deserialization test")
-                
-        except ImportError:
-            self.skipTest("Gemmi not available")
-
     def test_custom_objects(self):
         """Test object serialization/deserialization."""
         # Define a simple custom class

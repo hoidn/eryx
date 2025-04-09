@@ -580,9 +580,6 @@ class TestModelAdapters(unittest.TestCase):
         finally:
             # Clean up temp file
             import os
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-
     def test_model_adapters_initialization(self):
         """Test initialization of ModelAdapters."""
         # Verify sub-adapters are correctly initialized
