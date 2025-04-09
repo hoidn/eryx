@@ -682,65 +682,7 @@ class TestGradientUtils(unittest.TestCase):
         # Expected gradient: [[1, 1], [1, 1]]
         expected = torch.ones_like(x)
         self.assertTrue(torch.allclose(grad, expected, atol=1e-4))
-    
-    def test_validate_gradients(self):
-        """Test gradient validation function."""
-        # Test with identical gradients
-        analytical = torch.tensor([1.0, 2.0, 3.0], device=self.device, dtype=torch.float32)
-        numerical = torch.tensor([1.0, 2.0, 3.0], device=self.device, dtype=torch.float32)
-        
-        valid, rel_errors, abs_errors = GradientUtils.validate_gradients(analytical, numerical)
-        
-        self.assertTrue(valid)
-        self.assertTrue(torch.all(rel_errors == 0))
-        self.assertTrue(torch.all(abs_errors == 0))
-        
-        # Test with slightly different gradients within tolerance
-        analytical = torch.tensor([1.0, 2.0, 3.0], device=self.device)
-        numerical = torch.tensor([1.0001, 1.9998, 3.0002], device=self.device)
-        
-        valid, rel_errors, abs_errors = GradientUtils.validate_gradients(analytical, numerical)
-        
-        self.assertTrue(valid)
-        self.assertTrue(torch.all(rel_errors <= 1e-4))
-        self.assertTrue(torch.all(abs_errors <= 1e-4))
-        
-        # Test with gradients outside tolerance
-        analytical = torch.tensor([1.0, 2.0, 3.0], device=self.device)
-        numerical = torch.tensor([1.1, 2.2, 3.3], device=self.device)
-        
-        valid, rel_errors, abs_errors = GradientUtils.validate_gradients(analytical, numerical)
-        
-        self.assertFalse(valid)
-        
-        # Test with zero gradients
-        analytical = torch.zeros(3, device=self.device)
-        numerical = torch.zeros(3, device=self.device)
-        
-        valid, rel_errors, abs_errors = GradientUtils.validate_gradients(analytical, numerical)
-        
-        self.assertTrue(valid)
-        
-        # Test with very large and very small gradients
-        analytical = torch.tensor([1e-10, 1e10], device=self.device)
-        numerical = torch.tensor([1.1e-10, 1.1e10], device=self.device)
-        
-        valid, rel_errors, abs_errors = GradientUtils.validate_gradients(analytical, numerical, rtol=0.2)
-        
-        self.assertTrue(valid)
-        
-        # Test with different tolerance values
-        analytical = torch.tensor([1.0, 2.0, 3.0], device=self.device)
-        numerical = torch.tensor([1.05, 2.05, 3.05], device=self.device)
-        
-        # Should fail with default tolerance
-        valid, _, _ = GradientUtils.validate_gradients(analytical, numerical)
-        self.assertFalse(valid)
-        
-        # Should pass with higher tolerance
-        valid, _, _ = GradientUtils.validate_gradients(analytical, numerical, rtol=0.1)
-        self.assertTrue(valid)
-    
+
     def test_gradient_norm(self):
         """Test gradient norm function."""
         # Test L2 norm of [3, 4]

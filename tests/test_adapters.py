@@ -582,7 +582,7 @@ class TestModelAdapters(unittest.TestCase):
             import os
             if os.path.exists(temp_path):
                 os.remove(temp_path)
-    
+
     def test_model_adapters_initialization(self):
         """Test initialization of ModelAdapters."""
         # Verify sub-adapters are correctly initialized
@@ -594,7 +594,7 @@ class TestModelAdapters(unittest.TestCase):
         self.assertEqual(self.adapter_with_device.device, self.device)
         self.assertEqual(self.adapter_with_device.pdb_to_tensor.device, self.device)
         self.assertEqual(self.adapter_with_device.grid_to_tensor.device, self.device)
-    
+
     def test_model_adapters_integration(self):
         """Test integration of adapter components in ModelAdapters."""
         # Create a simple mock model

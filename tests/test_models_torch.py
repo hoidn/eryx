@@ -273,7 +273,7 @@ class TestMatrixConstruction(TestBase):
             ),
             "Projected M values don't match expected"
         )
-        
+
     def test_log_completeness(self):
         """Verify matrix construction logs exist and contain required attributes."""
         if not hasattr(self, 'verify_logs') or not self.verify_logs:

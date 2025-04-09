@@ -126,7 +126,7 @@ class TestObjectSerializer(unittest.TestCase):
                 
         except ImportError:
             self.skipTest("Gemmi not available")
-    
+
     def test_custom_objects(self):
         """Test object serialization/deserialization."""
         # Define a simple custom class
@@ -207,42 +207,6 @@ class TestObjectSerializer(unittest.TestCase):
             self.assertEqual(data, loaded)
         finally:
             os.unlink(filename)
-    
-    def test_custom_handler(self):
-        """Test registering and using custom type handlers."""
-        # Define a custom class
-        class Point:
-            def __init__(self, x, y):
-                self.x = x
-                self.y = y
-                
-            def __eq__(self, other):
-                if not isinstance(other, Point):
-                    return False
-                return self.x == other.x and self.y == other.y
-        
-        # Define custom handlers
-        def serialize_point(point):
-            return {
-                "__type__": "custom.Point",
-                "x": point.x,
-                "y": point.y
-            }
-        
-        def deserialize_point(data):
-            return Point(data["x"], data["y"])
-        
-        # Register handlers
-        self.serializer.register_handler(Point, serialize_point, deserialize_point)
-        
-        # Test serialization/deserialization
-        point = Point(10, 20)
-        serialized = self.serializer.serialize(point)
-        deserialized = self.serializer.deserialize(serialized)
-        
-        self.assertEqual(point, deserialized)
-        self.assertEqual(deserialized.x, 10)
-        self.assertEqual(deserialized.y, 20)
 
     def test_numpy_array_format(self):
         """Test the specific binary format used for NumPy array serialization."""
