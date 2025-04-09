@@ -154,10 +154,9 @@ class TestBatchedImplementation(TestBase):
         self.assertTrue(torch.all(k_computed == k_indices))
         self.assertTrue(torch.all(l_computed == l_indices))
         
-    def test_batched_structure_factors(self):
-        """
-        Test that batched structure factor calculation works correctly.
-        
+    def test_compute_K_performance(self):
+        """Test performance of compute_K with single-batch implementation."""
+        # Import necessary components
         This test verifies that the structure_factors function correctly handles
         fully collapsed tensor format and produces correct results.
         """
