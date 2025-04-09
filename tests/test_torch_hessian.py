@@ -87,6 +87,28 @@ class TestTorchHessian(TorchComponentTestCase):
             'gamma_intra': 1.0,
             'gamma_inter': 1.0
         }
+        
+    def create_models(self, test_params=None):
+        """Create NumPy and PyTorch models for testing."""
+        # Import models
+        from eryx.models import OnePhonon as NumpyOnePhonon
+        from eryx.models_torch import OnePhonon as TorchOnePhonon
+        
+        # Use default parameters if none provided
+        params = test_params or self.test_params
+        
+        # Create NumPy model
+        np_model = NumpyOnePhonon(**params)
+        
+        # Create PyTorch model with device
+        torch_params = params.copy()
+        torch_params['device'] = self.device
+        torch_model = TorchOnePhonon(**torch_params)
+        
+        self.np_model = np_model
+        self.torch_model = torch_model
+        
+        return np_model, torch_model
     
     def test_compute_gnm_hessian(self):
         """Test the compute_gnm_hessian method implementation."""

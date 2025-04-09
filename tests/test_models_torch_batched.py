@@ -47,7 +47,6 @@ class TestBatchedImplementation(TestBase):
             pdb_path,
             [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],  # Small grid for testing
             expand_p1=True,
-            use_batching=True,
             device=self.device
         )
         
@@ -80,7 +79,7 @@ class TestBatchedImplementation(TestBase):
     def test_tensor_format_conversion(self):
         """Test conversion between original and batched tensor formats."""
         # Create model
-        model = self.create_test_models(use_batching=True)
+        model = self.create_test_models()
         
         # Create test tensor in original format
         h_dim, k_dim, l_dim = 2, 3, 4
@@ -187,8 +186,8 @@ class TestBatchedImplementation(TestBase):
         U = torch.ones(3, device=self.device) * 0.5
         
         # Compute structure factors with and without batching
-        # Set batch_size to 2 to force multiple batches
-        sf_batched = structure_factors(q_grid, xyz, ff_a, ff_b, ff_c, U, batch_size=2)
+        # Compute structure factors
+        sf_batched = structure_factors(q_grid, xyz, ff_a, ff_b, ff_c, U)
         
         # Compute structure factors directly with structure_factors_batch
         sf_direct = structure_factors_batch(q_grid, xyz, ff_a, ff_b, ff_c, U)
@@ -271,7 +270,7 @@ class TestBatchedImplementation(TestBase):
         k_vec = torch.tensor([[0.1, 0.2, 0.3]], device=self.device)
         
         # Compute K matrix using original method
-        K_single = gnm.compute_K(hessian, kvec=k_vec[0])
+        K_single = gnm.compute_K(hessian, k_vec[0])
         
         # Compute using single-batch method
         K_batch = gnm.compute_K(hessian, k_vec)
@@ -299,7 +298,7 @@ class TestBatchedImplementation(TestBase):
         # Compute K matrices one by one using original method
         K_list = []
         for i in range(k_vecs.shape[0]):
-            K_list.append(gnm.compute_K(hessian, kvec=k_vecs[i]))
+            K_list.append(gnm.compute_K(hessian, k_vecs[i]))
         non_batched_time = time.time() - start_time
         
         # Time the single-batch computation
@@ -364,7 +363,6 @@ class TestBatchedImplementation(TestBase):
             pdb_path,
             [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],
             expand_p1=True,
-            use_batching=True,
             device=self.device
         )
         
@@ -372,7 +370,6 @@ class TestBatchedImplementation(TestBase):
             pdb_path,
             [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],
             expand_p1=True,
-            use_batching=False,
             device=self.device
         )
         
@@ -461,7 +458,7 @@ class TestBatchedImplementation(TestBase):
         k_vec = torch.tensor([[0.1, 0.2, 0.3]], device=self.device)
         
         # Compute Kinv using original method with reshape=True
-        Kinv_single = gnm.compute_Kinv(hessian, kvec=k_vec[0], reshape=True)
+        Kinv_single = gnm.compute_Kinv(hessian, k_vec[0], reshape=True)
         
         # Compute using single-batch method with reshape=True
         Kinv_batch = gnm.compute_Kinv(hessian, k_vec, reshape=True)
@@ -484,7 +481,7 @@ class TestBatchedImplementation(TestBase):
         # Compute Kinv matrices one by one using original method
         Kinv_list = []
         for i in range(k_vecs.shape[0]):
-            Kinv_list.append(gnm.compute_Kinv(hessian, kvec=k_vecs[i], reshape=True))
+            Kinv_list.append(gnm.compute_Kinv(hessian, k_vecs[i], reshape=True))
         non_batched_time = time.time() - start_time
         
         # Time the single-batch computation
@@ -565,13 +562,10 @@ class TestBatchedImplementation(TestBase):
             pdb_path,
             [-1, 1, 2], [-1, 1, 2], [-1, 1, 2],  # Small grid for testing
             expand_p1=True,
-            use_batching=True,
             device=self.device,
             # Pass gamma parameters directly to constructor to ensure they're used
             gamma_intra=torch.tensor(1.0, dtype=torch.float32, device=self.device, requires_grad=True),
-            gamma_inter=torch.tensor(0.5, dtype=torch.float32, device=self.device, requires_grad=True),
-            # Set small batch size for testing
-            batch_size=2
+            gamma_inter=torch.tensor(0.5, dtype=torch.float32, device=self.device, requires_grad=True)
         )
         
         # Verify gamma parameters require gradients
@@ -624,8 +618,7 @@ class TestBatchedImplementation(TestBase):
             pdb_path,
             [-2, 2, 2], [-2, 2, 2], [-2, 2, 2],
             expand_p1=True,
-            device=self.device,
-            phonon_batch_size=10  # Small batch size for testing
+            device=self.device
         )
         
         # Compute hessian
