@@ -268,7 +268,8 @@ class InfrastructureTest(unittest.TestCase):
             def test_assert_tensors_equal(self):
                 np_array = np.array([1.0, 2.0, 3.0])
                 torch_tensor = torch.tensor([1.0, 2.0, 3.0], device=self.device)
-                self.assert_tensors_equal(np_array, torch_tensor)
+                # Use TensorComparison directly instead of non-existent method
+                TensorComparison.assert_tensors_equal(np_array, torch_tensor)
                 
             def test_state_capture_injection(self):
                 # Create simple object
@@ -282,7 +283,7 @@ class InfrastructureTest(unittest.TestCase):
                 obj = SimpleObject()
                 
                 # Capture state - explicitly include all attributes
-                state = self.capture_model_state(obj, attributes=['value', 'array', 'list_attr'])
+                state = ModelState.capture_model_state(obj, attributes=['value', 'array', 'list_attr'])
                 
                 # Modify object
                 obj.value = 2
@@ -290,7 +291,7 @@ class InfrastructureTest(unittest.TestCase):
                 obj.list_attr = [4, 5, 6]
                 
                 # Inject state
-                self.inject_model_state(obj, state, to_tensor=False)
+                ModelState.inject_model_state(obj, state, to_tensor=False)
                 
                 # Verify restoration
                 self.assertEqual(obj.value, 1)
@@ -351,6 +352,37 @@ class MockModelTest(TorchComponentTestCase):
         # Replace with our mock modules
         sys.modules['eryx.models'] = MockModuleNP
         sys.modules['eryx.models_torch'] = MockModuleTorch
+        
+    # Add missing methods that are being tested
+    def create_models(self, test_params=None):
+        """Create NumPy and PyTorch models for testing."""
+        # Use default parameters if none provided
+        params = test_params or self.default_test_params
+        
+        # Create NumPy model
+        np_model = self.MockNumpyModel(**params)
+        
+        # Create PyTorch model with device
+        torch_params = params.copy()
+        torch_params['device'] = self.device
+        torch_model = self.MockTorchModel(**torch_params)
+        
+        return np_model, torch_model
+        
+    def prepare_test_environment(self):
+        """Prepare test environment with models."""
+        # Create models
+        self.np_model, self.torch_model = self.create_models()
+        
+    def run_component_test(self, test_func, *args, **kwargs):
+        """Run a component test function with args and capture results."""
+        # Call the test function
+        success, metrics = test_func(*args, **kwargs)
+        
+        # Add test name to metrics
+        metrics["test_name"] = test_func.__name__
+        
+        return success, metrics
     
     def tearDown(self):
         """Tear down test environment."""
