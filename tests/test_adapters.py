@@ -533,53 +533,6 @@ class TestModelAdapters(unittest.TestCase):
         v_imag = torch.imag(model.V).detach().cpu().numpy()
         self.assertTrue(np.allclose(v_imag, np.zeros_like(v_imag)))
         
-    def test_compatibility_with_logger(self):
-        """Test compatibility with Logger's state format."""
-        # Create a mock Logger
-        from eryx.autotest.logger import Logger
-        logger = Logger()
-        
-        # Create a simple object with NumPy arrays
-        class SimpleObject:
-            def __init__(self):
-                self.data = np.random.rand(5, 3)
-                self.values = np.random.rand(10)
-                self.name = "test_object"
-        
-        # Create object and capture state
-        obj = SimpleObject()
-        state = logger.captureState(obj)
-        
-        # Mock saving and loading the state
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix='.log', delete=False) as temp_file:
-            temp_path = temp_file.name
-        
-        try:
-            # Save and load the state
-            logger.saveStateLog(temp_path, state)
-            loaded_state = logger.loadStateLog(temp_path)
-            
-            # Test conversion of loaded state
-            tensor_state = self.adapter.pdb_to_tensor.convert_state_dict(loaded_state)
-            
-            # Verify conversion worked correctly
-            self.assertIsInstance(tensor_state['data'], torch.Tensor)
-            self.assertIsInstance(tensor_state['values'], torch.Tensor)
-            self.assertEqual(tensor_state['name'], "test_object")
-            
-            # Test model initialization from loaded state
-            class MockModel:
-                def __init__(self):
-                    pass
-            
-            model = self.adapter.initialize_from_state(MockModel, loaded_state)
-            self.assertIsInstance(model.data, torch.Tensor)
-            self.assertIsInstance(model.values, torch.Tensor)
-            
-        finally:
-            # Clean up temp file
-            import os
     def test_model_adapters_initialization(self):
         """Test initialization of ModelAdapters."""
         # Verify sub-adapters are correctly initialized

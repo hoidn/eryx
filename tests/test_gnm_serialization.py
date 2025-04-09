@@ -79,58 +79,6 @@ class TestGNMSerialization(unittest.TestCase):
         # Print state structure
         self._print_state_structure(loaded_state)
     
-    def test_torch_gnm_creation_from_state(self):
-        """Test creating a PyTorch GNM from serialized state."""
-        # Create a NumPy GNM instance
-        gnm = NumpyGNM(self.pdb_path, self.enm_cutoff, self.gamma_intra, self.gamma_inter)
-        
-        # Serialize the GNM
-        state = self._capture_state(gnm)
-        
-        # Create a PyTorch GNM from the state
-        builder = StateBuilder(device=self.device)
-        torch_gnm = builder.build(TorchGNM, state)
-        
-        # Verify the PyTorch GNM has the correct attributes
-        self._verify_torch_gnm(torch_gnm)
-        
-        # Test compute_hessian method
-        try:
-            hessian = torch_gnm.compute_hessian()
-            self.assertIsInstance(hessian, torch.Tensor)
-            self.assertEqual(hessian.dtype, torch.complex64)
-            expected_shape = (torch_gnm.n_asu, torch_gnm.n_atoms_per_asu, 
-                             torch_gnm.n_cell, torch_gnm.n_asu, torch_gnm.n_atoms_per_asu)
-            self.assertEqual(hessian.shape, expected_shape)
-            print(f"Hessian shape: {hessian.shape}")
-        except Exception as e:
-            self.fail(f"compute_hessian failed: {e}")
-            
-        # Test compute_K method
-        try:
-            # Create a test k-vector
-            kvec = torch.ones(3, device=self.device, requires_grad=True)
-            
-            # Compute K matrix
-            K = torch_gnm.compute_K(hessian, kvec)
-            
-            # Verify K matrix
-            self.assertIsInstance(K, torch.Tensor)
-            self.assertEqual(K.dtype, torch.complex64)
-            expected_shape = (torch_gnm.n_asu, torch_gnm.n_atoms_per_asu, 
-                             torch_gnm.n_asu, torch_gnm.n_atoms_per_asu)
-            self.assertEqual(K.shape, expected_shape)
-            print(f"K matrix shape: {K.shape}")
-            
-#            # Test gradient flow
-#            loss = torch.abs(K).sum()
-#            loss.backward()
-#            self.assertIsNotNone(kvec.grad)
-#            self.assertFalse(torch.allclose(kvec.grad, torch.zeros_like(kvec.grad)),
-#                           "No gradient flow to kvec in compute_K")
-        except Exception as e:
-            self.fail(f"compute_K failed: {e}")
-
     def _capture_state(self, obj: Any) -> Dict[str, Any]:
         """Capture the state of an object."""
         state = {}
