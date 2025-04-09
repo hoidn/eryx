@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import tempfile
 import os
-from tests.torch_test_base import TorchComponentTestCase
+from torch_test_base import TorchComponentTestCase
 
 class TestTorchDisorder(TorchComponentTestCase):
     """Test suite for PyTorch apply_disorder method."""

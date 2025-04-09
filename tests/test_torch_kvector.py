@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
 import torch
-from tests.torch_test_base import TorchComponentTestCase
-from tests.test_helpers.component_tests import KVectorTests
+from torch_test_base import TorchComponentTestCase
+from test_helpers.component_tests import KVectorTests
 
 class TestTorchKVector(TorchComponentTestCase):
     """

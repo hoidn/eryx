@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 import torch
-from tests.torch_test_base import TorchComponentTestCase
+from torch_test_base import TorchComponentTestCase
 
 # Define HessianTests class since it's missing
 class HessianTests:
