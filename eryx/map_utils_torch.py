@@ -35,7 +35,8 @@ def generate_grid(A_inv: torch.Tensor, hsampling: Tuple[float, float, float],
     References:
         - Original implementation: eryx/map_utils.py:generate_grid
     """
-    # Calculate steps for each dimension
+    # Calculate steps for each dimension matching the NumPy implementation:
+    # hsteps = oversampling * (hmax - hmin) + 1
     hsteps = int(hsampling[2] * (hsampling[1] - hsampling[0]) + 1)
     ksteps = int(ksampling[2] * (ksampling[1] - ksampling[0]) + 1)
     lsteps = int(lsampling[2] * (lsampling[1] - lsampling[0]) + 1)
@@ -178,6 +179,10 @@ def compute_resolution(cell: torch.Tensor, hkl: torch.Tensor) -> torch.Tensor:
         
     References:
         - Original implementation: eryx/map_utils.py:compute_resolution
+        
+    This function works with both grid-based and arbitrary vector lists.
+    hkl can be any tensor of shape (..., 3) where the last dimension
+    contains the Miller indices.
     """
     # Extract cell parameters
     a, b, c = cell[0], cell[1], cell[2]
