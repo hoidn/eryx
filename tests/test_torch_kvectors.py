@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 import torch
-from tests.torch_test_base import TorchComponentTestCase
+from tests.test_base import TestBase as TorchComponentTestCase
 from tests.test_helpers.component_tests import KVectorTests
 
 class TestTorchKVectors(TorchComponentTestCase):
