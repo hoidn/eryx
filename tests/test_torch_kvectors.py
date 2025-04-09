@@ -23,6 +23,27 @@ class TestTorchKVectors(TorchComponentTestCase):
             'gamma_inter': 1.0
         }
     
+    def create_models(self, params=None):
+        """Create NumPy and PyTorch model instances for testing.
+        
+        Args:
+            params: Optional dictionary of parameters to override defaults
+        """
+        if params is None:
+            params = self.test_params
+            
+        # Import models here to avoid circular imports
+        from eryx.models import OnePhonon as NumpyOnePhonon
+        from eryx.models_torch import OnePhonon as TorchOnePhonon
+        
+        # Create NumPy model
+        self.np_model = NumpyOnePhonon(**params)
+        
+        # Create PyTorch model
+        self.torch_model = TorchOnePhonon(**params)
+        
+        return self.np_model, self.torch_model
+    
     def test_center_kvec(self):
         """Test the _center_kvec method implementation."""
         # Create models
