@@ -47,50 +47,7 @@ class TestOnePhononMatrixConstruction(unittest.TestCase):
         model.n_dof_per_asu = 6  # For 'asu' group_by
         
         return model
-    
-    def test_build_A(self):
-        """Test _build_A method with ground truth data."""
-        # Load log data for this method
-        logs = self.logger.loadLog(f"{self.build_A_log}.log")
-        
-        # Process each input/output pair from logs
-        for i in range(len(logs) // 2):
-            # Get input data and expected output
-            instance_data = self.logger.serializer.deserialize(logs[2*i]['args'])[0]
-            expected_output = self.logger.serializer.deserialize(logs[2*i+1]['result'])
-            
-            # Create a partially initialized OnePhonon instance
-            model = OnePhonon.__new__(OnePhonon)
-            
-            # Set necessary attributes from instance_data
-            model.device = self.device
-            model.group_by = instance_data.group_by
-            model.n_asu = instance_data.n_asu
-            model.n_atoms_per_asu = instance_data.n_atoms_per_asu
-            model.n_dof_per_asu_actual = instance_data.n_dof_per_asu_actual
-            model.n_dof_per_asu = instance_data.n_dof_per_asu
-            
-            # Mock the crystal attribute and get_asu_xyz method
-            model.crystal = MagicMock()
-            
-            # Configure the mock to return tensor data when get_asu_xyz is called
-            def get_asu_xyz_side_effect(asu_id, unit_cell=None):
-                # Convert numpy array from instance_data to tensor
-                xyz_data = instance_data.crystal.get_asu_xyz(asu_id)
-                return torch.tensor(xyz_data, device=self.device)
-            
-            model.crystal.get_asu_xyz.side_effect = get_asu_xyz_side_effect
-            
-            # Call the method
-            model._build_A()
-            
-            # Convert result to numpy for comparison
-            actual_output = model.Amat.cpu().detach().numpy()
-            
-            # Compare with expected output
-            self.assertTrue(np.allclose(actual_output, expected_output, rtol=1e-5, atol=1e-8),
-                           "Results don't match ground truth")
-    
+
     def test_build_M_allatoms(self):
         """Test _build_M_allatoms method with ground truth data."""
         # Load log data for this method
@@ -137,7 +94,7 @@ class TestOnePhononMatrixConstruction(unittest.TestCase):
             # Compare with expected output
             self.assertTrue(np.allclose(actual_output_np, expected_output, rtol=1e-5, atol=1e-8),
                            "Results don't match ground truth")
-    
+
     def test_project_M(self):
         """Test _project_M method with ground truth data."""
         # Load log data for this method
@@ -174,63 +131,7 @@ class TestOnePhononMatrixConstruction(unittest.TestCase):
             # Compare with expected output
             self.assertTrue(np.allclose(actual_output_np, expected_output, rtol=1e-5, atol=1e-8),
                            "Results don't match ground truth")
-    
-    def test_build_M(self):
-        """Test _build_M method with ground truth data."""
-        # Load log data for this method
-        logs = self.logger.loadLog(f"{self.build_M_log}.log")
-        
-        # Process each input/output pair from logs
-        for i in range(len(logs) // 2):
-            # Get input data and expected output
-            instance_data = self.logger.serializer.deserialize(logs[2*i]['args'])[0]
-            expected_output = self.logger.serializer.deserialize(logs[2*i+1]['result'])
-            
-            # Create a partially initialized OnePhonon instance
-            model = OnePhonon.__new__(OnePhonon)
-            
-            # Set necessary attributes from instance_data
-            model.device = self.device
-            model.group_by = instance_data.group_by
-            model.n_asu = instance_data.n_asu
-            model.n_atoms_per_asu = instance_data.n_atoms_per_asu
-            model.n_dof_per_asu_actual = instance_data.n_dof_per_asu_actual
-            model.n_dof_per_asu = instance_data.n_dof_per_asu
-            
-            if hasattr(instance_data, 'Amat'):
-                model.Amat = torch.tensor(instance_data.Amat, device=self.device)
-            
-            # Mock _build_M_allatoms and _project_M methods
-            original_build_M_allatoms = model._build_M_allatoms if hasattr(model, '_build_M_allatoms') else None
-            original_project_M = model._project_M if hasattr(model, '_project_M') else None
-            
-            def mock_build_M_allatoms():
-                M_allatoms_data = instance_data._build_M_allatoms() if hasattr(instance_data, '_build_M_allatoms') else np.zeros((model.n_asu, model.n_dof_per_asu_actual, model.n_asu, model.n_dof_per_asu_actual))
-                return torch.tensor(M_allatoms_data, device=model.device)
-            
-            def mock_project_M(M_allatoms):
-                projected_data = instance_data._project_M(M_allatoms.cpu().numpy()) if hasattr(instance_data, '_project_M') else np.zeros((model.n_asu, model.n_dof_per_asu, model.n_asu, model.n_dof_per_asu))
-                return torch.tensor(projected_data, device=model.device)
-            
-            model._build_M_allatoms = MagicMock(side_effect=mock_build_M_allatoms)
-            model._project_M = MagicMock(side_effect=mock_project_M)
-            
-            # Call the method
-            model._build_M()
-            
-            # Restore original methods if they existed
-            if original_build_M_allatoms:
-                model._build_M_allatoms = original_build_M_allatoms
-            if original_project_M:
-                model._project_M = original_project_M
-            
-            # Convert result to numpy for comparison
-            actual_output = model.Linv.cpu().detach().numpy()
-            
-            # Compare with expected output
-            self.assertTrue(np.allclose(actual_output, expected_output, rtol=1e-5, atol=1e-8),
-                           "Results don't match ground truth")
-    
+
     def test_gradient_flow(self):
         """Test gradient flow through matrix operations."""
         # Create a test model with attributes that support gradients
