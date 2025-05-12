@@ -77,9 +77,10 @@ def extract_metadata_from_cbf(cbf_file_path, fields_to_extract):
                                   in the format "category.column".
 
     Returns:
-        dict: A dictionary with extracted metadata. Keys are the
-              "category.column" strings, values are the extracted values.
-              Returns None if the file cannot be read or a field is missing.
+        tuple: (metadata_dict, image_data)
+            - metadata_dict: A dictionary with extracted metadata. Keys are the
+                "category.column" strings, values are the extracted values.
+            - image_data: NumPy array containing the image data if available, None otherwise.
     """
     handle = None
     try:
@@ -90,9 +91,10 @@ def extract_metadata_from_cbf(cbf_file_path, fields_to_extract):
             print(f"Warning: Could not read CBF file {cbf_file_path}: {e}", file=sys.stderr)
         else:
             print(f"Warning: An unexpected error occurred reading {cbf_file_path}: {e}", file=sys.stderr)
-        return None
+        return None, None
 
     metadata = {"filepath": cbf_file_path}
+    image_data = None  # Initialize image_data
 
     try:
         try:
@@ -174,17 +176,71 @@ def extract_metadata_from_cbf(cbf_file_path, fields_to_extract):
             
             metadata[field_key] = current_value
 
+        # --- Attempt to extract image data (assuming 2D for simplicity) ---
+        try:
+            # Get image dimensions
+            dims = handle.get_image_size(0)  # element_number 0
+            ndimslow, ndimfast = dims[0], dims[1]
+
+            if ndimslow > 0 and ndimfast > 0:
+                # Assume unsigned 16-bit integers for now
+                elsize = 2  # For 16-bit integers
+                elsign = 0  # Unsigned
+
+                # Allocate numpy array
+                image_array_np = np.empty(ndimslow * ndimfast, dtype=np.uint16 if elsize==2 and elsign==0 else np.int16)
+                
+                # Try to get image data into the numpy array
+                try:
+                    # Ensure the array is C-contiguous
+                    image_array_np_contiguous = np.require(image_array_np, requirements=['C_CONTIGUOUS', 'W'])
+
+                    handle.get_image(0,  # element_number
+                                     image_array_np_contiguous,  # array
+                                     elsize, 
+                                     elsign, 
+                                     ndimslow, 
+                                     ndimfast)
+                    image_data = image_array_np_contiguous.reshape((ndimslow, ndimfast))
+
+                except TypeError as te:
+                    print(f"Debug: get_image with numpy array failed ({te}). Trying get_image_as_string.", file=sys.stderr)
+                    # Fallback to get_image_as_string
+                    image_string = handle.get_image_as_string(0, elsize, elsign, ndimslow, ndimfast)
+                    if elsize == 2 and elsign == 0:
+                        image_data = np.frombuffer(image_string, dtype=np.uint16).reshape((ndimslow, ndimfast))
+                    elif elsize == 2 and elsign == 1:
+                        image_data = np.frombuffer(image_string, dtype=np.int16).reshape((ndimslow, ndimfast))
+                    elif elsize == 4 and elsign == 0:
+                        image_data = np.frombuffer(image_string, dtype=np.uint32).reshape((ndimslow, ndimfast))
+                    elif elsize == 4 and elsign == 1:
+                        image_data = np.frombuffer(image_string, dtype=np.int32).reshape((ndimslow, ndimfast))
+                    else:
+                        print(f"Warning: Unsupported elsize/elsign for image data: {elsize}/{elsign}", file=sys.stderr)
+                except Exception as img_e:
+                    print(f"Warning: Could not extract image data from {cbf_file_path}: {img_e}", file=sys.stderr)
+            else:
+                print(f"Warning: Invalid image dimensions ({ndimslow}x{ndimfast}) for {cbf_file_path}", file=sys.stderr)
+
+        except Exception as e:
+            if is_cbf_error(e, "CBF_NOTFOUND"):
+                print(f"Info: No image data found or dimensions unavailable in {cbf_file_path}.", file=sys.stderr)
+            elif is_cbf_error(e):
+                print(f"Warning: CBF Error getting image data/size from {cbf_file_path}: {e}", file=sys.stderr)
+            else:
+                print(f"Warning: Unexpected Python error getting image data/size from {cbf_file_path}: {e}", file=sys.stderr)
+
     except Exception as e:
-        print(f"Warning: General error during metadata extraction for {cbf_file_path}: {e}", file=sys.stderr)
+        print(f"Warning: General error during metadata/image extraction for {cbf_file_path}: {e}", file=sys.stderr)
         for field_key in fields_to_extract:
             if field_key not in metadata:
                 metadata[field_key] = None
     
-    return metadata
+    return metadata, image_data
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Inspect metadata from CBF files and optionally plot a heatmap."
+        description="Inspect metadata from CBF files, optionally plot a heatmap or display first image."
     )
     parser.add_argument(
         "directory", type=str, help="Directory containing CBF files."
@@ -195,9 +251,15 @@ def main():
     parser.add_argument(
         "--fields",
         type=str,
-        required=True,
+        default="",  # Default to empty string if not provided
         help="Comma-separated list of metadata fields to extract, "
              "in 'category.column' format (e.g., 'axis.id,diffrn_source.beam_X').",
+    )
+    # New argument for image display
+    parser.add_argument(
+        "--show-image",
+        action="store_true",
+        help="Display the image from the first processed CBF file."
     )
     parser.add_argument(
         "--output-csv",
@@ -236,11 +298,16 @@ def main():
 
     args = parser.parse_args()
 
-    fields_to_extract = [f.strip() for f in args.fields.split(',')]
-    if not fields_to_extract or not all(f for f in fields_to_extract if f): # Ensure no empty strings after split
-        print("Error: No valid fields specified.", file=sys.stderr)
+    if not args.fields and not args.show_image:
+        print("Error: No fields specified for extraction and --show-image not used. Nothing to do.", file=sys.stderr)
         parser.print_help()
         sys.exit(1)
+
+    fields_to_extract = []
+    if args.fields:
+        fields_to_extract = [f.strip() for f in args.fields.split(',') if f.strip()]
+        if not fields_to_extract and args.fields:  # If fields was given but resulted in empty list
+            print("Warning: --fields argument provided but no valid fields were parsed.", file=sys.stderr)
 
     cbf_files = sorted(glob.glob(os.path.join(args.directory, args.pattern)))
 
@@ -248,23 +315,59 @@ def main():
         print(f"No files found matching pattern '{args.pattern}' in directory '{args.directory}'.", file=sys.stderr)
         sys.exit(1)
 
+    first_image_data = None
+    first_image_filename = None
+
     if args.limit is not None:
         print(f"Limiting processing to the first {args.limit} files.")
-        cbf_files = cbf_files[:args.limit]
+        cbf_files_to_process = cbf_files[:args.limit]
+    else:
+        cbf_files_to_process = cbf_files
 
-    print(f"Found {len(cbf_files)} files to process.")
+    print(f"Found {len(cbf_files_to_process)} files to process.")
 
     all_metadata = []
-    for i, cbf_file in enumerate(cbf_files):
-        print(f"Processing file {i+1}/{len(cbf_files)}: {os.path.basename(cbf_file)}", end='\r', flush=True)
-        metadata = extract_metadata_from_cbf(cbf_file, fields_to_extract)
-        if metadata: # Only append if metadata extraction was successful (not None)
+    for i, cbf_file in enumerate(cbf_files_to_process):
+        print(f"Processing file {i+1}/{len(cbf_files_to_process)}: {os.path.basename(cbf_file)}", end='\r', flush=True)
+        # Pass fields_to_extract even if empty, extract_metadata_from_cbf handles it
+        metadata, image_data = extract_metadata_from_cbf(cbf_file, fields_to_extract)
+        
+        if metadata:  # If metadata extraction was successful
             all_metadata.append(metadata)
-    print("\nProcessing complete.                                  ") # Spaces to clear the line
+        
+        if args.show_image and i == 0 and image_data is not None:  # Only store first image
+            first_image_data = image_data
+            first_image_filename = cbf_file
+            if not args.fields:  # If only showing image, break after first file
+                print(f"\nImage from {os.path.basename(first_image_filename)} extracted. Will display after processing.")
+                break
+                
+    print("\nProcessing complete.                                  ")  # Spaces to clear the line
 
-    if not all_metadata:
-        print("No metadata could be extracted from any files, or all extractions failed.", file=sys.stderr)
-        sys.exit(1)
+    if args.show_image and first_image_data is not None:
+        print(f"\nDisplaying image from: {os.path.basename(first_image_filename)}")
+        plt.figure(figsize=(10, 10))
+        # Determine good intensity limits, e.g., 1st and 99th percentile
+        vmin = np.percentile(first_image_data, 1)
+        vmax = np.percentile(first_image_data, 99)
+        plt.imshow(first_image_data, cmap='gray', origin='lower', vmin=vmin, vmax=vmax)
+        plt.colorbar(label="Intensity")
+        plt.title(f"CBF Image: {os.path.basename(first_image_filename)}")
+        plt.xlabel("Fast Dimension (pixels)")
+        plt.ylabel("Slow Dimension (pixels)")
+        plt.tight_layout()
+        plt.savefig("cbf_first_image.png")
+        print("Saved cbf_first_image.png")
+        plt.show()
+    elif args.show_image:
+        print("\n--show-image was specified, but no image data could be extracted from the first file.")
+
+    if fields_to_extract:  # Only proceed with metadata processing if fields were requested
+        if not all_metadata:
+            print("No metadata could be extracted from any files, or all extractions failed.", file=sys.stderr)
+            if not args.show_image:  # Exit if not also showing an image
+                sys.exit(1)
+        else:
 
     df = pd.DataFrame(all_metadata)
 
