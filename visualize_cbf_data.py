@@ -24,11 +24,16 @@ def parse_pilatus_header(header_string):
         return {}
     
     parsed_data = {}
-    # Regex to capture:
-    # Group 1: The key (non-greedy, up to a colon or equals sign or end of key-like part)
-    # Group 2: The value (everything after the key/colon/equals)
-    # This pattern is more flexible with or without colon, and with '='
-    key_value_pattern = re.compile(r"^\s*#\s*([^:=]+?)\s*[:=]?\s*(.*)$")
+    # Pattern 1: Key explicitly followed by ':' or '='
+    # Key (group 1): One or more non-colon/equals characters, followed by optional space
+    # Value (group 3): Everything after the delimiter and optional space
+    key_val_delimited_pattern = re.compile(r"^\s*#\s*([^:=]+?)\s*([:=])\s*(.*)$")
+    
+    # Pattern 2: Key followed by space then value (no explicit delimiter like : or =)
+    # Key (group 1): Word characters, underscores, hyphens, dots, N_
+    # Value (group 2): Everything after the key and at least one space
+    key_val_space_pattern = re.compile(r"^\s*#\s*([\w\s.-]+?N_[\w\s.-]+|[\w.-]+)\s+(.+)$") # More specific key part
+
     beam_xy_pattern = re.compile(r"Beam_xy\s*\(([^,]+),\s*([^)]+)\)")
 
     for line in header_string.splitlines():
@@ -38,52 +43,56 @@ def parse_pilatus_header(header_string):
         
         line_content_no_hash = line_content[1:].strip()
 
-        # Special handling for timestamp (if it doesn't fit key:value)
         if re.match(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}", line_content_no_hash):
             parsed_data["timestamp_header"] = line_content_no_hash
             continue
 
-        # Try to match Beam_xy
         beam_match = beam_xy_pattern.search(line_content_no_hash)
         if beam_match:
             try:
                 parsed_data["beam_x_header"] = float(beam_match.group(1).strip())
                 parsed_data["beam_y_header"] = float(beam_match.group(2).strip())
             except ValueError:
-                parsed_data["beam_x_header"] = beam_match.group(1).strip() # Store as string if not float
+                parsed_data["beam_x_header"] = beam_match.group(1).strip()
                 parsed_data["beam_y_header"] = beam_match.group(2).strip()
-            continue # Move to next line after handling Beam_xy
+            continue
 
-        # General key-value parsing with more flexible pattern
-        match = key_value_pattern.match(line_content)
-        if match:
-            key = match.group(1).strip()
-            value = match.group(2).strip()
-            
+        key = None
+        value = None
+
+        match_delimited = key_val_delimited_pattern.match(line_content)
+        if match_delimited:
+            key = match_delimited.group(1).strip()
+            value = match_delimited.group(3).strip()
+        else:
+            match_space = key_val_space_pattern.match(line_content)
+            if match_space:
+                key = match_space.group(1).strip()
+                value = match_space.group(2).strip()
+        
+        if key and value is not None: # Ensure both key and value were found
             # Further clean value if it's something like "autog (vrf = 1.000)" -> "autog"
             if "(" in value and ")" in value:
                 value_before_paren = value.split("(",1)[0].strip()
-                if value_before_paren: # If there's content before parenthesis
+                if value_before_paren:
                     value = value_before_paren
-
-            # Clean up key: lowercase, replace space, hyphen, and period with underscore
+            
             clean_key = key.lower().replace(" ", "_").replace("-", "_").replace(".", "_")
             
-            # Handle special case like "Pixel_size 172e-6 m x 172e-6 m"
             if clean_key == "pixel_size" and "m x" in value:
                 try:
-                    # Extract the first numeric part for pixel_size_x and pixel_size_y
                     numeric_part = re.match(r'([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)', value)
                     if numeric_part:
                         parsed_data["pixel_size_x"] = numeric_part.group(1)
-                        parsed_data["pixel_size_y"] = numeric_part.group(1) # Assuming square pixels
+                        parsed_data["pixel_size_y"] = numeric_part.group(1)
                 except:
-                    parsed_data[clean_key] = value # fallback
-            elif clean_key: # Ensure key is not empty
-                parsed_data[clean_key] = value
+                    parsed_data[clean_key] = value 
+            elif clean_key:
+                 parsed_data[clean_key] = value
         # else:
-            # print(f"Debug: Line not parsed by key-value: '{line_content}'")
-
+            # if line_content_no_hash: # Avoid printing for empty # lines
+            #     print(f"Debug: Line not parsed: '{line_content_no_hash}'")
+            
     return parsed_data
 
 header_details_df = df['array_data.header_contents'].apply(parse_pilatus_header).apply(pd.Series)
