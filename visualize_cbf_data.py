@@ -24,11 +24,12 @@ def parse_pilatus_header(header_string):
         return {}
     
     parsed_data = {}
-    # Regex to capture key (group 1) and value (group 2) from lines like "# Key: Value"
-    # Also handles cases like "# Key Value" (no colon) or "# Key" (no value)
-    # And specific timestamp line
-    key_value_pattern = re.compile(r"^\s*#\s*([^:]+?)\s*:\s*(.+)$")
-    beam_xy_pattern = re.compile(r"Beam_xy\s*\(([^,]+),\s*([^)]+)\)") # For Beam_xy
+    # Regex to capture:
+    # Group 1: The key (non-greedy, up to a colon or equals sign or end of key-like part)
+    # Group 2: The value (everything after the key/colon/equals)
+    # This pattern is more flexible with or without colon, and with '='
+    key_value_pattern = re.compile(r"^\s*#\s*([^:=]+?)\s*[:=]?\s*(.*)$")
+    beam_xy_pattern = re.compile(r"Beam_xy\s*\(([^,]+),\s*([^)]+)\)")
 
     for line in header_string.splitlines():
         line_content = line.strip()
@@ -38,8 +39,6 @@ def parse_pilatus_header(header_string):
         line_content_no_hash = line_content[1:].strip()
 
         # Special handling for timestamp (if it doesn't fit key:value)
-        # Example: # 2017-06-26T02:54:18.648
-        # This specific timestamp format is tricky as a key. Let's look for it.
         if re.match(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}", line_content_no_hash):
             parsed_data["timestamp_header"] = line_content_no_hash
             continue
@@ -55,16 +54,35 @@ def parse_pilatus_header(header_string):
                 parsed_data["beam_y_header"] = beam_match.group(2).strip()
             continue # Move to next line after handling Beam_xy
 
-        # General key: value parsing
+        # General key-value parsing with more flexible pattern
         match = key_value_pattern.match(line_content)
         if match:
             key = match.group(1).strip()
             value = match.group(2).strip()
-            # Clean up key: lowercase, replace space and hyphen with underscore
-            clean_key = key.lower().replace(" ", "_").replace("-", "_")
-            parsed_data[clean_key] = value
+            
+            # Further clean value if it's something like "autog (vrf = 1.000)" -> "autog"
+            if "(" in value and ")" in value:
+                value_before_paren = value.split("(",1)[0].strip()
+                if value_before_paren: # If there's content before parenthesis
+                    value = value_before_paren
+
+            # Clean up key: lowercase, replace space, hyphen, and period with underscore
+            clean_key = key.lower().replace(" ", "_").replace("-", "_").replace(".", "_")
+            
+            # Handle special case like "Pixel_size 172e-6 m x 172e-6 m"
+            if clean_key == "pixel_size" and "m x" in value:
+                try:
+                    # Extract the first numeric part for pixel_size_x and pixel_size_y
+                    numeric_part = re.match(r'([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)', value)
+                    if numeric_part:
+                        parsed_data["pixel_size_x"] = numeric_part.group(1)
+                        parsed_data["pixel_size_y"] = numeric_part.group(1) # Assuming square pixels
+                except:
+                    parsed_data[clean_key] = value # fallback
+            elif clean_key: # Ensure key is not empty
+                parsed_data[clean_key] = value
         # else:
-            # print(f"Debug: Line not parsed by key-value: '{line_content_no_hash}'")
+            # print(f"Debug: Line not parsed by key-value: '{line_content}'")
 
     return parsed_data
 
