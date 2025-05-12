@@ -95,72 +95,89 @@ def extract_metadata_from_cbf(cbf_file_path, fields_to_extract):
     metadata = {"filepath": cbf_file_path}
 
     try:
-        # Ensure we are in the first datablock.
         try:
             handle.select_datablock(0)
+            # print(f"Debug ({os.path.basename(cbf_file_path)}): Selected datablock 0. Name: {cbf2str_safe(handle.datablock_name())}")
         except Exception as db_e:
             if is_cbf_error(db_e, "CBF_NOTFOUND"):
                 print(f"Warning: No datablocks found in {cbf_file_path}. Cannot extract fields.", file=sys.stderr)
-                for field_key in fields_to_extract:
-                    metadata[field_key] = None
-                return metadata
-            else: # Other datablock error
+            else:
                 print(f"Warning: Error selecting datablock in {cbf_file_path}: {db_e}", file=sys.stderr)
-                for field_key in fields_to_extract:
-                    metadata[field_key] = None
-                return metadata
-
+            for field_key in fields_to_extract: metadata[field_key] = None
+            return metadata
 
         for field_key in fields_to_extract:
-            current_value = None # Default to None for the field
+            current_value = None
+            category_name, column_name = None, None # Initialize
             try:
                 category_name, column_name = field_key.split('.')
             except ValueError:
-                print(f"Warning: Invalid field format '{field_key}'. "
-                      "Expected 'category.column'. Skipping.", file=sys.stderr)
+                print(f"Warning: Invalid field format '{field_key}'. Skipping.", file=sys.stderr)
                 metadata[field_key] = None
                 continue
+            
+            # --- Start Enhanced Debugging for a specific field ---
+            is_debug_field = (field_key == "array_data.header_convention")
+            if is_debug_field: print(f"\n--- Debugging field: {field_key} in {os.path.basename(cbf_file_path)} ---")
+            # --- End Enhanced Debugging ---
 
             try:
-                # Attempt to find category and column
-                # find_category should operate on the current datablock
-                handle.find_category(category_name.encode())
-                handle.find_column(column_name.encode())
+                # Ensure datablock context (though find_category should use current)
+                # handle.select_datablock(0) # Probably not needed here if already selected
 
-                if handle.count_rows() > 0:
-                    handle.select_row(0) # Select the first row
+                if is_debug_field: print(f"  Attempting find_category('{category_name}')")
+                handle.find_category(category_name.encode())
+                if is_debug_field: print(f"  SUCCESS: find_category. Current category: {cbf2str_safe(handle.category_name())}")
+
+                if is_debug_field: print(f"  Attempting find_column('{column_name}')")
+                handle.find_column(column_name.encode())
+                if is_debug_field: print(f"  SUCCESS: find_column. Current column: {cbf2str_safe(handle.column_name())}")
+
+                num_rows = handle.count_rows()
+                if is_debug_field: print(f"  Number of rows in category: {num_rows}")
+
+                if num_rows > 0:
+                    handle.select_row(0)
+                    if is_debug_field: print(f"  SUCCESS: select_row(0). Current row number: {handle.row_number()}")
 
                     value_type_raw = handle.get_typeofvalue()
                     value_type = cbf2str_safe(value_type_raw)
+                    if is_debug_field: print(f"  Type of value: '{value_type}' (raw: {repr(value_type_raw)})")
 
                     if value_type == "bnry":
                         current_value = "(Binary Data)"
-                    elif value_type == "null": # Explicitly handle CIF null
+                    elif value_type == "null":
                         current_value = None
+                        if is_debug_field: print(f"  Value is CIF null, setting to Python None.")
                     else:
                         value_raw = handle.get_value()
                         current_value = cbf2str_safe(value_raw)
+                        if is_debug_field: print(f"  Raw value from get_value(): {repr(value_raw)}")
+                        if is_debug_field: print(f"  Processed value (cbf2str_safe): {repr(current_value)}")
                 else:
-                    # Category or column found, but no rows. Value is effectively missing.
                     current_value = None
+                    if is_debug_field: print(f"  No rows in category, value set to None.")
+                
+                if is_debug_field: print(f"--- End Debugging field: {field_key} ---")
 
             except Exception as field_e:
-                # CBF_NOTFOUND is common if category/column doesn't exist
+                current_value = None # Ensure it's None on error
+                if is_debug_field:
+                    print(f"  ERROR during extraction of {field_key}: {type(field_e).__name__}: {field_e}")
+                    print(f"--- End Debugging field: {field_key} ---")
+
                 if not is_cbf_error(field_e, "CBF_NOTFOUND"):
-                    # Report other errors more verbosely
                     if is_cbf_error(field_e):
                         print(f"Warning: CBF Error extracting field '{field_key}' from {cbf_file_path}: {field_e}", file=sys.stderr)
                     else:
                         print(f"Warning: Unexpected Python error extracting field '{field_key}' from {cbf_file_path}: {field_e}", file=sys.stderr)
-                # In all error cases for a field, or if not found, current_value remains/is set to None
-                current_value = None
             
             metadata[field_key] = current_value
 
-    except Exception as e: # Catch-all for the main processing block
+    except Exception as e:
         print(f"Warning: General error during metadata extraction for {cbf_file_path}: {e}", file=sys.stderr)
         for field_key in fields_to_extract:
-            if field_key not in metadata: # Ensure all fields are present in the output dict
+            if field_key not in metadata:
                 metadata[field_key] = None
     
     return metadata
