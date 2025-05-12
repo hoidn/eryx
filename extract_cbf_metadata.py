@@ -368,8 +368,107 @@ def main():
             if not args.show_image:  # Exit if not also showing an image
                 sys.exit(1)
         else:
+            df = pd.DataFrame(all_metadata)
 
-    df = pd.DataFrame(all_metadata)
+            # Identify columns that are explicitly used for numeric heatmap operations
+            numeric_heatmap_cols = []
+            if args.heatmap_x: numeric_heatmap_cols.append(args.heatmap_x)
+            if args.heatmap_y: numeric_heatmap_cols.append(args.heatmap_y)
+            if args.heatmap_value: numeric_heatmap_cols.append(args.heatmap_value)
+            
+            # Convert only these specified heatmap-related columns to numeric if they exist
+            for col in numeric_heatmap_cols:
+                if col in df.columns:
+                    if "(Binary Data)" not in df[col].astype(str).unique(): # Check for our placeholder
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                        print(f"Info: Attempted conversion to numeric for column '{col}'.")
+                    else:
+                        print(f"Info: Column '{col}' contains '(Binary Data)' and will not be converted to numeric.", file=sys.stderr)
+            
+            print("\nExtracted Metadata (first 5 rows):")
+            print(df.head().to_string()) # .to_string() for better console output of wide dataframes
+
+            if args.output_csv:
+                try:
+                    df.to_csv(args.output_csv, index=False)
+                    print(f"\nMetadata saved to {args.output_csv}")
+                except Exception as e:
+                    print(f"\nError saving CSV to {args.output_csv}: {e}", file=sys.stderr)
+
+            if args.heatmap_x and args.heatmap_y:
+                # Check if heatmap fields are present *after* DataFrame creation
+                if args.heatmap_x not in df.columns or args.heatmap_y not in df.columns:
+                    missing_fields = []
+                    if args.heatmap_x not in df.columns: missing_fields.append(args.heatmap_x)
+                    if args.heatmap_y not in df.columns: missing_fields.append(args.heatmap_y)
+                    print(f"Error: Heatmap X/Y field(s) {', '.join(missing_fields)} not found in extracted DataFrame columns.", file=sys.stderr)
+                    sys.exit(1)
+                if args.heatmap_value and args.heatmap_value not in df.columns:
+                    print(f"Error: Heatmap value field '{args.heatmap_value}' not found in extracted DataFrame columns.", file=sys.stderr)
+                    sys.exit(1)
+                
+                # Create a copy for plotting to avoid modifying the original DataFrame
+                df_plot = df.copy()
+
+
+                df_plot_cleaned = df_plot.dropna(subset=[args.heatmap_x, args.heatmap_y])
+                if args.heatmap_value:
+                    df_plot_cleaned = df_plot_cleaned.dropna(subset=[args.heatmap_value])
+
+                if df_plot_cleaned.empty:
+                    print("No data available for heatmap after dropping NaNs in specified columns.", file=sys.stderr)
+                    sys.exit(1)
+
+                try:
+                    print(f"\nGenerating heatmap for X='{args.heatmap_x}', Y='{args.heatmap_y}'"
+                          f"{', Value=' + args.heatmap_value if args.heatmap_value else ', Aggregation=count'}")
+                    
+                    if args.heatmap_value:
+                        pivot_data = pd.pivot_table(
+                            df_plot_cleaned,
+                            values=args.heatmap_value,
+                            index=args.heatmap_y,
+                            columns=args.heatmap_x,
+                            aggfunc=args.heatmap_agg
+                        )
+                        agg_label = f"{args.heatmap_agg} of {args.heatmap_value}"
+                    else:
+                        pivot_data = pd.pivot_table(
+                            df_plot_cleaned,
+                            index=args.heatmap_y,
+                            columns=args.heatmap_x,
+                            aggfunc='size',
+                            fill_value=0
+                        )
+                        agg_label = "Count"
+
+                    if pivot_data.empty:
+                        print("Pivot table for heatmap is empty. Check data and field choices.", file=sys.stderr)
+                        sys.exit(1)
+                    
+                    if pivot_data.shape[0] > 50 or pivot_data.shape[1] > 50:
+                        print(f"Warning: Heatmap dimensions are large ({pivot_data.shape[0]}x{pivot_data.shape[1]}). "
+                              "Consider binning continuous data or choosing fields with fewer unique values.", file=sys.stderr)
+
+                    plt.figure(figsize=(12, 10))
+                    sns.heatmap(pivot_data, annot=True, fmt=".1f" if args.heatmap_value else "d", cmap="viridis", cbar_kws={'label': agg_label})
+                    plt.title(f"Heatmap of {args.heatmap_y} vs {args.heatmap_x}")
+                    plt.xlabel(args.heatmap_x)
+                    plt.ylabel(args.heatmap_y)
+                    plt.tight_layout()
+                    
+                    heatmap_filename = "metadata_heatmap.png"
+                    plt.savefig(heatmap_filename)
+                    print(f"Heatmap saved to {heatmap_filename}")
+                    # plt.show() # Comment out or make optional if running in non-interactive environment
+
+                except Exception as e:
+                    print(f"Error generating heatmap: {e}", file=sys.stderr)
+                    import traceback
+                    traceback.print_exc()
+                    print("Make sure heatmap-x, heatmap-y, and heatmap-value (if used) are appropriate for pivoting and aggregation.")
+            elif args.heatmap_x or args.heatmap_y:
+                print("Warning: Both --heatmap-x and --heatmap-y must be specified to generate a heatmap.", file=sys.stderr)
 
     # Identify columns that are explicitly used for numeric heatmap operations
     numeric_heatmap_cols = []
