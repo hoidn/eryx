@@ -268,13 +268,18 @@ def main():
 
     df = pd.DataFrame(all_metadata)
 
-    # Convert columns to numeric where possible, coercing errors to NaN
-    # This should happen *after* all text extraction is done.
-    for col in fields_to_extract:
-        if col in df.columns and col != "array_data.header_contents": # Don't try to convert header_contents to numeric
-            # Check if the column contains the placeholder for binary data
-            if "(Binary Data)" not in df[col].astype(str).unique():
+    # Identify columns that are explicitly used for numeric heatmap operations
+    numeric_heatmap_cols = []
+    if args.heatmap_x: numeric_heatmap_cols.append(args.heatmap_x)
+    if args.heatmap_y: numeric_heatmap_cols.append(args.heatmap_y)
+    if args.heatmap_value: numeric_heatmap_cols.append(args.heatmap_value)
+    
+    # Convert only these specified heatmap-related columns to numeric if they exist
+    for col in numeric_heatmap_cols:
+        if col in df.columns:
+            if "(Binary Data)" not in df[col].astype(str).unique(): # Check for our placeholder
                 df[col] = pd.to_numeric(df[col], errors='coerce')
+                print(f"Info: Attempted conversion to numeric for column '{col}'.")
             else:
                 print(f"Info: Column '{col}' contains '(Binary Data)' and will not be converted to numeric.", file=sys.stderr)
     
@@ -289,28 +294,19 @@ def main():
             print(f"\nError saving CSV to {args.output_csv}: {e}", file=sys.stderr)
 
     if args.heatmap_x and args.heatmap_y:
-        if args.heatmap_x not in fields_to_extract or args.heatmap_y not in fields_to_extract:
-            print("Error: Heatmap X or Y field not in extracted fields.", file=sys.stderr)
+        # Check if heatmap fields are present *after* DataFrame creation
+        if args.heatmap_x not in df.columns or args.heatmap_y not in df.columns:
+            missing_fields = []
+            if args.heatmap_x not in df.columns: missing_fields.append(args.heatmap_x)
+            if args.heatmap_y not in df.columns: missing_fields.append(args.heatmap_y)
+            print(f"Error: Heatmap X/Y field(s) {', '.join(missing_fields)} not found in extracted DataFrame columns.", file=sys.stderr)
             sys.exit(1)
-        if args.heatmap_value and args.heatmap_value not in fields_to_extract:
-            print("Error: Heatmap value field not in extracted fields.", file=sys.stderr)
+        if args.heatmap_value and args.heatmap_value not in df.columns:
+            print(f"Error: Heatmap value field '{args.heatmap_value}' not found in extracted DataFrame columns.", file=sys.stderr)
             sys.exit(1)
         
         # Create a copy for plotting to avoid modifying the original DataFrame
         df_plot = df.copy()
-
-        # Ensure heatmap columns are numeric if they are intended to be
-        # This is important if they were not converted earlier or if they are derived
-        try:
-            if df_plot[args.heatmap_x].dtype == 'object':
-                 df_plot[args.heatmap_x] = pd.to_numeric(df_plot[args.heatmap_x], errors='coerce')
-            if df_plot[args.heatmap_y].dtype == 'object':
-                 df_plot[args.heatmap_y] = pd.to_numeric(df_plot[args.heatmap_y], errors='coerce')
-            if args.heatmap_value and df_plot[args.heatmap_value].dtype == 'object':
-                 df_plot[args.heatmap_value] = pd.to_numeric(df_plot[args.heatmap_value], errors='coerce')
-        except KeyError as ke:
-            print(f"Error: Heatmap field {ke} not found in DataFrame after processing.", file=sys.stderr)
-            sys.exit(1)
 
 
         df_plot_cleaned = df_plot.dropna(subset=[args.heatmap_x, args.heatmap_y])
