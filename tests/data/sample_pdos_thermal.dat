@@ -1,0 +1,25 @@
+# Sample PDOS file for thermal mode testing
+# Format: frequency (THz) <tab> density
+# Represents phonon density of states with thermal population (exponential decay pattern)
+# Use with pdos_mode='thermal' and temperature_k parameter
+0.0	0.0
+0.5	0.8
+1.0	1.5
+1.5	2.1
+2.0	2.5
+2.5	2.8
+3.0	3.0
+3.5	2.9
+4.0	2.7
+4.5	2.4
+5.0	2.0
+5.5	1.6
+6.0	1.2
+6.5	0.9
+7.0	0.6
+7.5	0.4
+8.0	0.2
+8.5	0.1
+9.0	0.05
+9.5	0.02
+10.0	0.01

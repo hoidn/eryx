@@ -22,14 +22,6 @@ Carry out the following steps:
 [Placeholder for the user's main analysis query]
 </analysis_request>
 
-<git_context>
-<\!-- Placeholder for content from analysis_context.txt -->
-</git_context>
-
-<codebase_context>
-<\!-- Placeholder for content from repomix-output.xml -->
-</codebase_context>
-
 <guidelines>
 ## GUIDELINES FOR ANALYSIS
 1.  **Think from First Principles:** Do not just accept the user's premises. Analyze the code to form your own expert opinion.
@@ -47,3 +39,4 @@ Please provide your analysis in the following structure:
 4.  **Potential Risks & Considerations:** A list of potential pitfalls, trade-offs, or dependencies to be aware of.
 </output format>
 </task>
+PROMPT < /dev/null

@@ -11,7 +11,7 @@
 **Feature Branch:** feature/user-specified-phonon-population-modeling
 **Baseline Branch:** feature/multi-trial-statistics
 **Baseline Commit Hash:** f8d969625eb0b63744d217b6b9d12d07323c266d
-**Last Phase Commit Hash:** f8d969625eb0b63744d217b6b9d12d07323c266d
+**Last Phase Commit Hash:** d47371f096ba2dc74f06c16edb3e596b2728b1ae
 ---
 
 **Created:** 2025-01-24
@@ -89,27 +89,37 @@ This document orchestrates the implementation of the objective defined in the ma
 
 ---
 
-### **Final Phase: Validation & Documentation**
+### **Phase 3: Documentation and Finalization** 
 
-**Goal:** Complete the feature with PDOS extraction utility, comprehensive documentation, and final validation against all R&D plan success criteria.
+**Goal:** Document the feature and add utility methods.
 
-**Deliverable:** Fully documented and tested PDOS feature with `get_calculated_pdos()` method, updated docstrings, and user guide, ready for production use.
+**Deliverable:** Complete documentation and PDOS extraction utility.
 
 **Estimated Duration:** 1 day
 
 **Key Tasks:**
-- Implement `get_calculated_pdos()` method for extracting model's implicit PDOS
-- Update `OnePhononTorch` class docstring with detailed parameter descriptions
-- Add unit tests for the PDOS extraction method
-- Create user guide section explaining PDOS file format and usage patterns
-- Verify all R&D plan success criteria are met through end-to-end testing
+- Update class docstrings with new parameters
+- Add user guide section for PDOS file format
 - Perform final code review and cleanup
 
-**Dependencies:** All previous phases complete
+**Dependencies:** Requires Phase 2 completion
 
-**Implementation Checklist:** `phase_final_checklist.md`
+**Implementation Checklist:** `phase_3_checklist.md`
 
-**Success Test:** All R&D plan success criteria verified: PDOS file acceptance in both modes, gradient flow preservation, existing functionality preservation, and PDOS extraction capability.
+**Success Test:** All documentation is complete and feature is ready for production use.
+
+---
+
+### **Phase 4: PDOS Generation Utility**
+
+**Goal:** To provide a user-facing utility method that allows the extraction of the model's internal PDOS, closing the loop between simulation and custom input.
+
+**Deliverable:** A new public method `OnePhononTorch.generate_pdos()` and corresponding tests and documentation.
+
+**Implementation Checklist:**
+- The detailed, step-by-step implementation for this phase is tracked in: `[ ] phase_4_checklist.md`
+
+**Duration:** 1 day
 
 ---
 
@@ -118,7 +128,8 @@ This document orchestrates the implementation of the objective defined in the ma
 ### Phase Status:
 - [ ] **Phase 1:** Core API and Differentiable Logic Implementation - 0% complete
 - [ ] **Phase 2:** Integration Testing and Validation - 0% complete
-- [ ] **Final Phase:** Validation & Documentation - 0% complete
+- [ ] **Phase 3:** Documentation and Finalization - 0% complete
+- [ ] **Phase 4:** PDOS Generation Utility (see `phase_4_checklist.md`)
 
 **Current Phase:** Phase 1: Core API and Differentiable Logic Implementation
 **Overall Progress:** ░░░░░░░░░░░░░░░░ 0%

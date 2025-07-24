@@ -15,6 +15,7 @@
 - Maintain full gradient flow through the PDOS interpolation
 - Preserve existing functionality when no PDOS is provided
 - Enable extraction of the model's calculated PDOS for analysis
+- A new public utility method, `OnePhononTorch.generate_pdos()`, that calculates the model's internal phonon frequencies, computes their density distribution (histogram), and returns the result as a 2-column NumPy array `[Frequency (THz), Density]`, suitable for saving and reusing as a PDOS input file.
 
 ## 🔬 **TECHNICAL APPROACH**
 
