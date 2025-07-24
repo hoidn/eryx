@@ -1,0 +1,191 @@
+diff --git a/eryx/models_torch.py b/eryx/models_torch.py
+index 66bbd10..ee4d67b 100644
+--- a/eryx/models_torch.py
++++ b/eryx/models_torch.py
+@@ -89,7 +89,10 @@ class OnePhonon:
+                  model: str = 'gnm',
+                  gnm_cutoff: float = 4., gamma_intra: float = 1., gamma_inter: float = 1.,
+                  n_processes: int = 8, device: Optional[torch.device] = None,
+-                 q_vectors: Optional[torch.Tensor] = None):
++                 q_vectors: Optional[torch.Tensor] = None,
++                 pdos_path: Optional[str] = None,
++                 pdos_mode: str = 'thermal',
++                 temperature_k: Optional[float] = None):
+         """
+         Initialize the OnePhonon model with PyTorch tensors.
+         
+@@ -114,6 +117,11 @@ class OnePhonon:
+             gamma_inter: Spring constant for inter-asu interactions.
+             n_processes: Number of processes for parallel computation.
+             device: PyTorch device to use (default: CUDA if available, else CPU).
++            pdos_path: Optional path to PDOS file with 2 columns (frequency in THz, density).
++            pdos_mode: Mode for PDOS interpretation ('thermal' or 'direct'). 
++                      'thermal': Density represents thermal populations, normalized by Boltzmann factor.
++                      'direct': Density represents phonon populations directly.
++            temperature_k: Temperature in Kelvin, required when pdos_mode='thermal'.
+             
+         Note:
+             When using arbitrary q-vector mode (by providing q_vectors), the calculation bypasses
+@@ -163,6 +171,25 @@ class OnePhonon:
+             raise ValueError("hsampling, ksampling, and lsampling are required when model='gnm' (for ADP calculation), even in arbitrary q-vector mode.")
+         # --- END VALIDATION ---
+ 
++        # PDOS parameter validation and storage
++        self.pdos_path = pdos_path
++        self.pdos_mode = pdos_mode
++        self.temperature_k = temperature_k
++        
++        if self.pdos_path is not None:
++            # Validate file exists
++            if not os.path.exists(self.pdos_path):
++                raise ValueError(f"PDOS file not found: {self.pdos_path}")
++            
++            # Validate pdos_mode
++            if self.pdos_mode not in ['thermal', 'direct']:
++                raise ValueError(f"pdos_mode must be 'thermal' or 'direct', got '{self.pdos_mode}'")
++            
++            # For thermal mode, temperature is required
++            if self.pdos_mode == 'thermal':
++                if self.temperature_k is None or self.temperature_k <= 0:
++                    raise ValueError("temperature_k must be provided and > 0 when pdos_mode='thermal'")
++
+         # Store sampling parameters regardless of mode if provided
+         self.hsampling = hsampling
+         self.ksampling = ksampling
+@@ -337,6 +364,11 @@ class OnePhonon:
+         import logging
+         logging.debug(f"[_setup_phonons] STARTING: mode={'arbitrary' if getattr(self, 'use_arbitrary_q', False) else 'grid'}, model_type={model}")
+ 
++        # Load PDOS data if provided
++        if self.pdos_path is not None:
++            self._load_and_prepare_pdos()
++            logging.debug(f"[_setup_phonons] Loaded PDOS data: {len(self.pdos_omega)} points, mode={self.pdos_mode}")
++
+         # 1. Build structural/mass matrices (mode-independent)
+         self._build_A()
+         self._build_M()
+@@ -1307,12 +1339,39 @@ class OnePhonon:
+         ).detach()
+         
+         # Calculate Winv = 1 / eigenvalues (using differentiable eigenvalues)
+-        eps_div = torch.tensor(1e-8, dtype=self.real_dtype, device=self.device) # Use tensor for eps_div
+-        winv_unique_real = torch.where(
+-            torch.isnan(eigenvalues_unique),
+-            torch.tensor(float('nan'), device=eigenvalues_unique.device, dtype=self.real_dtype),
+-            1.0 / torch.maximum(eigenvalues_unique, eps_div) # Ensure division is float64
+-        ).to(dtype=self.real_dtype) # Ensure final real dtype
++        eps_div = torch.tensor(1e-8, dtype=self.real_dtype, device=self.device)
++        
++        # Check if PDOS is available for custom population calculation
++        if hasattr(self, 'pdos_omega') and self.pdos_omega is not None:
++            # Calculate frequencies: omega = sqrt(eigenvalues)
++            omega = torch.sqrt(torch.maximum(eigenvalues_unique.real, eps_div))
++            
++            # Interpolate population factors from PDOS
++            population_factor = self._differentiable_interp(omega)
++            
++            # For thermal mode, apply additional Boltzmann factor
++            if self.pdos_mode == 'thermal':
++                # Physical constants
++                hbar = 1.054571817e-34  # J⋅s
++                kB = 1.380649e-23       # J/K
++                
++                # Apply Boltzmann factor: population *= exp(-ħω / kBT)
++                boltzmann_factor = torch.exp(-omega * hbar / (kB * self.temperature_k))
++                population_factor = population_factor * boltzmann_factor
++            
++            # Use population factor as Winv (inverse population = inverse phonon amplitude)
++            winv_unique_real = torch.where(
++                torch.isnan(eigenvalues_unique),
++                torch.tensor(float('nan'), device=eigenvalues_unique.device, dtype=self.real_dtype),
++                population_factor
++            ).to(dtype=self.real_dtype)
++        else:
++            # Default behavior: Winv = 1 / eigenvalues (original thermal equilibrium)
++            winv_unique_real = torch.where(
++                torch.isnan(eigenvalues_unique),
++                torch.tensor(float('nan'), device=eigenvalues_unique.device, dtype=self.real_dtype),
++                1.0 / torch.maximum(eigenvalues_unique, eps_div)
++            ).to(dtype=self.real_dtype)
+         Winv_unique = winv_unique_real.to(dtype=self.complex_dtype) # Cast to complex
+         
+         # Now expand the unique results to match the original q-vector list
+@@ -2075,6 +2134,78 @@ class OnePhonon:
+         
+         return flat_indices
+ 
++    def _load_and_prepare_pdos(self):
++        """
++        Load PDOS data from file and convert to PyTorch tensors with proper device placement.
++        
++        Loads a 2-column PDOS file (frequency in THz, density) and converts frequency
++        to rad/s for internal calculations. Creates tensors on the appropriate device
++        with gradient tracking enabled.
++        """
++        if self.pdos_path is None:
++            return
++            
++        # Load PDOS data using numpy
++        pdos_data = np.loadtxt(self.pdos_path)
++        if pdos_data.shape[1] != 2:
++            raise ValueError(f"PDOS file must have 2 columns (frequency, density), got {pdos_data.shape[1]}")
++        
++        # Extract frequency and density columns
++        omega_thz = pdos_data[:, 0]  # Frequency in THz
++        density = pdos_data[:, 1]    # Density values
++        
++        # Convert frequency from THz to rad/s
++        omega_rad_s = omega_thz * 2 * np.pi * 1e12
++        
++        # Create PyTorch tensors with proper device placement and dtype
++        self.pdos_omega = torch.tensor(omega_rad_s, device=self.device, dtype=self.real_dtype)
++        self.pdos_density = torch.tensor(density, device=self.device, dtype=self.real_dtype)
++        
++        # Enable gradient tracking for the density values (frequencies are fixed)
++        self.pdos_density.requires_grad_(True)
++        
++        # Apply normalization for thermal mode
++        if self.pdos_mode == 'thermal':
++            # Physical constants
++            hbar = 1.054571817e-34  # J⋅s
++            kB = 1.380649e-23       # J/K
++            
++            # Compute Boltzmann factor: exp(-ħω / kBT)
++            boltzmann_factor = torch.exp(-self.pdos_omega * hbar / (kB * self.temperature_k))
++            
++            # Normalize density by Boltzmann factor to get population
++            self.pdos_density = self.pdos_density / boltzmann_factor
++
++    def _differentiable_interp(self, query_omega: torch.Tensor) -> torch.Tensor:
++        """
++        Differentiable linear interpolation of PDOS density at query frequencies.
++        
++        Uses torch.searchsorted and pure tensor arithmetic to maintain gradient flow.
++        
++        Args:
++            query_omega: Tensor of frequencies (rad/s) to interpolate at
++            
++        Returns:
++            Interpolated density values as tensor with gradients preserved
++        """
++        # Find indices for interpolation brackets
++        indices = torch.searchsorted(self.pdos_omega, query_omega)
++        
++        # Handle boundary conditions with torch operations
++        indices = torch.clamp(indices, 1, len(self.pdos_omega) - 1)
++        
++        # Compute interpolation weights
++        x0 = self.pdos_omega[indices - 1]
++        x1 = self.pdos_omega[indices]
++        y0 = self.pdos_density[indices - 1]
++        y1 = self.pdos_density[indices]
++        
++        # Linear interpolation using tensor arithmetic
++        weights = (query_omega - x0) / (x1 - x0)
++        interpolated = y0 + weights * (y1 - y0)
++        
++        return interpolated
++
+ # Minimal implementations for additional models
+ 
+ class RigidBodyTranslations:
