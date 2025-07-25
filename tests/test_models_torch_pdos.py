@@ -424,7 +424,7 @@ END
             f.write("0.0\t1.0\t2.0\n1.0\t2.0\t3.0\n")  # 3 columns instead of 2
             pdos_path = f.name
         
-        with pytest.raises(ValueError, match="PDOS file must have 2 columns"):
+        with pytest.raises(ValueError, match="PDOS file must have exactly 2 columns"):
             model = OnePhonon(
                 pdb_path=sample_pdb_path,
                 hsampling=(-0.2, 0.2, 2),
@@ -589,6 +589,144 @@ class TestPDOSNumericalAccuracy:
             atol=1e-12,
             err_msg="Torch interpolation should match numpy reference within numerical precision"
         )
+
+
+class TestGeneratePDOS:
+    """Test suite for the generate_pdos method."""
+    
+    def setup_method(self):
+        """Setup test fixtures for generate_pdos testing."""
+        self.device = torch.device('cpu')  # Use CPU for reproducible tests
+        
+        # Create a simple test PDB file
+        self.test_pdb_content = """HEADER    TEST STRUCTURE
+ATOM      1  CA  ALA A   1      10.000  10.000  10.000  1.00 10.00           C
+ATOM      2  CA  ALA A   2      12.000  10.000  10.000  1.00 10.00           C  
+ATOM      3  CA  ALA A   3      14.000  10.000  10.000  1.00 10.00           C
+CRYST1   30.000   30.000   30.000  90.00  90.00  90.00 P 1           1
+END
+"""
+        
+        # Create temporary PDB file
+        self.temp_pdb_file = tempfile.NamedTemporaryFile(mode='w', suffix='.pdb', delete=False)
+        self.temp_pdb_file.write(self.test_pdb_content)
+        self.temp_pdb_file.close()
+    
+    def teardown_method(self):
+        """Clean up temporary files."""
+        os.unlink(self.temp_pdb_file.name)
+    
+    def create_test_model(self):
+        """Create a minimal OnePhonon model for testing."""
+        return OnePhonon(
+            self.temp_pdb_file.name,
+            hsampling=[-1, 1, 4],
+            ksampling=[-1, 1, 4], 
+            lsampling=[-1, 1, 4],
+            device=self.device
+        )
+    
+    def test_generate_pdos_correctness(self):
+        """Test that generate_pdos matches reference calculation from visuals.py."""
+        model = self.create_test_model()
+        model.apply_disorder()
+        
+        # Reference implementation from visuals.py
+        # ax.hist(np.sqrt(1. / np.real(self.phonon.Winv).flatten()), bins=50, orientation='horizontal')
+        freq_ref = np.sqrt(1. / np.real(model.Winv.detach().cpu().numpy()).flatten())
+        freq_clean_ref = freq_ref[np.isfinite(freq_ref)]
+        # Note: reference used rad/s, but we want THz for the method
+        freq_thz_ref = freq_clean_ref / (2 * np.pi * 1e12)
+        hist_ref, edges_ref = np.histogram(freq_thz_ref, bins=100, density=True)
+        centers_ref = 0.5 * (edges_ref[1:] + edges_ref[:-1])
+        pdos_ref = np.column_stack([centers_ref, hist_ref])
+        
+        # Method implementation
+        pdos_method = model.generate_pdos(bins=100, density=True)
+        
+        # Compare results
+        np.testing.assert_allclose(pdos_method, pdos_ref, rtol=1e-10)
+    
+    def test_generate_pdos_error_handling(self):
+        """Test that generate_pdos raises appropriate error when called incorrectly."""
+        model = self.create_test_model()
+        
+        # Test with deliberately set None Winv (since Winv is initialized during setup)
+        model.Winv = None
+        with pytest.raises(RuntimeError, match="Phonon modes must be computed before generating PDOS"):
+            model.generate_pdos()
+        
+        # Test without the Winv attribute at all
+        if hasattr(model, 'Winv'):
+            delattr(model, 'Winv')
+        with pytest.raises(RuntimeError, match="Call compute_gnm_phonons\\(\\) or apply_disorder\\(\\) first"):
+            model.generate_pdos()
+    
+    def test_generate_pdos_density_normalization(self):
+        """Test density normalization and sanity checks."""
+        model = self.create_test_model()
+        model.apply_disorder()
+        
+        # Test with density=True
+        pdos_density = model.generate_pdos(bins=50, density=True)
+        
+        # Check that all values are finite
+        assert np.all(np.isfinite(pdos_density)), "All PDOS values should be finite"
+        
+        # Check output format
+        assert pdos_density.shape[1] == 2, "PDOS should have 2 columns"
+        assert pdos_density.shape[0] == 50, "PDOS should have requested number of bins"
+        
+        # Check that frequencies are in THz range (should be reasonable)
+        frequencies = pdos_density[:, 0]
+        # Note: Frequencies can be negative for acoustic modes, so we check absolute values
+        assert np.max(np.abs(frequencies)) < 1000, "Frequencies should be reasonable in THz"
+        assert np.all(np.isfinite(frequencies)), "All frequencies should be finite"
+        
+        # Check that densities are non-negative
+        densities = pdos_density[:, 1]
+        assert np.all(densities >= 0), "Densities should be non-negative"
+        
+        # Test with density=False
+        pdos_counts = model.generate_pdos(bins=50, density=False)
+        
+        # Check that counts are integers (approximately)
+        counts = pdos_counts[:, 1]
+        assert np.all(counts >= 0), "Counts should be non-negative"
+        
+        # The total count should match the number of phonon modes
+        total_modes = model.Winv.numel()
+        # Note: Some modes might be filtered out (NaN/inf), so we check approximately
+        assert np.sum(counts) <= total_modes, "Total counts should not exceed total modes"
+    
+    def test_generate_pdos_bins_parameter(self):
+        """Test that the bins parameter works correctly."""
+        model = self.create_test_model()
+        model.apply_disorder()
+        
+        # Test different numbers of bins
+        for bins in [10, 50, 200]:
+            pdos = model.generate_pdos(bins=bins)
+            assert pdos.shape[0] == bins, f"PDOS should have {bins} bins"
+            assert pdos.shape[1] == 2, "PDOS should always have 2 columns"
+    
+    def test_generate_pdos_output_format(self):
+        """Test that the output format is suitable for saving and reuse."""
+        model = self.create_test_model()
+        model.apply_disorder()
+        
+        pdos = model.generate_pdos(bins=100)
+        
+        # Test that we can save it as expected
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.dat', delete=False) as f:
+            np.savetxt(f.name, pdos, header="# Freq(THz) Density")
+            
+            # Test that we can reload it
+            reloaded = np.loadtxt(f.name)
+            np.testing.assert_allclose(reloaded, pdos)
+            
+            # Clean up
+            os.unlink(f.name)
 
 
 if __name__ == '__main__':

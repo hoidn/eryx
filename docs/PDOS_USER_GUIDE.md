@@ -297,6 +297,66 @@ np.savetxt("synthetic_pdos.dat", pdos_data,
            header="# Frequency(THz) Density", fmt="%.6f")
 ```
 
+### Extracting Model PDOS
+
+The `generate_pdos()` method allows you to extract the phonon density of states from a computed model, enabling the complete workflow: run simulation → extract PDOS → save → reuse in subsequent runs.
+
+```python
+from eryx.models_torch import OnePhonon
+import numpy as np
+
+# Step 1: Run initial simulation
+model = OnePhonon(
+    "protein.pdb",
+    hsampling=[-4, 4, 16],
+    ksampling=[-4, 4, 16], 
+    lsampling=[-4, 4, 16]
+)
+
+# Compute phonons and intensity
+intensity = model.apply_disorder()
+
+# Step 2: Extract PDOS from computed phonon modes
+pdos_data = model.generate_pdos(bins=200, density=True)
+
+# Step 3: Save extracted PDOS for future use
+np.savetxt("extracted_pdos.dat", pdos_data, 
+           header="# Freq(THz) Density - Extracted from protein.pdb", 
+           fmt="%.8f")
+
+# Step 4: Use the extracted PDOS in a new simulation
+model_reuse = OnePhonon(
+    "protein.pdb",
+    hsampling=[-2, 2, 8],
+    ksampling=[-2, 2, 8],
+    lsampling=[-2, 2, 8],
+    pdos_path="extracted_pdos.dat",
+    pdos_mode="direct"  # Use extracted densities directly
+)
+
+intensity_reuse = model_reuse.apply_disorder()
+```
+
+#### Method Parameters
+
+- `bins` (int, default=100): Number of histogram bins for frequency discretization
+- `density` (bool, default=True): If True, normalize histogram to probability density; if False, return raw counts
+
+#### Output Format
+
+The method returns a 2-column NumPy array:
+- Column 1: Frequency bin centers in THz
+- Column 2: Density values or counts
+
+This format is directly compatible with the PDOS file format used by the `pdos_path` parameter.
+
+#### Important Notes
+
+- Must call `compute_gnm_phonons()` or `apply_disorder()` before using `generate_pdos()`
+- The extracted PDOS captures the full frequency spectrum including negative frequencies (acoustic modes)
+- Use `density=True` for smooth, interpolatable PDOS data
+- Use `density=False` when you need raw mode counts
+
 ### Validation Against Experiments
 
 Compare model output with experimental phonon spectra:

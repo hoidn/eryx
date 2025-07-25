@@ -96,8 +96,23 @@ class OnePhonon:
         pdos_path="direct_pdos.dat",
         pdos_mode="direct",
     )
+    
+    # Extract and reuse model PDOS  
+    intensity = model_thermal.apply_disorder()
+    pdos_data = model_thermal.generate_pdos(bins=200)
+    np.savetxt("extracted_pdos.dat", pdos_data, header="# Freq(THz) Density")
     ```
     
+    PDOS Generation:
+    
+    The `generate_pdos()` method allows extraction of the model's internal phonon density
+    of states after computation, enabling the complete workflow: simulation → PDOS extraction 
+    → custom input for subsequent runs.
+    
+    Key methods:
+    - `generate_pdos(bins=100, density=True)`: Extract PDOS from computed phonon modes
+      Returns 2-column array [frequency_THz, density] suitable for saving and reuse
+      
     PDOS File Format:
     
     PDOS files should contain two columns:
@@ -2287,6 +2302,60 @@ class OnePhonon:
         interpolated = y0 + weights * (y1 - y0)
         
         return interpolated
+
+    def generate_pdos(self, bins: int = 100, density: bool = True) -> np.ndarray:
+        """
+        Generate Phonon Density of States from computed phonon modes.
+        
+        This method extracts the phonon frequencies from the model's internal
+        Winv tensor and computes their histogram to create a PDOS that can be
+        saved and reused as input for subsequent simulations.
+        
+        Parameters
+        ----------
+        bins : int, optional
+            Number of histogram bins for frequency discretization (default: 100)
+        density : bool, optional  
+            If True, normalize histogram to density (default: True)
+            
+        Returns
+        -------
+        np.ndarray
+            2-column array [frequency_THz, density] suitable for saving as PDOS file
+            
+        Raises
+        ------
+        RuntimeError
+            If phonon modes have not been computed yet
+            
+        Examples
+        --------
+        >>> model = OnePhonon("protein.pdb", hsampling=[-2,2,16], ...)
+        >>> intensity = model.apply_disorder()  # Computes phonons
+        >>> pdos = model.generate_pdos(bins=200)
+        >>> np.savetxt("extracted_pdos.dat", pdos, header="# Freq(THz) Density")
+        """
+        # Check preconditions
+        if not hasattr(self, 'Winv') or self.Winv is None:
+            raise RuntimeError("Phonon modes must be computed before generating PDOS. "
+                              "Call compute_gnm_phonons() or apply_disorder() first.")
+        
+        # Extract frequencies following reference logic
+        # Reference: np.sqrt(1. / np.real(self.phonon.Winv).flatten())
+        omega_squared = 1.0 / self.Winv.real  # Convert from Winv (1/ω²) to ω²
+        omega = torch.sqrt(torch.clamp(omega_squared, min=0))  # Avoid sqrt of negative
+        freq_thz = omega / (2 * np.pi * 1e12)  # Convert rad/s to THz
+        
+        # Flatten and clean data
+        freq_flat = freq_thz.flatten().detach().cpu().numpy()
+        freq_clean = freq_flat[np.isfinite(freq_flat)]  # Remove NaN/inf values
+        
+        # Create histogram
+        hist, bin_edges = np.histogram(freq_clean, bins=bins, density=density)
+        bin_centers = 0.5 * (bin_edges[1:] + bin_edges[:-1])
+        
+        # Return as 2-column array
+        return np.column_stack([bin_centers, hist])
 
 # Minimal implementations for additional models
 
