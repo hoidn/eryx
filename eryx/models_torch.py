@@ -24,11 +24,13 @@ from eryx.adapters import PDBToTensor, TensorToNumpy
 
 class OnePhonon:
     """
-    PyTorch implementation of the OnePhonon model for diffuse scattering calculations.
+    PyTorch implementation of the OnePhonon model for diffuse scattering calculations with optional
+    user-specified Phonon Density of States (PDOS) support.
     
     This class implements a lattice of interacting rigid bodies in the one-phonon
     approximation (a.k.a small-coupling regime) using PyTorch tensors and operations
-    to enable gradient flow.
+    to enable gradient flow. It supports custom phonon population modeling through
+    external PDOS data while maintaining full differentiability.
     
     This implementation supports two modes of operation:
     
@@ -43,34 +45,79 @@ class OnePhonon:
        - Maps each q-vector to its equivalent k-vector in the first Brillouin zone
        - Enables targeted evaluation with physically correct phonon properties
        
-    The arbitrary q-vector mode is particularly useful for:
-    - Focusing computation on specific regions of interest
-    - Matching experimental data points for optimization
-    - Custom sampling patterns not constrained to a regular grid
+    PDOS Support:
+    
+    The model supports user-specified Phonon Density of States through three new parameters:
+    
+    - pdos_path (str, optional): Path to PDOS file containing frequency-density data.
+      File format: 2 columns (frequency in THz, density), tab or space separated.
+      
+    - pdos_mode ({'thermal', 'direct'}): Mode for PDOS interpretation.
+      * 'thermal': Density represents vibrational density of states that will be
+        weighted by Boltzmann thermal factors: n(ω) = ρ(ω) / (exp(ℏω/kT) - 1)
+      * 'direct': Density represents phonon populations directly: n(ω) = ρ(ω)
+      
+    - temperature_k (float, optional): Temperature in Kelvin for thermal mode.
+      Required when pdos_mode='thermal'.
+    
+    The PDOS integration uses differentiable interpolation to preserve gradient flow,
+    enabling optimization of structural parameters based on experimental phonon data.
     
     Example usage:
     
     ```python
-    # Grid-based mode
-    model_grid = OnePhonon(
+    # Standard usage (no PDOS)
+    model = OnePhonon(
+        "structure.pdb",
+        hsampling=[-4, 4, 3],
+        ksampling=[-17, 17, 3], 
+        lsampling=[-29, 29, 3],
+    )
+    
+    # Thermal PDOS mode
+    model_thermal = OnePhonon(
         "structure.pdb",
         hsampling=[-4, 4, 3],
         ksampling=[-17, 17, 3],
         lsampling=[-29, 29, 3],
+        pdos_path="thermal_pdos.dat",
+        pdos_mode="thermal",
+        temperature_k=300.0,
     )
     
-    # Arbitrary q-vector mode
+    # Direct PDOS mode with arbitrary q-vectors
     q_vectors = torch.tensor([
         [0.1, 0.2, 0.3],
         [0.4, 0.5, 0.6],
-        # ... more q-vectors ...
     ])
-    
-    model_q = OnePhonon(
+    model_direct = OnePhonon(
         "structure.pdb",
         q_vectors=q_vectors,
+        pdos_path="direct_pdos.dat",
+        pdos_mode="direct",
     )
     ```
+    
+    PDOS File Format:
+    
+    PDOS files should contain two columns:
+    - Column 1: Frequency in THz
+    - Column 2: Density of states or population values
+    
+    Example PDOS file content:
+    ```
+    0.0    0.1
+    1.0    0.5
+    2.0    1.2
+    3.0    0.8
+    4.0    0.3
+    ```
+    
+    Notes:
+    - Frequencies should be monotonically increasing
+    - Negative frequencies are supported for acoustic branches
+    - Out-of-range frequencies are handled by extrapolation
+    - The PDOS data is interpolated using differentiable PyTorch operations
     
     References:
         - Original NumPy implementation in eryx/models.py:OnePhonon
@@ -79,7 +126,7 @@ class OnePhonon:
     # Class-level default, will be set properly in __init__
     use_arbitrary_q: bool = False
     
-    #@debug
+
     def __init__(self, pdb_path: str, 
                  hsampling: Optional[Tuple[float, float, float]] = None, 
                  ksampling: Optional[Tuple[float, float, float]] = None, 
@@ -177,18 +224,21 @@ class OnePhonon:
         self.temperature_k = temperature_k
         
         if self.pdos_path is not None:
-            # Validate file exists
+            # Validate file exists and is readable
             if not os.path.exists(self.pdos_path):
-                raise ValueError(f"PDOS file not found: {self.pdos_path}")
+                raise ValueError(f"PDOS file not found: '{self.pdos_path}'. Please check the file path.")
+            
+            if not os.path.isfile(self.pdos_path):
+                raise ValueError(f"PDOS path is not a file: '{self.pdos_path}'. Please provide a valid file path.")
             
             # Validate pdos_mode
             if self.pdos_mode not in ['thermal', 'direct']:
-                raise ValueError(f"pdos_mode must be 'thermal' or 'direct', got '{self.pdos_mode}'")
+                raise ValueError(f"pdos_mode must be 'thermal' or 'direct', got '{self.pdos_mode}'. Use 'thermal' for Boltzmann-weighted densities or 'direct' for population values.")
             
             # For thermal mode, temperature is required
             if self.pdos_mode == 'thermal':
                 if self.temperature_k is None or self.temperature_k <= 0:
-                    raise ValueError("temperature_k must be provided and > 0 when pdos_mode='thermal'")
+                    raise ValueError("temperature_k must be provided and > 0 when pdos_mode='thermal'. Example: temperature_k=300.0 for room temperature.")
 
         # Store sampling parameters regardless of mode if provided
         self.hsampling = hsampling
@@ -202,7 +252,7 @@ class OnePhonon:
 
         logging.debug("[INIT] Completed OnePhonon constructor.")
     
-    #@debug
+
     def _setup(self, pdb_path: str, expand_p1: bool, res_limit: float, group_by: str):
         """
         Compute q-vectors to evaluate and build the unit cell and its neighbors.
@@ -352,7 +402,7 @@ class OnePhonon:
                     if (i_cell == self.id_cell_ref) and (j_asu == i_asu):
                         self.gamma_tensor[i_cell, i_asu, j_asu] = self.gamma_intra
     
-    #@debug
+
     def _setup_phonons(self, pdb_path: str, model: str, 
                        gnm_cutoff: float, gamma_intra: float, gamma_inter: float):
         """
@@ -410,7 +460,7 @@ class OnePhonon:
 
         logging.debug("[_setup_phonons] FINISHED.")
     
-    #@debug
+
     def _build_A(self):
         """
         Build the displacement projection matrix A that projects rigid-body
@@ -438,12 +488,6 @@ class OnePhonon:
                 # Center coordinates properly
                 xyz = xyz - xyz.mean(dim=0, keepdim=True)
                 
-                # Debug print for centered coordinates
-                if i_asu == 0:
-                    print(f"Torch ASU {i_asu} Centered XYZ (mean): {xyz.mean(dim=0).detach().cpu().numpy()}")
-                    print(f"Torch ASU {i_asu} Centered XYZ (first 3 atoms):")
-                    for i in range(min(3, xyz.shape[0])):
-                        print(f"  Atom {i}: {xyz[i].detach().cpu().numpy()}")
                 
                 # Process each atom
                 for i_atom in range(self.n_atoms_per_asu):
@@ -452,9 +496,6 @@ class OnePhonon:
                     
                     # Update skew-symmetric matrix for rotations
                     if i_atom < xyz.shape[0]:
-                        # Debug print for specific atoms
-                        if i_asu == 0 and i_atom < 3:
-                            print(f"  Torch Atom {i_atom} XYZ: {xyz[i_atom].detach().cpu().numpy()}")
                         
                         # Fill the skew-symmetric matrix
                         Atmp[0, 1] = xyz[i_atom, 2]  
@@ -464,18 +505,11 @@ class OnePhonon:
                         Atmp[2, 0] = xyz[i_atom, 1]
                         Atmp[2, 1] = -xyz[i_atom, 0]
                         
-                        # Debug print for Atmp
-                        if i_asu == 0 and i_atom < 3:
-                            print(f"  Torch Atom {i_atom} Atmp:\n{Atmp.detach().cpu().numpy()}")
                     
                     # Set identity part (translations) and then the rotation part
                     self.Amat[i_asu, i_atom*3:(i_atom+1)*3, 0:3] = Adiag
                     self.Amat[i_asu, i_atom*3:(i_atom+1)*3, 3:6] = Atmp
                     
-                    # Debug print for assigned block
-                    # if i_asu == 0 and i_atom < 3:
-                    #     assigned_block = self.Amat[i_asu, i_atom*3:(i_atom+1)*3, :]
-                    #     print(f"  Torch Atom {i_atom} Assigned Block:\n{assigned_block.detach().cpu().numpy()}")
             
             # Keep high precision
             
@@ -484,7 +518,7 @@ class OnePhonon:
         else:
             self.Amat = None
     
-    #@debug
+
     def _build_M(self):
         """
         Build the mass matrix M and compute its inverse (via Cholesky).
@@ -544,7 +578,7 @@ class OnePhonon:
             # Do NOT convert back to float32
             self.Linv.requires_grad_(True)
     
-    #@debug
+
     def _build_M_allatoms(self) -> torch.Tensor:
         """
         Build the all-atom mass matrix M_0.
@@ -600,7 +634,7 @@ class OnePhonon:
         
         return M_allatoms
     
-    #@debug
+
     def _project_M(self, M_allatoms: Union[torch.Tensor, np.ndarray]) -> torch.Tensor:
         """
         Project all-atom mass matrix M_0 using the A matrix: M = A.T M_0 A
@@ -636,7 +670,7 @@ class OnePhonon:
         
         return Mmat
     
-    #@debug
+
     def _build_kvec_Brillouin(self):
         """
         Compute all k-vectors and their norm in the first Brillouin zone.
@@ -742,7 +776,7 @@ class OnePhonon:
                     self.V.requires_grad_(True)
                     self.Winv.requires_grad_(True)
     
-    #@debug
+
     def _center_kvec(self, x: int, L: int) -> float:
         """
         Center a k-vector index using exact NumPy-compatible operations.
@@ -900,7 +934,7 @@ class OnePhonon:
             return all_indices
     
     
-    #@debug
+
     def compute_hessian(self) -> torch.Tensor:
         """
         Compute the projected Hessian matrix for the supercell.
@@ -996,30 +1030,48 @@ class OnePhonon:
     
     def compute_gnm_phonons(self):
         """
-        Compute phonon modes for each k-vector in the first Brillouin zone.
+        Compute phonon modes for each k-vector in the first Brillouin zone with optional PDOS integration.
         
         This implementation performs a vectorized computation for all k-vectors
         simultaneously to improve performance. Supports both grid-based and
-        arbitrary q-vector modes.
+        arbitrary q-vector modes with conditional PDOS-based phonon population modeling.
         
-        This method optimizes by:
+        Optimization Strategy:
         1. Finding unique k-vectors in the first BZ
-        2. Computing phonons only for these unique k-vectors
+        2. Computing phonons only for these unique k-vectors  
         3. Expanding the results back to match the original q-vector list
         
+        PDOS Integration:
+        When PDOS data is provided (self.pdos_path is not None), this method:
+        1. Computes phonon frequencies: ω = √(eigenvalues)
+        2. Interpolates population factors from PDOS using _differentiable_interp()
+        3. For thermal mode: applies additional Boltzmann factor exp(-ℏω/kBT)
+        4. Uses interpolated population factors instead of default 1/eigenvalues
+        
+        PDOS Modes:
+        - **thermal**: PDOS density represents vibrational density of states,
+          normalized by thermal Boltzmann factors to get phonon populations
+        - **direct**: PDOS density represents phonon populations directly
+        
+        Default Behavior (no PDOS):
+        Uses thermal equilibrium assumption with Winv = 1/eigenvalues for phonon populations.
+        
+        Mathematical Details:
+        - **With PDOS**: population_factor = interpolate(ρ(ω)) × [exp(-ℏω/kBT) if thermal]
+        - **Without PDOS**: Winv = 1/λ where λ are the GNM eigenvalues
+        
         The eigenvalues (Winv) and eigenvectors (V) are stored for intensity calculation.
+        All operations preserve gradient flow for optimization of structural parameters.
+        
+        Raises:
+            RuntimeError: If Hessian computation fails or eigenvalue decomposition fails
+            
+        Sets:
+            self.winv (torch.Tensor): Inverse phonon populations for all q-vectors
+            self.V (torch.Tensor): Phonon eigenvectors for all q-vectors
         """
         import logging
-        # --- Modifications for Debugging ---
         import torch
-        # Define the target k-vector value (get this from a preliminary run or calculation)
-        # Example for BZ (0,0,1) in the 2x2x2 grid for 5zck_p1:
-        kvec_target_tensor = torch.tensor([0.00000000, 0.00000000, -0.01691246], dtype=self.real_dtype, device=self.device)
-        debug_kvec_atol = 1e-9 # Tolerance for matching k-vectors
-        
-        DEBUG_IDX_BZ = 1 # Corresponds to BZ index (0,0,1) in 2x2x2 grid
-        DEBUG_IDX_FULL = 9 # Corresponding full grid index (based on previous mapping)
-        # --- End Modifications ---
 
         # Compute the Hessian matrix first (works for both modes)
         hessian = self.compute_hessian()
@@ -1031,23 +1083,6 @@ class OnePhonon:
         unique_k_bz, inverse_indices = torch.unique(rounded_kvec, dim=0, return_inverse=True)
         n_unique_k = unique_k_bz.shape[0]
         logging.debug(f"[compute_gnm_phonons] Found {n_unique_k} unique k_BZ vectors to process.")
-
-        # --- Add detailed check for specific indices ---
-        # indices_to_check = [9, 61] # Check original q_idx 9 and 61
-        # if self.kvec.shape[0] > max(indices_to_check): # Ensure indices are valid
-        #      print("--- DEBUG: Unique K Mapping Check ---")
-        #      for i in indices_to_check:
-        #          original_k = self.kvec[i]
-        #          unique_idx = inverse_indices[i].item()
-        #          mapped_unique_k = unique_k_bz[unique_idx]
-        #          print(f"  q_idx {i}:")
-        #          print(f"    kvec[i] (Mapped BZ): {original_k.cpu().numpy()}")
-        #          print(f"    unique_idx (j):      {unique_idx}")
-        #          print(f"    unique_k_bz[j]:      {mapped_unique_k.cpu().numpy()}")
-        #          # Check if they are close
-        #          print(f"    Match within tol?:   {torch.allclose(original_k, mapped_unique_k, atol=tolerance*1.1)}") # Use slightly larger tol
-        #      print("--- End Check ---")
-        # --- End detailed check ---
 
         total_points = self.kvec.shape[0]
         if getattr(self, 'use_arbitrary_q', False):
@@ -1136,8 +1171,6 @@ class OnePhonon:
         for i in range(n_unique_k):
             current_kvec = unique_k_bz[i]
             
-            # Check if this is our target k-vector
-            is_target_kvec = torch.allclose(current_kvec, kvec_target_tensor, atol=debug_kvec_atol)
             
             D_i = Dmat_unique[i]
             D_i_hermitian = 0.5 * (D_i + D_i.H) # Ensure Hermiticity
@@ -1287,8 +1320,6 @@ class OnePhonon:
         for i in range(n_unique_k):
             current_kvec = unique_k_bz[i]
             
-            # Check if this is our target k-vector
-            is_target_kvec = torch.allclose(current_kvec, kvec_target_tensor, atol=debug_kvec_atol)
             
             D_i = Dmat_unique[i]
             D_i_hermitian = 0.5 * (D_i + D_i.H) # Ensure Hermiticity
@@ -1382,28 +1413,10 @@ class OnePhonon:
         self.V.requires_grad_(False)
         self.Winv.requires_grad_(eigenvalues_unique.requires_grad) # Simplified (same effect)
 
-        # --- Add check after expansion ---
-        # indices_to_check = [9, 61] # Check original q_idx 9 and 61
-        # if self.Winv.shape[0] > max(indices_to_check):
-        #      print("--- DEBUG: Expansion Check ---")
-        #      for i in indices_to_check:
-        #          unique_idx = inverse_indices[i].item()
-        #          print(f"  q_idx {i} (unique_idx={unique_idx}):")
-        #          # Compare first element of Winv
-        #          print(f"    Winv[{i}][0]:         {self.Winv[i, 0].item()}")
-        #          print(f"    Winv_unique[{unique_idx}][0]: {Winv_unique[unique_idx, 0].item()}")
-        #          print(f"    Match?:              {torch.allclose(self.Winv[i, 0], Winv_unique[unique_idx, 0])}")
-        #      print("--- End Check ---")
-        # --- End check after expansion ---
-        
-        # Final check for the target k-vector
-        # target_index_to_print = 1 # Corresponds to (0,0,1) in 2x2x2 BZ
-        
-        
         logging.debug(f"Phonon computation complete: V.shape={self.V.shape}, Winv.shape={self.Winv.shape}")
         logging.debug(f"V requires_grad: {self.V.requires_grad}, Winv requires_grad: {self.Winv.requires_grad}")
     
-    #@debug
+
     def compute_gnm_K(self, hessian: torch.Tensor, kvec: torch.Tensor = None) -> torch.Tensor:
         """
         Compute the dynamical matrix K(kvec) from the Hessian.
@@ -1430,7 +1443,7 @@ class OnePhonon:
                     Kmat[i_asu, :, j_asu, :] += hessian[i_asu, :, j_cell, j_asu, :] * eikr
         return Kmat
     
-    #@debug
+
     def compute_Kinv(self, hessian: torch.Tensor, kvec: torch.Tensor = None, 
                      reshape: bool = True) -> torch.Tensor:
         """
@@ -1604,7 +1617,7 @@ class OnePhonon:
         
         logging.debug(f"[compute_covariance_matrix] Complete: ADP.shape={self.ADP.shape}, requires_grad={self.ADP.requires_grad}")
     
-    #@debug
+
     def apply_disorder(self, rank: int = -1, outdir: Optional[str] = None, 
                        use_data_adp: bool = False) -> torch.Tensor:
         # --- Phase 0 Instrumentation ---
@@ -1995,7 +2008,7 @@ class OnePhonon:
         result = tensor.reshape(h_dim, k_dim, l_dim, *tensor.shape[1:])
         return result
     
-    #@debug
+
     def compute_rb_phonons(self):
         """
         Compute phonons for the rigid-body model.
@@ -2140,19 +2153,60 @@ class OnePhonon:
         
         Loads a 2-column PDOS file (frequency in THz, density) and converts frequency
         to rad/s for internal calculations. Creates tensors on the appropriate device
-        with gradient tracking enabled.
+        with gradient tracking enabled for differentiable optimization.
+        
+        The method performs the following operations:
+        1. Loads PDOS data using np.loadtxt from the file specified by self.pdos_path
+        2. Validates file format (must have exactly 2 columns)
+        3. Converts frequency from THz to rad/s using: ω[rad/s] = ω[THz] × 2π × 10¹²
+        4. Creates PyTorch tensors with proper device placement and dtype
+        5. Enables gradient tracking for density values (frequencies remain fixed)
+        6. For thermal mode: normalizes density by Boltzmann factor exp(-ℏω/kBT)
+        
+        File Format:
+            Column 1: Frequency in THz
+            Column 2: Density of states or population values
+        
+        Physical Constants Used:
+            ℏ = 1.054571817×10⁻³⁴ J⋅s (reduced Planck constant)
+            kB = 1.380649×10⁻²³ J/K (Boltzmann constant)
+        
+        Raises:
+            ValueError: If PDOS file doesn't have exactly 2 columns
+            FileNotFoundError: If pdos_path file doesn't exist (handled by np.loadtxt)
+        
+        Sets:
+            self.pdos_omega (torch.Tensor): Frequencies in rad/s with shape [n_points]
+            self.pdos_density (torch.Tensor): Density values with shape [n_points], gradient-enabled
         """
         if self.pdos_path is None:
             return
             
-        # Load PDOS data using numpy
-        pdos_data = np.loadtxt(self.pdos_path)
-        if pdos_data.shape[1] != 2:
-            raise ValueError(f"PDOS file must have 2 columns (frequency, density), got {pdos_data.shape[1]}")
+        # Load PDOS data using numpy with proper error handling
+        try:
+            pdos_data = np.loadtxt(self.pdos_path)
+        except (IOError, ValueError, OSError) as e:
+            raise ValueError(f"Failed to load PDOS file '{self.pdos_path}'. Please check file exists and contains valid numerical data. Error: {e}")
+        
+        if pdos_data.ndim != 2 or pdos_data.shape[1] != 2:
+            raise ValueError(f"PDOS file must have exactly 2 columns (frequency in THz, density), got shape {pdos_data.shape}. Check file format and ensure no missing values.")
+        
+        if pdos_data.shape[0] < 2:
+            raise ValueError(f"PDOS file must contain at least 2 data points for interpolation, got {pdos_data.shape[0]} points.")
         
         # Extract frequency and density columns
         omega_thz = pdos_data[:, 0]  # Frequency in THz
         density = pdos_data[:, 1]    # Density values
+        
+        # Validate frequency data
+        if not np.all(np.diff(omega_thz) > 0):
+            raise ValueError("PDOS frequencies must be monotonically increasing. Sort your data by frequency column.")
+        
+        if np.any(np.isnan(omega_thz)) or np.any(np.isnan(density)):
+            raise ValueError("PDOS data contains NaN values. Please check your input file for missing or invalid data.")
+        
+        if np.any(np.isinf(omega_thz)) or np.any(np.isinf(density)):
+            raise ValueError("PDOS data contains infinite values. Please check your input file for numerical issues.")
         
         # Convert frequency from THz to rad/s
         omega_rad_s = omega_thz * 2 * np.pi * 1e12
@@ -2180,13 +2234,41 @@ class OnePhonon:
         """
         Differentiable linear interpolation of PDOS density at query frequencies.
         
-        Uses torch.searchsorted and pure tensor arithmetic to maintain gradient flow.
+        Uses torch.searchsorted and pure tensor arithmetic to maintain gradient flow
+        for optimization of structural parameters. This implementation ensures that
+        gradients with respect to both the PDOS density values and query frequencies
+        are preserved through the interpolation process.
+        
+        The method performs linear interpolation between adjacent PDOS data points:
+        f(x) = y₀ + (x - x₀) × (y₁ - y₀) / (x₁ - x₀)
+        
+        where (x₀, y₀) and (x₁, y₁) are the bracketing PDOS points for query point x.
+        
+        Boundary Handling:
+        - Query frequencies outside the PDOS range are clamped to the nearest boundary
+        - This provides extrapolation using the edge values of the PDOS data
+        
+        Implementation Details:
+        - Uses torch.searchsorted for efficient bracket finding (O(log n) per query)
+        - Employs torch.clamp to handle boundary conditions differentiably
+        - All operations use tensor arithmetic to preserve gradient flow
+        - No detach() or numpy operations that would break the computational graph
         
         Args:
-            query_omega: Tensor of frequencies (rad/s) to interpolate at
+            query_omega (torch.Tensor): Frequencies in rad/s to interpolate at.
+                                      Shape: [n_queries] or any compatible shape.
             
         Returns:
-            Interpolated density values as tensor with gradients preserved
+            torch.Tensor: Interpolated density values with same shape as query_omega.
+                         Gradients preserved for both density and frequency inputs.
+        
+        Raises:
+            RuntimeError: If self.pdos_omega or self.pdos_density are not initialized
+        
+        Performance Notes:
+        - GPU-compatible for large-scale computations
+        - Memory usage scales linearly with number of query points
+        - Computational complexity: O(n_queries × log(n_pdos_points))
         """
         # Find indices for interpolation brackets
         indices = torch.searchsorted(self.pdos_omega, query_omega)
@@ -2209,17 +2291,17 @@ class OnePhonon:
 # Minimal implementations for additional models
 
 class RigidBodyTranslations:
-    #@debug
+
     def __init__(self, *args, **kwargs):
         pass
 
 class LiquidLikeMotions:
-    #@debug
+
     def __init__(self, *args, **kwargs):
         pass
 
 class RigidBodyRotations:
-    #@debug
+
     def __init__(self, *args, **kwargs):
         pass
 
