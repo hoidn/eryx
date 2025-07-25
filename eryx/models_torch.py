@@ -2354,8 +2354,12 @@ class OnePhonon:
         hist, bin_edges = np.histogram(freq_clean, bins=bins, density=density)
         bin_centers = 0.5 * (bin_edges[1:] + bin_edges[:-1])
         
+        # Ensure output is sorted by frequency (should already be, but make explicit)
+        pdos_data = np.column_stack([bin_centers, hist])
+        sort_indices = np.argsort(pdos_data[:, 0])
+        
         # Return as 2-column array
-        return np.column_stack([bin_centers, hist])
+        return pdos_data[sort_indices]
 
 # Minimal implementations for additional models
 
