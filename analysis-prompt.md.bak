@@ -39,4 +39,3 @@ Please provide your analysis in the following structure:
 4.  **Potential Risks & Considerations:** A list of potential pitfalls, trade-offs, or dependencies to be aware of.
 </output format>
 </task>
-PROMPT < /dev/null

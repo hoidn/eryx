@@ -1,28 +1,34 @@
-### **File: `.claude/commands/complete-phase.md` (Revised and Hardened)**
+# Command: /complete-phase [optional-phase-number] [optional-git-ref] <initiative-path>
 
-```markdown
-# Command: /complete-phase
+**Goal:** Manage the end-of-phase transition using a formal review cycle. This command now supports optional overrides for the phase number and the `git diff` baseline, making it a highly versatile review tool.
 
-**Goal:** Manage the end-of-phase transition using a formal review cycle. This command now operates in two distinct modes, determined by the presence of a review file.
+**Usage:**
+-   **Automatic (Standard):** `/complete-phase plans/active/my-initiative`
+    -   *Completes the current phase from `PROJECT_STATUS.md`, diffing against the `Last Phase Commit Hash`.*
+-   **Manual Phase:** `/complete-phase 2 plans/active/my-initiative`
+    -   *Completes Phase 2, diffing against its default baseline.*
+-   **Manual Baseline (Powerful):** `/complete-phase plans/active/my-initiative main`
+    -   *Completes the current phase, but generates a diff against the `main` branch.*
+-   **Fully Manual:** `/complete-phase 2 plans/active/my-initiative abc123f`
+    -   *Completes Phase 2, generating a diff against the specific commit `abc123f`.*
 
 ---
 
 ## 🔴 **CRITICAL: MANDATORY EXECUTION FLOW**
 
-**You MUST operate in one of two modes. You are not allowed to mix them.**
+**You MUST operate in one of two distinct modes. You are not allowed to mix them.**
 
 **Mode 1: Request Review (Default)**
-*   **Trigger:** No `review_phase_N.md` file exists for the current phase.
-*   **Action:** You MUST generate a `review_request_phase_N.md` file containing a `git diff` and then HALT.
+*   **Trigger:** No `review_phase_N.md` file exists for the target phase.
+*   **Action:** You MUST parse all arguments, determine the correct diff baseline (from state files or user override), generate a `review_request_phase_N.md` file containing the `git diff`, and then HALT.
 
 **Mode 2: Process Review**
-*   **Trigger:** A `review_phase_N.md` file EXISTS for the current phase.
-*   **Action:** You MUST read the review, parse the `VERDICT`, and then either commit the changes (on `ACCEPT`) or report the required fixes (on `REJECT`).
+*   **Trigger:** A `review_phase_N.md` file EXISTS for the target phase.
+*   **Action:** You MUST read the review, parse the `VERDICT`, and then either commit the changes (on `ACCEPT`) or report the required fixes (on `REJECT`). The `[optional-git-ref]` argument has no effect in this mode.
 
 **DO NOT:**
 -   ❌ Commit any code without a `VERDICT: ACCEPT` from a review file.
 -   ❌ Generate a new review request if a review file already exists.
--   ❌ Mark a phase as complete if the verdict is `REJECT` or if the commit fails.
 
 ---
 
@@ -34,97 +40,122 @@ You are Claude Code, an autonomous agent. You will execute the Git and file comm
 
 ## 📋 **YOUR EXECUTION WORKFLOW**
 
-### Step 1: Determine Current Mode
--   Read `PROJECT_STATUS.md` to get the current initiative path and phase number (`N`).
--   Check if the file `<path>/review_phase_N.md` exists.
--   If it exists, proceed to **Mode 2: Process Review**.
--   If it does not exist, proceed to **Mode 1: Request Review**.
+### Step 1: Parse Arguments & Determine Mode
+
+This step uses a robust parsing strategy to handle flexible arguments and determine the correct `PHASE_NUMBER` and `DIFF_BASE`.
+
+```bash
+# --- Argument Parsing Logic ---
+PHASE_NUMBER=""
+GIT_REF_OVERRIDE=""
+INITIATIVE_PATH=""
+
+# The last argument is always the path.
+INITIATIVE_PATH="${@: -1}" 
+
+# Verify the initiative path exists before proceeding.
+if [ ! -d "$INITIATIVE_PATH" ]; then
+    echo "❌ ERROR: Initiative path '$INITIATIVE_PATH' not found."
+    exit 1
+fi
+
+# Process optional arguments (phase number and git ref) by looping
+# through all arguments except the last one (the path).
+for arg in "${@:1:$#-1}"; do
+    if [[ "$arg" =~ ^[0-9]+$ ]]; then
+        PHASE_NUMBER="$arg"
+    elif git rev-parse --verify "$arg" >/dev/null 2>&1; then
+        GIT_REF_OVERRIDE="$arg"
+    else
+        echo "⚠️ Warning: Ignoring unrecognized argument '$arg'. It is not a valid phase number or git ref."
+    fi
+done
+
+# --- Determine Final Phase Number ---
+if [ -z "$PHASE_NUMBER" ]; then
+    echo "ℹ️ No phase number provided. Auto-detecting from PROJECT_STATUS.md..."
+    PHASE_NUMBER=$(grep 'Current Phase:' PROJECT_STATUS.md | sed 's/.*Phase \([0-9]*\).*/\1/')
+    if ! [[ "$PHASE_NUMBER" =~ ^[0-9]+$ ]]; then
+        echo "❌ ERROR: Could not auto-detect phase number from PROJECT_STATUS.md."
+        exit 1
+    fi
+    echo "✅ Auto-detected current phase as: Phase $PHASE_NUMBER"
+else
+    echo "✅ Using explicitly provided phase number: $PHASE_NUMBER"
+fi
+
+# --- Determine Mode ---
+if [ -f "$INITIATIVE_PATH/review_phase_${PHASE_NUMBER}.md" ]; then
+    echo "✅ Review file found. Proceeding in 'Process Review' mode."
+    # Proceed to Mode 2
+else
+    echo "ℹ️ No review file found. Proceeding in 'Request Review' mode."
+    # Proceed to Mode 1
+fi
+```
 
 ---
 
 ### **MODE 1: REQUEST REVIEW**
 
-#### Step 1.1: Read State and Generate Diff
--   Read `<path>/implementation.md` to get the `Last Phase Commit Hash`. This is your diff base.
--   Run the following command to generate the diff. This uses a tested pattern that is robust.
+#### Step 1.1: Determine Diff Baseline and Generate Diff
 
 ```bash
-# Ensure a temporary directory exists
+# --- Determine Final Diff Baseline ---
+DIFF_BASE=""
+BASELINE_SOURCE_MSG="" # For logging in the review request
+
+if [ -n "$GIT_REF_OVERRIDE" ]; then
+    DIFF_BASE="$GIT_REF_OVERRIDE"
+    BASELINE_SOURCE_MSG="Override provided by user: '$GIT_REF_OVERRIDE'"
+    echo "✅ Using provided git ref override as diff baseline: $DIFF_BASE"
+else
+    echo "ℹ️ No git ref override provided. Using default from implementation.md..."
+    DIFF_BASE=$(grep 'Last Phase Commit Hash:' "$INITIATIVE_PATH/implementation.md" | awk '{print $4}')
+    BASELINE_SOURCE_MSG="Default from implementation.md: '$DIFF_BASE'"
+    if [ -z "$DIFF_BASE" ]; then
+        echo "❌ ERROR: Could not determine default diff baseline from '$INITIATIVE_PATH/implementation.md'."
+        exit 1
+    fi
+    echo "✅ Using default diff baseline: $DIFF_BASE"
+fi
+
+# --- Generate the Diff ---
 mkdir -p ./tmp
-
-# Extract the baseline commit hash for the diff
-# Note: Using awk is a simple, tested way to extract the value
-diff_base=$(grep 'Last Phase Commit Hash:' <path>/implementation.md | awk '{print $4}')
-
-# Generate the diff against the baseline hash
-git diff "${diff_base}"..HEAD > ./tmp/phase_diff.txt
+git diff "${DIFF_BASE}"..HEAD > ./tmp/phase_diff.txt
 ```
 
-#### Step 1.2: Generate Review Request File
--   Create a new file: `<path>/review_request_phase_N.md`.
--   Populate it using the "REVIEW REQUEST TEMPLATE" below. You must embed the content of `plan.md`, `implementation.md`, `phase_N_checklist.md`, and `./tmp/phase_diff.txt` using the robust sequential `echo`/`cat` pattern.
-
-#### Step 1.3: Notify and Halt
--   Inform the user that the review request is ready at `<path>/review_request_phase_N.md`.
--   Instruct them to have it reviewed and to create the `review_phase_N.md` file with a clear verdict.
+#### Step 1.2: Generate Review Request File & Halt
+-   Create a new file: `$INITIATIVE_PATH/review_request_phase_${PHASE_NUMBER}.md`.
+-   Populate it using the "REVIEW REQUEST TEMPLATE" below, including the `BASELINE_SOURCE_MSG`.
+-   Inform the user that the review request is ready and instruct them to run `/review-phase-gemini` or perform a manual review.
 -   **HALT.** Your task for this run is complete.
 
 ---
 
 ### **MODE 2: PROCESS REVIEW**
 
+*(This mode is unaffected by the `[optional-git-ref]` argument)*
+
 #### Step 2.1: Read and Parse Review File
--   Read the file `<path>/review_phase_N.md`.
--   Find the line starting with `VERDICT:`. Extract the verdict (`ACCEPT` or `REJECT`).
--   If no valid verdict is found, report an error and stop.
+-   Read the file `$INITIATIVE_PATH/review_phase_${PHASE_NUMBER}.md`.
+-   Parse the `VERDICT: [ACCEPT|REJECT]`.
 
-#### Step 2.2: 🔴 MANDATORY - Conditional Execution (On `ACCEPT`)
--   If `VERDICT: ACCEPT`, you MUST execute the following sequence of commands precisely.
-
-```bash
-# 1. Add all changes to staging
-git add -A
-
-# 2. Commit the changes for this phase
-#    Note: The deliverable description should be extracted from implementation.md
-phase_deliverable="<Extract Deliverable from implementation.md for the current phase>"
-git commit -m "Phase N: $phase_deliverable"
-
-# 3. Verify the commit was successful
-if [ $? -ne 0 ]; then
-    echo "❌ ERROR: Git commit failed. Halting."
-    exit 1
-fi
-
-# 4. Capture the new commit hash for state update
-new_hash=$(git rev-parse HEAD)
-echo "New commit hash is: $new_hash"
-```
-
--   **Update State:** Modify `<path>/implementation.md`, replacing the old `Last Phase Commit Hash` with the `$new_hash`.
--   **Finalize Phase:** Mark the current phase as complete in all status documents (`implementation.md`, `PROJECT_STATUS.md`).
--   **Prepare Next Phase:** If this is not the final phase, generate the checklist for Phase N+1. If it is the final phase, archive the initiative.
--   **Report Success:** Announce that the phase was accepted, committed, and that the next phase is ready.
-
-#### Step 2.3: Conditional Execution (On `REJECT`)
--   If `VERDICT: REJECT`, extract all lines from the "Required Fixes" section of the review file.
--   Present these fixes clearly to the user.
--   Instruct the user to address the feedback and then run `/complete-phase` again to generate a new review request.
--   **HALT.** Make no changes to Git or status files.
+#### Step 2.2: Conditional Execution
+-   If `VERDICT: ACCEPT`, execute the `git add`, `git commit`, and state update sequence.
+-   If `VERDICT: REJECT`, report the required fixes to the user and halt.
 
 ---
 
 ## 템플릿 & 가이드라인 (Templates & Guidelines)
 
-### **REVIEW REQUEST TEMPLATE**
+### **REVIEW REQUEST TEMPLATE (Revised)**
 *This is the content for the agent-generated `review_request_phase_N.md`.*
 ```markdown
 # Review Request: Phase <N> - <Phase Name>
 
 **Initiative:** <Initiative Name>
 **Generated:** <YYYY-MM-DD HH:MM:SS>
-
-This document contains all necessary information to review the work completed for Phase <N>.
 
 ## Instructions for Reviewer
 
@@ -148,70 +179,33 @@ This document contains all necessary information to review the work completed fo
 ---
 ## 2. Code Changes for This Phase
 
-**Baseline Commit:** `<Last Phase Commit Hash from implementation.md>`
-**Current Branch:** `<current feature branch name>`
-**Changes since last phase:**
+**This diff shows changes between the specified baseline and the current HEAD.**
+
+**Baseline Used:** <Value of $BASELINE_SOURCE_MSG from logic above>
+**Current Branch:** <current feature branch name>
 
 ```diff
 <The full output of the 'git diff' command is embedded here>
 ```
 ```
 
-### **REVIEW FILE TEMPLATE (for human reviewers)**
-*This is the expected format of the human-created `review_phase_N.md`.*
-```markdown
-# Review: Phase <N> - <Phase Name>
-
-**Reviewer:** <Reviewer's Name>
-**Date:** <YYYY-MM-DD>
-
-## Verdict
-
-**VERDICT: ACCEPT**
-
 ---
-## Comments
 
-The implementation looks solid. The new module is well-tested and follows project conventions.
+## 📊 **SAMPLE INTERACTION (With Override)**
 
----
-## Required Fixes (if REJECTED)
-
-*(This section would be empty for an ACCEPT verdict)*
-- **Fix 1:** In `src/module/file.py`, the error handling for `function_x` is incomplete. It must also catch `KeyError`.
-- **Fix 2:** The unit test `tests/test_module.py::test_function_x_edge_case` does not assert the correct exception type.
 ```
+User: /complete-phase plans/active/hotfix-auth-module main
 
----
-## 📊 **SAMPLE INTERACTION**
+You: "No review file found. Proceeding in 'Request Review' mode.
+       Auto-detected current phase as: Phase 3
+       Using provided git ref override as diff baseline: main"
 
-### ✅ Correct Execution:
-```
-User: /complete-phase
+     [You execute 'git diff main..HEAD', then generate 'review_request_phase_3.md']
 
-You: "Phase 1 checklist is complete. A review file was not found, so I will now generate a review request."
-
-     [You execute 'git diff ...', then generate 'review_request_phase_1.md']
-
-You: "✅ Review request for Phase 1 has been generated at:
-       `plans/active/my-initiative/review_request_phase_1.md`
-       Please have it reviewed. Once the review is complete and saved as
-       `review_phase_1.md` with a verdict, run this command again to process it."
-
-[... Human review happens, 'review_phase_1.md' is created with VERDICT: ACCEPT ...]
-
-User: /complete-phase
-
-You: "Review file for Phase 1 found. Processing review..."
-     [You read 'review_phase_1.md' and find 'VERDICT: ACCEPT']
-You: "Verdict is ACCEPT. Committing changes and finalizing phase."
-
-     [You execute 'git add', 'git commit', 'git rev-parse HEAD']
-     [You update 'implementation.md' with the new commit hash]
-     [You update 'PROJECT_STATUS.md' and generate 'phase_2_checklist.md']
-
-You: "✅ Phase 1 has been accepted and committed.
-       - Commit hash: <new_hash>
-       - The checklist for Phase 2 is now available at: `plans/active/my-initiative/phase_2_checklist.md`"
-```
+You: "✅ Review request for Phase 3 has been generated at:
+       `plans/active/hotfix-auth-module/review_request_phase_3.md`
+       
+       The diff was generated against the 'main' branch as requested.
+       
+       Please have it reviewed. Once the review is complete, run `/review-phase-gemini` or create the review file manually, then run this command again to process it."
 ```
