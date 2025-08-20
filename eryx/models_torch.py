@@ -1210,13 +1210,15 @@ class OnePhonon:
             if D_i.requires_grad and not eigenvalues_tensor.requires_grad:
                 eigenvalues_tensor = eigenvalues_tensor + 0.0 * D_i.real.sum() # Connect graph
             
+            #print('EIGENVALUE TENSOR SHAPE:', eigenvalues_tensor.shape)
             # 3. Process eigenvalues (thresholding only, keep ascending order from eigh)
-            eps = torch.tensor(1e-6, dtype=self.real_dtype, device=self.device) # Use tensor for eps
+            eps = torch.tensor(1e-7, dtype=self.real_dtype, device=self.device) # Use tensor for eps
             eigenvalues_processed = torch.where(
                 eigenvalues_tensor < eps,
                 torch.tensor(float('nan'), device=eigenvalues_tensor.device, dtype=self.real_dtype),
                 eigenvalues_tensor # Already real_dtype
             )
+            #print('THRESHOLDED EIGENVALUE TENSOR SHAPE:', eigenvalues_processed.shape)
             
             # Append the processed eigenvalues to the list
             eigenvalues_unique_list.append(eigenvalues_processed)

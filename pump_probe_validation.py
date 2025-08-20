@@ -18,7 +18,7 @@ except ImportError as e:
     print(f"Details: {e}")
     sys.exit(1)
 
-def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0):
+def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, slice_idx=None):
     """
     Compares default thermal model against model with pumped phonon mode.
     
@@ -28,6 +28,8 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0):
         Multiplier for pump intensity relative to thermal maximum (default: 3.0)
     pump_energy_percentile : float
         Percentile of frequency distribution to pump (default: 50.0)
+    slice_idx : int, optional
+        Index of the slice to plot along the k-axis (default: shape[1]//4)
     """
     print("--- Starting Pumped Mode PDOS Visual Validation ---")
 
@@ -38,9 +40,14 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0):
         print(f"ERROR: Test PDB file not found at '{pdb_path}'")
         return
 
-    hsampling_high_res = [-2, 2, 4]
-    ksampling_high_res = [-2, 2, 4]
-    lsampling_high_res = [-2, 2, 4]
+#    hsampling_high_res = [-2, 2, 4]
+#    ksampling_high_res = [-2, 2, 4]
+#    lsampling_high_res = [-2, 2, 4]
+
+    hsampling_high_res = [-4, 4, 4]
+    ksampling_high_res = [-4, 4, 4]
+    lsampling_high_res = [-4, 4, 4]
+
     print(f"Initializing base model (sampling rate: {hsampling_high_res[2]})...")
     
     base_model = OnePhonon(
@@ -159,7 +166,11 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0):
 
     # Helper function for plotting intensity slices with log scaling
     def plot_slice(ax, intensity_map, title, hkl_grid):
-        slice_idx = intensity_map.shape[1] // 2
+        nonlocal slice_idx
+        if slice_idx is None:
+            slice_idx = intensity_map.shape[1] // 4
+        # Validate slice_idx is within bounds
+        slice_idx = max(0, min(slice_idx, intensity_map.shape[1] - 1))
         slice_data = intensity_map[:, slice_idx, :]
         
         # Calculate Miller Index extents for labels
@@ -217,6 +228,8 @@ def main():
                         help='Pump intensity multiplier relative to thermal maximum (default: 3.0)')
     parser.add_argument('--pump-energy-percentile', '-p', type=float, default=50.0,
                         help='Percentile of frequency distribution to pump (default: 95.0)')
+    parser.add_argument('--slice-idx', '-s', type=int, default=None,
+                        help='Index of the slice to plot along the k-axis (default: shape[1]//4)')
     parser.add_argument('--list-examples', action='store_true',
                         help='Show example usage and exit')
     
@@ -224,10 +237,10 @@ def main():
     
     if args.list_examples:
         print("Example usage:")
-        print("  python pump_probe_validation.py                    # Default: 3x pump at 50 percentile")
-        print("  python pump_probe_validation.py -m 5.0 -p 90      # 5x pump at 90th percentile")
-        print("  python pump_probe_validation.py -m 1.5 -p 50      # 1.5x pump at median frequency")
-        print("  python pump_probe_validation.py -m 10.0 -p 99     # 10x pump at highest frequencies")
+        print("  python pump_probe_validation.py                        # Default: 3x pump at 50 percentile, auto slice")
+        print("  python pump_probe_validation.py -m 5.0 -p 90          # 5x pump at 90th percentile")
+        print("  python pump_probe_validation.py -m 1.5 -p 50 -s 0     # 1.5x pump at median frequency, first slice")
+        print("  python pump_probe_validation.py -m 10.0 -p 99 -s 3    # 10x pump at highest frequencies, slice 3")
         sys.exit(0)
     
     # Validate arguments
@@ -237,11 +250,18 @@ def main():
     if not (0 <= args.pump_energy_percentile <= 100):
         print("ERROR: Pump energy percentile must be between 0 and 100")
         sys.exit(1)
+    if args.slice_idx is not None and args.slice_idx < 0:
+        print("ERROR: Slice index must be non-negative")
+        sys.exit(1)
     
     print(f"Running with pump magnitude: {args.pump_magnitude}x")
     print(f"Running with pump energy percentile: {args.pump_energy_percentile}%")
+    if args.slice_idx is not None:
+        print(f"Running with slice index: {args.slice_idx}")
+    else:
+        print("Running with slice index: auto (shape[1]//4)")
     
-    run_high_res_validation(args.pump_magnitude, args.pump_energy_percentile)
+    run_high_res_validation(args.pump_magnitude, args.pump_energy_percentile, args.slice_idx)
 
 if __name__ == "__main__":
     main()
