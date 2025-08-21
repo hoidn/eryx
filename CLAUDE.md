@@ -27,6 +27,11 @@ pip install -r requirements.txt
 - **Enable debug mode**: Set environment variable `DEBUG_MODE=1` to enable state capture logging
 - **View debug logs**: Check `logs/` directory for detailed execution traces
 
+### Comparison Scripts
+- **Run NumPy only**: `python run_numpy.py` - Executes NumPy implementation and saves results
+- **Run PyTorch only**: `python run_torch.py` - Executes both PyTorch implementations (grid and arbitrary q-vector modes)
+- **Run full comparison**: `python run_comparison.py` - Runs all implementations and generates comparison visualizations
+
 ### Code Quality
 - No specific linting commands found - check if `ruff`, `black`, or `flake8` should be added to requirements
 

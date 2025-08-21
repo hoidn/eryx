@@ -3,7 +3,7 @@
 PyTorch implementation of diffuse scattering simulation.
 
 This script provides a PyTorch-based implementation of the diffuse scattering
-simulation, parallel to the NumPy implementation in run_debug.py. It enables
+simulation, parallel to the NumPy implementation in run_numpy.py. It enables
 gradient-based optimization of simulation parameters.
 """
 
@@ -114,7 +114,7 @@ def run_np():
     """
     Run NumPy version of the diffuse scattering simulation.
     
-    This is the same function as in run_debug.py, included for direct comparison.
+    This is the same function as in run_numpy.py, included for direct comparison.
     """
     logging.info("Starting NP branch computation")
     pdb_path = "tests/pdbs/5zck_p1.pdb"

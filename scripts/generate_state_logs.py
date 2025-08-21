@@ -36,7 +36,7 @@ def run_component(component_name: str, exclude_attrs: Optional[List[str]] = None
         
         if component_name == "onePhonon":
             # Import and run OnePhonon test
-            # The run_debug.py file is at the root level, not in eryx package
+            # The comparison scripts are at the root level, not in eryx package
             import sys
             import os
             
@@ -46,8 +46,8 @@ def run_component(component_name: str, exclude_attrs: Optional[List[str]] = None
                 sys.path.insert(0, root_dir)
                 
             # Now import from the root level
-            import run_debug
-            run_debug.run_np()
+            import run_numpy
+            run_numpy.run_np()
             return True
         elif component_name == "mapUtils":
             # Import and run map_utils tests

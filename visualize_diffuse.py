@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Visualize the diffuse intensity output from run_debug.py.
+Visualize the diffuse intensity output from comparison scripts.
 
 Provides functions to load and visualize diffuse intensity data saved
-by run_debug.py, handling potential reshaping of 1D data.
+by run_comparison.py, handling potential reshaping of 1D data.
 
 Usage (as script):
     python visualize_diffuse.py [--dataset {torch,np,arbq}] [--plot-q]
@@ -302,7 +302,7 @@ def main(dataset='torch', plot_q=False):
 if __name__ == '__main__':
     # Set up command line argument parsing
     parser = argparse.ArgumentParser(
-        description='Visualize diffuse intensity data from run_debug.py'
+        description='Visualize diffuse intensity data from comparison scripts'
     )
     parser.add_argument(
         '--dataset',
