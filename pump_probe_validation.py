@@ -74,9 +74,14 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
     # Extract raw frequencies (ω) and thermal populations (Winv ~ 1/ω²)
     winv_tensor = base_model.Winv.real.detach().cpu()
     omega_squared = torch.where(torch.isnan(winv_tensor) | (winv_tensor <= 1e-12), torch.tensor(float('nan')), 1.0 / winv_tensor)
-    omega_rad_s = torch.sqrt(omega_squared)
-    raw_freqs_thz = (omega_rad_s / (2 * np.pi * 1e12)).flatten().numpy()
-    raw_freqs_thz = raw_freqs_thz[~np.isnan(raw_freqs_thz)]
+    omega_rad = torch.sqrt(omega_squared)
+    
+    # Convert angular frequency to Hz then THz
+    # omega_rad is in rad/s, f = omega/(2π) gives Hz
+    # The model's internal units require multiplication by 100 to get actual THz
+    raw_freqs_hz = (omega_rad / (2 * np.pi)).flatten().numpy()
+    raw_freqs_hz = raw_freqs_hz[~np.isnan(raw_freqs_hz)]
+    raw_freqs_thz = raw_freqs_hz * 100  # Convert to actual THz
     
     thermal_population_weights = winv_tensor.flatten().numpy()
     thermal_population_weights = thermal_population_weights[~np.isnan(thermal_population_weights)]
@@ -97,12 +102,14 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
     pump_intensity = np.max(thermal_hist_values) * pump_magnitude
     pumped_pop_values[pump_bin_index] += pump_intensity
     
-    print(f"Target pump frequency (percentile): {pump_frequency_thz:.2e} THz.")
-    print(f"Actual pump frequency (bin center): {actual_pump_freq_thz:.2e} THz.")
-    print(f"Added a 'pump' of intensity {pump_intensity:.2e} to the thermal population at bin {pump_bin_index}.")
+    print(f"Target pump frequency (percentile): {pump_frequency_thz:.2f} THz")
+    print(f"Actual pump frequency (bin center): {actual_pump_freq_thz:.2f} THz")
+    print(f"Added pump of intensity {pump_intensity:.2e} to thermal population at bin {pump_bin_index}")
 
     # Save the "pumped" PDOS to a temporary file for the simulation
-    pumped_pdos_data = np.vstack((bin_centers, pumped_pop_values)).T
+    # Convert frequencies back to model's internal units
+    bin_centers_model_units = bin_centers / 100  # Convert THz back to model units
+    pumped_pdos_data = np.vstack((bin_centers_model_units, pumped_pop_values)).T
     with open(temp_pdos_path, 'w') as f: # Overwrite the temp file
         np.savetxt(f, pumped_pdos_data, fmt="%.15e")  # Use high precision
 
@@ -138,10 +145,10 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
 
     # Plot A: Default Thermal Population Model
     ax = axes[0, 0]
-    ax.plot(bin_centers * 1e13, thermal_hist_values, color='royalblue', lw=2)
-    ax.fill_between(bin_centers * 1e13, thermal_hist_values, color='royalblue', alpha=0.2)
+    ax.plot(bin_centers, thermal_hist_values, color='royalblue', lw=2)
+    ax.fill_between(bin_centers, thermal_hist_values, color='royalblue', alpha=0.2)
     ax.set_title("A) Effective Thermal Population (Equilibrium)", fontsize=14)
-    ax.set_xlabel("Frequency (10¹³ Hz)")
+    ax.set_xlabel("Frequency (THz)")
     ax.set_ylabel("Weighted Density (Population)")
     ax.grid(True, linestyle='--', alpha=0.6)
     ax.set_xlim(left=0)
@@ -151,11 +158,11 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
 
     # Plot B: "Pumped" Thermal Population Model
     ax = axes[0, 1]
-    ax.plot(bin_centers * 1e13, pumped_pop_values, color='orangered', lw=2)
-    ax.fill_between(bin_centers * 1e13, pumped_pop_values, color='orangered', alpha=0.2)
-    ax.axvline(actual_pump_freq_thz * 1e13, color='red', linestyle='--', lw=2, label=f'Pumped Mode ({actual_pump_freq_thz * 1e13:.1f})')
+    ax.plot(bin_centers, pumped_pop_values, color='orangered', lw=2)
+    ax.fill_between(bin_centers, pumped_pop_values, color='orangered', alpha=0.2)
+    ax.axvline(actual_pump_freq_thz, color='red', linestyle='--', lw=2, label=f'Pumped Mode ({actual_pump_freq_thz:.2f} THz)')
     ax.set_title("B) Pumped Thermal Population (Non-Equilibrium)", fontsize=14)
-    ax.set_xlabel("Frequency (10¹³ Hz)")
+    ax.set_xlabel("Frequency (THz)")
     ax.set_ylabel("Population (Arbitrary Units)")
     ax.grid(True, linestyle='--', alpha=0.6)
     ax.set_xlim(left=0)
