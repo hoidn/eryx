@@ -295,30 +295,32 @@ def create_benchmark_datasets(pdb_path: str = "tests/pdbs/5zck_p1.pdb") -> Dict[
     Returns:
         Dictionary with dataset configurations
     """
+    # Note: Third parameter is oversampling factor, not number of points!
+    # Points = (max - min) * oversampling + 1
     datasets = {
         'small': {
-            'name': 'Small (3x3x3 grid)',
-            'hsampling': [-1, 1, 3],
-            'ksampling': [-1, 1, 3], 
-            'lsampling': [-1, 1, 3],
+            'name': 'Small (3x3x3 grid = 27 points)',
+            'hsampling': [-1, 1, 1],  # 2 * 1 + 1 = 3 points
+            'ksampling': [-1, 1, 1], 
+            'lsampling': [-1, 1, 1],
             'pdb_path': pdb_path,
-            'n_points': 3 * 3 * 3
+            'n_points': 3 * 3 * 3  # 27 points
         },
         'medium': {
-            'name': 'Medium (5x5x5 grid)',
-            'hsampling': [-2, 2, 5],
-            'ksampling': [-2, 2, 5],
-            'lsampling': [-2, 2, 5],
+            'name': 'Medium (5x5x5 grid = 125 points)',
+            'hsampling': [-2, 2, 1],  # 4 * 1 + 1 = 5 points
+            'ksampling': [-2, 2, 1],
+            'lsampling': [-2, 2, 1],
             'pdb_path': pdb_path,
-            'n_points': 5 * 5 * 5
+            'n_points': 5 * 5 * 5  # 125 points
         },
         'large': {
-            'name': 'Large (8x8x8 grid)',
-            'hsampling': [-3, 3, 8],
-            'ksampling': [-3, 3, 8],
-            'lsampling': [-3, 3, 8],
+            'name': 'Large (9x9x9 grid = 729 points)',
+            'hsampling': [-4, 4, 1],  # 8 * 1 + 1 = 9 points
+            'ksampling': [-4, 4, 1],
+            'lsampling': [-4, 4, 1],
             'pdb_path': pdb_path,
-            'n_points': 8 * 8 * 8
+            'n_points': 9 * 9 * 9  # 729 points
         }
     }
     
