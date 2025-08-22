@@ -1,0 +1,68 @@
+{
+  "results": [
+    {
+      "name": "grid_small",
+      "num_runs": 5,
+      "time_mean": 0.06315706726163625,
+      "time_std": 0.002187672648020376,
+      "time_min": 0.061611585319042206,
+      "time_max": 0.06744480971246958,
+      "time_median": 0.061926367692649364,
+      "cpu_delta_mb": 7.0,
+      "gpu_delta_mb": 8.43994140625,
+      "cpu_peak_mb": 4494.296875,
+      "gpu_peak_mb": 142.2919921875,
+      "timestamp": "2025-08-21T22:54:41.358211",
+      "output_shape": [
+        343
+      ],
+      "output_device": "cuda:0"
+    },
+    {
+      "name": "grid_medium",
+      "num_runs": 5,
+      "time_mean": 0.28642908465117217,
+      "time_std": 0.0077595596266452,
+      "time_min": 0.2710851049050689,
+      "time_max": 0.2921548644080758,
+      "time_median": 0.2898649424314499,
+      "cpu_delta_mb": 1.0,
+      "gpu_delta_mb": 197.76806640625,
+      "cpu_peak_mb": 7688.046875,
+      "gpu_peak_mb": 528.5302734375,
+      "timestamp": "2025-08-21T22:55:06.207616",
+      "output_shape": [
+        9261
+      ],
+      "output_device": "cuda:0"
+    },
+    {
+      "name": "grid_large",
+      "num_runs": 3,
+      "time_mean": 1.2893191414574783,
+      "time_std": 0.047002202021218444,
+      "time_min": 1.2228483706712723,
+      "time_max": 1.322749374434352,
+      "time_median": 1.3223596792668104,
+      "cpu_delta_mb": 4.75,
+      "gpu_delta_mb": 2484.1962890625,
+      "cpu_peak_mb": 7702.8515625,
+      "gpu_peak_mb": 5129.43798828125,
+      "timestamp": "2025-08-21T22:55:33.785077",
+      "output_shape": [
+        117649
+      ],
+      "output_device": "cuda:0"
+    }
+  ],
+  "system_info": {
+    "python_version": "2.7.1+cu126",
+    "torch_version": "2.7.1+cu126",
+    "cuda_available": true,
+    "cpu_count": 32,
+    "total_memory_gb": 125.69927978515625,
+    "cuda_version": "12.6",
+    "gpu_name": "NVIDIA GeForce RTX 3090",
+    "gpu_memory_gb": 23.56243896484375
+  }
+}
