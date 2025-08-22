@@ -50,15 +50,70 @@ Establish baseline performance metrics and testing infrastructure before any cha
 
 ## Phase 1: Core Intensity Calculation Vectorization
 
+### Pre-Phase 1: Required Documentation Review
+
+**CRITICAL: Before starting ANY Phase 1 work, the implementing agent MUST read:**
+
+1. **`/home/ollie/Documents/eryx/CLAUDE.md`** (Updated)
+   - Contains critical API information about grid parameters
+   - Explains the oversampling factor confusion
+   - Has AI behavioral rules to follow
+
+2. **`/home/ollie/Documents/eryx/plans/fixplan.md`**
+   - Details the specific vectorization strategies
+   - Shows exact loop locations and line numbers
+   - Contains performance bottleneck analysis
+
+3. **`/home/ollie/Documents/eryx/MEMORY_ANALYSIS.md`**
+   - Explains actual memory usage patterns
+   - Shows why vectorization is critical
+   - Contains grid size calculations
+
+4. **`/home/ollie/Documents/eryx/docs/architecture.md`**
+   - PyTorch port architecture
+   - Gradient flow requirements
+   - Component boundaries and interfaces
+
+5. **`/home/ollie/Documents/eryx/archive/svd_gradient_fix.md`**
+   - Critical gradient preservation techniques
+   - Complex tensor operation handling
+   - Known PyTorch gradient issues and workarounds
+
+6. **`/home/ollie/Documents/eryx/tests/test_gradient_flow.py`**
+   - How to verify gradient preservation
+   - Test patterns for optimization
+   - Gradient validation methods
+
+7. **Source Code Files to Study:**
+   - **`eryx/models_torch.py`** lines 1780-1900 (apply_disorder method)
+   - **`eryx/scatter_torch.py`** (structure_factors function)
+   - **`eryx/torch_utils.py`** (tensor utility functions)
+
+### Reading Checklist
+- [ ] Understood grid parameter semantics (oversampling factor)
+- [ ] Located the triple nested loops (lines 1826-1828)
+- [ ] Located the arbitrary q-vector loops (lines 1787-1804)
+- [ ] Understood gradient flow requirements
+- [ ] Reviewed SVD gradient workarounds
+- [ ] Familiar with structure factor calculations
+- [ ] Understood memory scaling issues
+
 ### Objectives
 Vectorize the critical intensity calculation loops in both arbitrary q-vector and grid modes.
 
 ### 1A: Arbitrary Q-Vector Mode Vectorization
 
+#### Pre-Implementation Setup
+- [ ] Create a new file `eryx/models_torch_vectorized.py` 
+  - [ ] Copy entire OnePhonon class as OnePhononVectorized
+  - [ ] This allows A/B testing without breaking original
+  - [ ] Add comment header explaining vectorization changes
+
 #### Implementation Checklist
 - [ ] **Backup original implementation**
-  - [ ] Copy `apply_disorder` method to `apply_disorder_legacy`
-  - [ ] Add feature flag: `use_vectorized=True` parameter
+  - [ ] Keep original `apply_disorder` method intact in original file
+  - [ ] Add feature flag: `use_vectorized=False` parameter default
+  - [ ] Create `apply_disorder_vectorized` method in new class
 
 - [ ] **Vectorize intensity calculation (lines 1787-1804)**
   - [ ] Replace point-by-point loop with batch operations
@@ -374,13 +429,27 @@ Document changes, update user guides, and prepare for release.
 - [ ] Documentation: All public methods documented
 
 ### Timeline Estimates
-- **Phase 0**: 2-3 days (setup and benchmarking)
-- **Phase 1**: 5-7 days (core vectorization)
+- **Phase 0**: ✅ COMPLETE (setup and benchmarking)
+- **Phase 1**: 5-7 days (core vectorization) - HIGH COMPLEXITY
+  - Day 1-2: Documentation review and understanding
+  - Day 3-4: Arbitrary q-vector mode vectorization
+  - Day 5-6: Grid mode vectorization
+  - Day 7: Testing and validation
 - **Phase 2**: 3-4 days (structure factors)
 - **Phase 3**: 2-3 days (initialization)
 - **Phase 4**: 3-4 days (integration)
 - **Phase 5**: 2-3 days (documentation)
 - **Total**: 17-24 days
+
+### Phase 1 Complexity Warning
+Phase 1 is the most complex phase because:
+1. Modifies core mathematical computations
+2. Must preserve gradient flow exactly
+3. Requires deep understanding of tensor broadcasting
+4. Numerical precision must be maintained to 1e-12
+5. Memory patterns change significantly
+
+**Recommendation**: Allocate extra time for Phase 1 debugging and validation.
 
 ---
 
