@@ -1,0 +1,96 @@
+2025-08-22 02:02:56,178 INFO: Running PyTorch grid mode...
+2025-08-22 02:02:56,505 INFO: Starting PyTorch branch computation on cpu
+2025-08-22 02:02:56,505 DEBUG: [INIT] Called OnePhonon constructor (q_vectors is None? True)
+2025-08-22 02:02:56,505 DEBUG: [INIT] Grid Mode detected.
+2025-08-22 02:02:56,505 DEBUG: [INIT] final use_arbitrary_q=False
+2025-08-22 02:02:56,507 DEBUG: [_setup] Extracted 112 element weights.
+2025-08-22 02:02:56,507 DEBUG: [_setup] use_arbitrary_q=False
+2025-08-22 02:02:56,518 DEBUG: [_setup] grid-based map_shape=(25, 103, 175), hkl_grid.shape=torch.Size([450625, 3]), hkl_grid.dtype=torch.float64
+2025-08-22 02:02:56,521 DEBUG: [_setup] Calculated q_grid shape=torch.Size([450625, 3]), q_grid.dtype=torch.float64
+2025-08-22 02:02:56,521 DEBUG: [_setup] q_grid requires_grad: True
+2025-08-22 02:02:56,526 DEBUG: [_setup] resolution computed, shape=torch.Size([450625]), dtype=torch.float64
+2025-08-22 02:02:56,527 DEBUG: [_setup] n_asu=4
+2025-08-22 02:02:56,529 DEBUG: [_setup_phonons] STARTING: mode=grid, model_type=gnm
+2025-08-22 02:02:56,536 DEBUG: [_setup_phonons] Built A and M matrices.
+2025-08-22 02:02:56,536 DEBUG: [_build_kvec_Brillouin] use_arbitrary_q=False
+2025-08-22 02:02:56,536 DEBUG: [_build_kvec_Brillouin] Grid-based mode. Using Brillouin zone sampling dimensions.
+2025-08-22 02:02:56,536 DEBUG: [_build_kvec_Brillouin] Brillouin zone dimensions: h_dim=3, k_dim=3, l_dim=3
+2025-08-22 02:02:56,536 DEBUG: [_build_kvec_Brillouin] Total k-points: 27
+2025-08-22 02:02:56,536 DEBUG: [_build_kvec_Brillouin] kvec shape=torch.Size([27, 3]), norm shape=torch.Size([27, 1])
+2025-08-22 02:02:56,536 DEBUG: [_setup_phonons] Built kvec, shape: torch.Size([27, 3])
+2025-08-22 02:02:56,536 WARNING: [_setup_phonons] Re-initializing V/Winv to size 27
+2025-08-22 02:02:56,590 DEBUG: [_setup_phonons] Setup GNM gamma parameters.
+2025-08-22 02:02:56,590 DEBUG: [_setup_phonons] Calling compute_gnm_phonons...
+2025-08-22 02:03:01,516 DEBUG: [compute_gnm_phonons] Found 27 unique k_BZ vectors to process.
+2025-08-22 02:03:01,516 DEBUG: Computing phonons for 27 unique BZ k-vectors from 27 grid points (3x3x3)
+2025-08-22 02:03:01,516 DEBUG: [compute_gnm_phonons] Found 27 unique k_BZ vectors to process.
+2025-08-22 02:03:01,534 DEBUG: Compute_K complete, Kmat_unique_2d shape = torch.Size([27, 24, 24])
+2025-08-22 02:03:01,534 DEBUG: [DEBUG compute_gnm_phonons] Processing 27 unique k-vectors
+2025-08-22 02:03:01,539 DEBUG: Recomputed eigenvalues using eigh complete for unique k-vectors
+2025-08-22 02:03:01,539 DEBUG: eigenvalues_unique requires_grad: True
+2025-08-22 02:03:01,539 DEBUG: v_unique_detached requires_grad: False
+2025-08-22 02:03:01,539 DEBUG: Computing phonons for 27 unique BZ k-vectors from 27 grid points (3x3x3)
+2025-08-22 02:03:01,539 DEBUG: [compute_gnm_phonons] Found 27 unique k_BZ vectors to process.
+2025-08-22 02:03:01,559 DEBUG: Kmat_unique requires_grad: True
+2025-08-22 02:03:01,559 DEBUG: Kmat_unique.grad_fn: <CopySlices object at 0x7a6d2155a320>
+2025-08-22 02:03:01,559 DEBUG: Compute_K complete, Kmat_unique_2d shape = torch.Size([27, 24, 24])
+2025-08-22 02:03:01,559 DEBUG: [DEBUG compute_gnm_phonons] Processing 27 unique k-vectors
+2025-08-22 02:03:01,566 DEBUG: Recomputed eigenvalues using eigh complete for unique k-vectors
+2025-08-22 02:03:01,566 DEBUG: eigenvalues_unique requires_grad: True
+2025-08-22 02:03:01,566 DEBUG: v_unique_detached requires_grad: False
+2025-08-22 02:03:01,567 DEBUG: Phonon computation complete: V.shape=torch.Size([27, 24, 24]), Winv.shape=torch.Size([27, 24])
+2025-08-22 02:03:01,567 DEBUG: V requires_grad: False, Winv requires_grad: True
+2025-08-22 02:03:01,567 DEBUG: [_setup_phonons] compute_gnm_phonons finished.
+2025-08-22 02:03:01,567 DEBUG: [_setup_phonons] Calling compute_covariance_matrix...
+2025-08-22 02:03:01,567 DEBUG: [compute_covariance_matrix] Generating local BZ grid (3x3x3 = 27 points) for averaging.
+2025-08-22 02:03:06,406 DEBUG: [compute_covariance_matrix] Computed Kinv_all_bz for BZ grid, shape=torch.Size([27, 24, 24])
+2025-08-22 02:03:06,410 DEBUG: [compute_covariance_matrix] Extracted diagonal values, shape=torch.Size([24])
+2025-08-22 02:03:06,410 DEBUG: [compute_covariance_matrix] ADP scaling factor: 3.39794225e-02
+2025-08-22 02:03:06,410 DEBUG: [compute_covariance_matrix] Complete: ADP.shape=torch.Size([28]), requires_grad=True
+2025-08-22 02:03:06,410 DEBUG: [_setup_phonons] compute_covariance_matrix finished.
+2025-08-22 02:03:06,410 DEBUG: [_setup_phonons] FINISHED.
+2025-08-22 02:03:06,410 DEBUG: [INIT] Completed OnePhonon constructor.
+2025-08-22 02:03:06,410 DEBUG: [apply_disorder] rank=-1, use_data_adp=True, use_arbitrary_q=False
+2025-08-22 02:03:06,410 DEBUG: [apply_disorder] Using ADP from PDB data (use_data_adp=True).
+2025-08-22 02:03:06,410 DEBUG: [apply_disorder] Using ADP with shape: torch.Size([28]), requires_grad=False
+2025-08-22 02:03:06,411 DEBUG: [apply_disorder] q_grid.size=450625 total points. res_mask sum=450625.
+2025-08-22 02:03:06,411 DEBUG: [apply_disorder] GRID MODE (using direct indexing)
+2025-08-22 02:03:06,411 DEBUG: [apply_disorder] Total points: 450625, Valid points (res_mask): 450625
+2025-08-22 02:03:06,412 DEBUG: [apply_disorder] GRID MODE (using BZ loops)
+2025-08-22 02:03:06,412 DEBUG: [apply_disorder] Starting loops over Brillouin zone...
+2025-08-22 02:03:06,412 DEBUG: [_at_kvec_from_miller_points] Single point: (0,0,0) -> 18585 indices
+2025-08-22 02:03:06,473 DEBUG: [_at_kvec_from_miller_points] Single point: (0,0,1) -> 18270 indices
+2025-08-22 02:03:06,528 DEBUG: [_at_kvec_from_miller_points] Single point: (0,0,2) -> 18270 indices
+2025-08-22 02:03:06,584 DEBUG: [_at_kvec_from_miller_points] Single point: (0,1,0) -> 18054 indices
+2025-08-22 02:03:06,640 DEBUG: [_at_kvec_from_miller_points] Single point: (0,1,1) -> 17748 indices
+2025-08-22 02:03:06,695 DEBUG: [_at_kvec_from_miller_points] Single point: (0,1,2) -> 17748 indices
+2025-08-22 02:03:06,749 DEBUG: [_at_kvec_from_miller_points] Single point: (0,2,0) -> 18054 indices
+2025-08-22 02:03:06,803 DEBUG: [_at_kvec_from_miller_points] Single point: (0,2,1) -> 17748 indices
+2025-08-22 02:03:06,856 DEBUG: [_at_kvec_from_miller_points] Single point: (0,2,2) -> 17748 indices
+2025-08-22 02:03:06,910 DEBUG: [_at_kvec_from_miller_points] Single point: (1,0,0) -> 16520 indices
+2025-08-22 02:03:06,960 DEBUG: [_at_kvec_from_miller_points] Single point: (1,0,1) -> 16240 indices
+2025-08-22 02:03:07,011 DEBUG: [_at_kvec_from_miller_points] Single point: (1,0,2) -> 16240 indices
+2025-08-22 02:03:07,063 DEBUG: [_at_kvec_from_miller_points] Single point: (1,1,0) -> 16048 indices
+2025-08-22 02:03:07,114 DEBUG: [_at_kvec_from_miller_points] Single point: (1,1,1) -> 15776 indices
+2025-08-22 02:03:07,163 DEBUG: [_at_kvec_from_miller_points] Single point: (1,1,2) -> 15776 indices
+2025-08-22 02:03:07,211 DEBUG: [_at_kvec_from_miller_points] Single point: (1,2,0) -> 16048 indices
+2025-08-22 02:03:07,261 DEBUG: [_at_kvec_from_miller_points] Single point: (1,2,1) -> 15776 indices
+2025-08-22 02:03:07,309 DEBUG: [_at_kvec_from_miller_points] Single point: (1,2,2) -> 15776 indices
+2025-08-22 02:03:07,358 DEBUG: [_at_kvec_from_miller_points] Single point: (2,0,0) -> 16520 indices
+2025-08-22 02:03:07,409 DEBUG: [_at_kvec_from_miller_points] Single point: (2,0,1) -> 16240 indices
+2025-08-22 02:03:07,460 DEBUG: [_at_kvec_from_miller_points] Single point: (2,0,2) -> 16240 indices
+2025-08-22 02:03:07,510 DEBUG: [_at_kvec_from_miller_points] Single point: (2,1,0) -> 16048 indices
+2025-08-22 02:03:07,558 DEBUG: [_at_kvec_from_miller_points] Single point: (2,1,1) -> 15776 indices
+2025-08-22 02:03:07,606 DEBUG: [_at_kvec_from_miller_points] Single point: (2,1,2) -> 15776 indices
+2025-08-22 02:03:07,654 DEBUG: [_at_kvec_from_miller_points] Single point: (2,2,0) -> 16048 indices
+2025-08-22 02:03:07,703 DEBUG: [_at_kvec_from_miller_points] Single point: (2,2,1) -> 15776 indices
+2025-08-22 02:03:07,753 DEBUG: [_at_kvec_from_miller_points] Single point: (2,2,2) -> 15776 indices
+2025-08-22 02:03:07,802 DEBUG: PyTorch: hkl_grid shape = torch.Size([450625, 3])
+2025-08-22 02:03:07,802 DEBUG: PyTorch: hkl_grid coordinate ranges:
+2025-08-22 02:03:07,802 DEBUG:   Dimension 0: min = -4.0, max = 4.0
+2025-08-22 02:03:07,803 DEBUG:   Dimension 1: min = -17.0, max = 17.0
+2025-08-22 02:03:07,803 DEBUG:   Dimension 2: min = -29.0, max = 29.0
+2025-08-22 02:03:07,816 DEBUG: PyTorch: q_grid range: min = -6.227867192703222, max = 6.227867192703222
+2025-08-22 02:03:07,952 INFO: PyTorch Grid: Saved q-vectors ((450625, 3)) and intensity ((450625,)) to torch_grid_results.npz
+2025-08-22 02:03:07,953 INFO: PyTorch Grid diffuse intensity stats: min=4.419692978884885, max=264412.9588698485
+2025-08-22 02:03:08,613 INFO: Completed PyTorch grid run

@@ -1018,14 +1018,10 @@ class OnePhonon:
                     # Apply Kronecker product with identity matrix (3x3)
                     # This expands each element of the hessian into a 3x3 block
                     h_block = hessian_allatoms[i_asu, :, i_cell, j_asu, :]
-                    h_expanded = torch.zeros((h_block.shape[0] * 3, h_block.shape[1] * 3), 
-                                            dtype=self.complex_dtype, device=self.device)
                     
-                    # Manually implement the Kronecker product (ensure h_block is complex)
+                    # Use torch.kron for efficient Kronecker product
                     h_block_complex = h_block.to(self.complex_dtype)
-                    for i in range(h_block.shape[0]):
-                        for j in range(h_block.shape[1]):
-                            h_expanded[i*3:(i+1)*3, j*3:(j+1)*3] = h_block_complex[i, j] * eye3 # Multiply complex * complex
+                    h_expanded = torch.kron(h_block_complex, eye3)
 
                     # Perform matrix multiplication with expanded hessian
                     # Ensure all tensors are complex for compatibility
