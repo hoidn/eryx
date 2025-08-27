@@ -121,3 +121,31 @@ intensity = model_torch.apply_disorder()
 - The project is actively developing PyTorch gradient capabilities
 - Multi-trial statistics and PDOS integration are recent additions
 - State-based testing framework is continuously enhanced
+- Advanced 3D visualization features are being implemented (see planning docs)
+
+## Visualization Development
+
+### Planning Documents
+- **Architecture Specification**: `VISUALIZATION_ARCHITECTURE.md` - Detailed component design and technical specifications
+- **Implementation Plan**: `IMPLEMENTATION_PLAN.md` - Phased development plan with checkpoints
+- **Format Decision**: `ANIMATION_FORMAT_DECISION.md` - Rationale for standalone vs Jupyter approaches
+
+### Visualization Features (In Development)
+- **Progressive Slicing Animation**: Animated GIF/MP4 showing 3D data slicing along arbitrary planes
+- **Interactive Volume Rendering**: WebGL-based 3D heatmap with dynamic controls
+- **Dual Implementation**: Standalone formats (primary) + Jupyter widgets (enhancement)
+
+### Visualization Module Structure
+```
+eryx/visualization/
+├── core/           # Data handling, coordinates, NaN processing
+├── slicing/        # Plane calculations and animation
+├── volume/         # 3D rendering backends
+└── interactive/    # Controls and widgets
+```
+
+### Testing Visualization Code
+- Use subagents for all testing/debugging tasks
+- Verify against existing visualization functions
+- Test with synthetic data before real datasets
+- Check NaN handling at lattice points
