@@ -13,6 +13,13 @@ import k3d
 from scipy.spatial import SphericalVoronoi
 import time
 import os
+import sys
+
+# Add the project root to path if not already there
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from eryx.visualization.core.data_handler import IntensityDataHandler
 
 
@@ -670,178 +677,6 @@ class SphericalClippingController:
             self.plot.stop_auto_play()
         self.is_animating = False
         self.animation_type = None
-    
-    # ========== SYNCHRONIZED ANIMATIONS ==========
-    
-    def create_zoom_reveal_animation(self, duration=5.0, final_radius_factor=0.2):
-        """Zoom in while shrinking sphere to reveal internal structure.
-        
-        Args:
-            duration: Total animation duration in seconds
-            final_radius_factor: Final sphere radius as fraction of initial
-        """
-        import threading
-        import time
-        import math
-        
-        world_center = self.get_world_sphere_center()
-        steps = 50
-        
-        # Camera animation (zoom in)
-        camera_frames = []
-        start_distance = self.get_optimal_camera_distance(scale_factor=3.0)
-        end_distance = self.get_optimal_camera_distance(scale_factor=1.0)
-        
-        for i in range(steps):
-            t = duration * i / (steps - 1)
-            progress = i / (steps - 1)
-            smooth_progress = 0.5 * (1 - math.cos(math.pi * progress))
-            
-            # Camera zooms in
-            distance = start_distance + (end_distance - start_distance) * smooth_progress
-            theta = math.pi * progress / 6  # Slight rotation
-            
-            x = distance * math.cos(theta)
-            y = distance * math.sin(theta)
-            z = distance * 0.5  # Elevated view
-            
-            camera = [
-                x + world_center[0], y + world_center[1], z + world_center[2],
-                world_center[0], world_center[1], world_center[2],
-                0, 0, 1
-            ]
-            camera_frames.append([t, camera])
-        
-        self.plot.camera_animation = camera_frames
-        
-        # Sphere animation (shrink in parallel)
-        original_radius = self.sphere_radius
-        
-        def animate_sphere():
-            for i in range(steps):
-                progress = i / (steps - 1)
-                self.sphere_radius = original_radius * (1 - (1 - final_radius_factor) * progress)
-                self.update_clipping()
-                time.sleep(duration / steps)
-            # Optionally restore
-            # self.sphere_radius = original_radius
-        
-        # Start both animations
-        self.plot.start_auto_play()
-        self.is_animating = True
-        self.animation_type = 'zoom_reveal'
-        threading.Thread(target=animate_sphere).start()
-    
-    def create_octant_inspection_animation(self, duration=8.0, pause_duration=0.5):
-        """Camera tours each octant for comprehensive inspection.
-        
-        Args:
-            duration: Total animation duration
-            pause_duration: Pause at each octant position
-        """
-        import math
-        
-        world_center = self.get_world_sphere_center()
-        distance = self.get_optimal_camera_distance(scale_factor=2.0)
-        
-        frames = []
-        
-        # Visit each octant's optimal viewing angle
-        octant_positions = []
-        for x_sign in [1, -1]:
-            for y_sign in [1, -1]:
-                for z_sign in [1, -1]:
-                    # Calculate viewing angle for this octant
-                    theta = math.atan2(y_sign, x_sign)
-                    phi = math.acos(z_sign / math.sqrt(3))
-                    
-                    x = distance * math.sin(phi) * math.cos(theta)
-                    y = distance * math.sin(phi) * math.sin(theta)
-                    z = distance * math.cos(phi)
-                    
-                    octant_positions.append([x, y, z])
-        
-        # Create smooth path through octant views
-        time_per_octant = duration / len(octant_positions)
-        current_time = 0
-        
-        for i, pos in enumerate(octant_positions):
-            camera = [
-                pos[0] + world_center[0],
-                pos[1] + world_center[1],
-                pos[2] + world_center[2],
-                world_center[0], world_center[1], world_center[2],
-                0, 0, 1
-            ]
-            
-            # Add keyframe
-            frames.append([current_time, camera])
-            
-            # Add pause frame (same position, later time)
-            if pause_duration > 0:
-                current_time += pause_duration
-                frames.append([current_time, camera])
-            
-            current_time += time_per_octant - pause_duration
-            
-            # Optionally sync octant exclusion
-            if self.octant_cut:
-                # This would need to be in a separate thread
-                # self.octant_signs = [1 if pos[j] > 0 else -1 for j in range(3)]
-                # self.update_clipping()
-                pass
-        
-        self.plot.camera_animation = frames
-        self.is_animating = True
-        self.animation_type = 'octant_tour'
-        self.plot.start_auto_play()
-    
-    def add_anisotropy_showcase_animation(self, duration=10.0):
-        """Multi-elevation orbital animation to highlight anisotropic features.
-        
-        Args:
-            duration: Total animation duration
-        """
-        import math
-        
-        world_center = self.get_world_sphere_center()
-        base_distance = self.get_optimal_camera_distance(scale_factor=2.5)
-        
-        frames = []
-        
-        # Multiple elevation levels to showcase
-        elevations = [30, 60, 90, 60, 30]  # degrees
-        points_per_elevation = 20
-        
-        t = 0
-        time_per_point = duration / (len(elevations) * points_per_elevation)
-        
-        for elevation in elevations:
-            phi = math.radians(elevation)
-            
-            for i in range(points_per_elevation):
-                theta = 2 * math.pi * i / points_per_elevation
-                
-                # Variable radius for visual interest
-                radius = base_distance * (1 + 0.2 * math.sin(theta * 2))
-                
-                x = radius * math.sin(phi) * math.cos(theta)
-                y = radius * math.sin(phi) * math.sin(theta)
-                z = radius * math.cos(phi)
-                
-                camera = [
-                    x + world_center[0], y + world_center[1], z + world_center[2],
-                    world_center[0], world_center[1], world_center[2],
-                    0, 0, 1
-                ]
-                
-                frames.append([t, camera])
-                t += time_per_point
-        
-        self.plot.camera_animation = frames
-        self.is_animating = True
-        self.animation_type = 'anisotropy'
-        self.plot.start_auto_play()
     
     def create_sphere_guide(self):
         """Create a visual sphere guide."""

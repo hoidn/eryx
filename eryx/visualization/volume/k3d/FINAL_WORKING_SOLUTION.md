@@ -33,33 +33,88 @@ Where:
 - `(nx, ny, nz)` = normal vector pointing outward from visible region
 - `d` = signed distance from origin along normal direction
 
-### Your Data Conversion:
+### Data Loading - Now with Automatic Shape Detection:
 ```python
-# Your data: 68921 elements = 41³ (perfect cube!)
-data_1d = np.load('torch_diffuse_intensity.npy')  # Shape: (68921,)
-data_3d = data_1d.reshape(41, 41, 41)             # Shape: (41, 41, 41)
-data_3d = np.nan_to_num(data_3d, nan=0.0)         # Handle NaN values
+from eryx.visualization.core.data_handler import IntensityDataHandler
+
+# Method 1: Automatic loading with metadata (RECOMMENDED)
+handler = IntensityDataHandler('torch')  # or 'np', 'arbq', or file path
+q_vectors, intensity, map_shape = handler.load_data()
+if intensity.ndim == 1 and map_shape:
+    intensity = intensity.reshape(map_shape)  # Uses shape from NPZ metadata
+data_3d = np.nan_to_num(intensity, nan=0.0)
+
+# Method 2: Manual shape specification (if needed)
+data_1d = np.load('torch_diffuse_intensity.npy')
+# Shape is determined from your sampling parameters, NOT hard-coded
+# e.g., [-2,2,10] gives 41 steps, so 41³ = 68,921 elements
+data_3d = data_1d.reshape(41, 41, 41)  # Or use your actual shape
+data_3d = np.nan_to_num(data_3d, nan=0.0)
 ```
 
-## 🎮 THREE WORKING METHODS
+## 🎮 CLIPPING METHODS
 
-### Method 1: Static Clipping
+### Method 1: Planar Clipping (K3D Native)
 ```python
 plot.clipping_planes = [[1, 0, 0, 0]]     # qx > 0 half-space
 plot.clipping_planes = [[0, 0, 1, 0.5]]   # qz > 0.5 plane
 plot.clipping_planes = [[1,0,0,0], [0,1,0,0]]  # Multiple planes
 ```
 
-### Method 2: Python Animation (Frame Sequence)
+### Method 2: Spherical Clipping (Data Masking)
 ```python
+from eryx.visualization.volume.k3d.k3d_spherical_clipping import SphericalClippingController
+
+# Now supports flexible data sources
+controller = SphericalClippingController('torch')  # or 'np', 'arbq', or file path
+controller.sphere_radius = 15.0
+controller.sphere_center = [20.5, 20.5, 20.5]  # Volume center
+controller.clip_inside = True  # Show inside sphere
+controller.method = 'masking'
+controller.update_clipping()
+```
+
+### Method 3: Octant Exclusion (Remove 1/8 of Data)
+```python
+# EXCLUDES the selected octant (shows 7/8 of data)
+controller.octant_cut = True
+controller.octant_mode = 'custom'
+controller.octant_signs = [1, 1, 1]  # Excludes x>center, y>center, z>center octant
+controller.update_clipping()
+
+# Common use case: Remove positive octant to see internal structure
+controller.octant_cut = True
+controller.octant_mode = 'first'  # Excludes first octant (all positive)
+```
+
+### Method 4: Combined Spherical + Octant
+```python
+# Sphere with one octant removed (e.g., for cross-section view)
+controller.sphere_radius = 20.0
+controller.clip_inside = True  # Show inside sphere
+controller.octant_cut = True  # Also exclude an octant
+controller.octant_mode = 'first'  # Remove x>0, y>0, z>0 octant
+controller.method = 'masking'
+controller.update_clipping()
+```
+
+### Animation Examples:
+```python
+# Animate planar clipping
 for frame in range(num_frames):
     pos = -2 + 4 * (frame / (num_frames - 1))  # -2 to +2
     plot.clipping_planes = [[1, 0, 0, pos]]
     with open(f'frame_{frame}.html', 'w') as f:
         f.write(plot.get_snapshot())
+
+# Animate spherical radius
+for radius in np.linspace(5, 25, 30):
+    controller.sphere_radius = radius
+    controller.update_clipping()
+    time.sleep(0.05)
 ```
 
-### Method 3: Browser Animation (Real-time)
+### Browser Animation (Real-time)
 ```javascript
 // In browser console:
 plot.set('clipping_planes', [[1, 0, 0, 0.5]]);

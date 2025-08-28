@@ -133,9 +133,11 @@ intensity = model_torch.apply_disorder()
 - **Interactive Notebooks**: [`eryx/visualization/volume/k3d/`](./eryx/visualization/volume/k3d/) - Jupyter notebooks with real-time controls
 
 #### Matplotlib Animation Development (In Progress)
-- **Architecture Specification**: `VISUALIZATION_ARCHITECTURE.md` - Technical specifications for slicing animation
-- **Implementation Plan**: `IMPLEMENTATION_PLAN.md` - Phased development plan with checkpoints  
-- **Format Decision**: `ANIMATION_FORMAT_DECISION.md` - Rationale for standalone vs Jupyter approaches
+- **Architecture Specification**: [`docs/visualization/VISUALIZATION_ARCHITECTURE.md`](./docs/visualization/VISUALIZATION_ARCHITECTURE.md) - Technical specifications for slicing animation
+- **Implementation Plan**: [`docs/visualization/IMPLEMENTATION_PLAN.md`](./docs/visualization/IMPLEMENTATION_PLAN.md) - Phased development plan with checkpoints  
+- **Format Decision**: [`docs/visualization/ANIMATION_FORMAT_DECISION.md`](./docs/visualization/ANIMATION_FORMAT_DECISION.md) - Rationale for standalone vs Jupyter approaches
+- **Phase 1 Report**: [`docs/visualization/PHASE1_COMPLETION_REPORT.md`](./docs/visualization/PHASE1_COMPLETION_REPORT.md) - Foundation components completion
+- **Phase 2 Report**: [`docs/visualization/PHASE2_COMPLETION_REPORT.md`](./docs/visualization/PHASE2_COMPLETION_REPORT.md) - Slicing animation completion
 
 **Note**: The K3D system is production-ready and should be the primary choice for new visualization work. The matplotlib animation system provides an alternative for environments without WebGL or for specific publication requirements.
 
@@ -244,3 +246,26 @@ eryx/visualization/
 - Test with synthetic data before real datasets
 - Check NaN handling at lattice points
 - **K3D Requirements**: Works in Jupyter, exports to standalone HTML
+
+### Visualization Troubleshooting
+
+#### K3D Issues
+- **Import error**: Install with `pip install k3d` (requires Python 3.7+)
+- **Blank visualization**: Check data validity with `np.isfinite(data).any()`
+- **Slow performance**: Reduce data size or adjust `alpha_coef` parameter (try 10-50)
+- **Browser display issues**: Enable WebGL in Chrome/Firefox settings
+- **Jupyter not displaying**: Ensure `%matplotlib widget` or restart kernel
+- **Export limitation**: Clipping planes don't export to HTML (use Jupyter/Python instead)
+
+#### Data Format Issues  
+- **Wrong shape (68921 elements)**: Use `data.reshape(41, 41, 41)`
+- **Wrong shape (450625 elements)**: Use `data.reshape(25, 103, 175)` or check `map_shape`
+- **NaN values**: Apply `np.nan_to_num(data, nan=0.0)` or use percentile clipping
+- **Poor contrast**: Use percentile clipping: `np.clip(data, np.percentile(data, 1), np.percentile(data, 99))`
+- **Memory errors**: Subsample with `data[::2, ::2, ::2]` or reduce volume resolution
+
+#### Common Errors & Solutions
+- **`AttributeError: 'k3d.colormaps'`**: Use `k3d.basic_color_maps.Jet` instead
+- **`RuntimeWarning: divide by zero`**: Check for zero-norm vectors in calculations
+- **`TraitError: 'grid' trait`**: Use `grid_visible=False` not `grid=False`
+- **Clipping planes not working**: Stay in Python/Jupyter, don't export to HTML

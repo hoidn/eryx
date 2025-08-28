@@ -59,9 +59,14 @@ animation.save('slicing_animation.gif')
 
 #### Key Files:
 - `final_k3d_clipping_solution.py` - Main production implementation  
-- `k3d_spherical_clipping.py/.ipynb` - Spherical clipping for isotropic analysis
+- `k3d_spherical_clipping.py/.ipynb` - Spherical & octant clipping
 - `k3d_interactive_clipping.py/.ipynb` - Interactive GUI controls
 - `FINAL_WORKING_SOLUTION.md` - Complete documentation and examples
+
+#### Advanced Features:
+- **Spherical Clipping**: Show data inside/outside sphere
+- **Octant Exclusion**: Remove 1/8 of data to reveal internal structure
+- **Combined Masks**: Sphere + octant for cross-section views
 
 ### 2. Progressive Slicing Animation (Matplotlib)
 - **Status**: Functional, optimizing performance
@@ -197,26 +202,41 @@ plot = create_clipped_visualization(
 data = np.load('torch_diffuse_intensity.npy')
 volume = data.reshape(41, 41, 41)
 
-# Multiple analysis views
+# Planar clipping examples
 analyses = {
     'full_volume': [],                           # No clipping
     'positive_qx': [[1, 0, 0, 0]],             # qx > 0
     'central_slice': [[0, 0, 1, -0.1], [0, 0, 1, 0.1]], # |qz| < 0.1
-    'first_octant': [[1,0,0,0], [0,1,0,0], [0,0,1,0]]   # All positive
 }
 
 for name, planes in analyses.items():
     plot = create_clipped_visualization(volume, clipping_planes=planes)
     with open(f'{name}.html', 'w') as f:
         f.write(plot.get_snapshot())
+
+# Spherical and octant clipping
+from eryx.visualization.volume.k3d.k3d_spherical_clipping import SphericalClippingController
+
+controller = SphericalClippingController()
+controller.sphere_radius = 15.0
+controller.clip_inside = True  # Show inside sphere
+
+# Exclude one octant to reveal structure
+controller.octant_cut = True
+controller.octant_mode = 'first'  # Excludes x>0, y>0, z>0 octant
+controller.method = 'masking'
+controller.update_clipping()
 ```
 
 ## Documentation Links
 
-- **Architecture**: `../VISUALIZATION_ARCHITECTURE.md` - Technical specifications
-- **Implementation Plan**: `../IMPLEMENTATION_PLAN.md` - Development roadmap  
-- **K3D Complete Guide**: `volume/k3d/FINAL_WORKING_SOLUTION.md` - Comprehensive documentation
-- **Main Project Guide**: `../CLAUDE.md` - Integration with eryx project
+- **Architecture**: [`../../docs/visualization/VISUALIZATION_ARCHITECTURE.md`](../../docs/visualization/VISUALIZATION_ARCHITECTURE.md) - Technical specifications
+- **Implementation Plan**: [`../../docs/visualization/IMPLEMENTATION_PLAN.md`](../../docs/visualization/IMPLEMENTATION_PLAN.md) - Development roadmap  
+- **Phase 1 Report**: [`../../docs/visualization/PHASE1_COMPLETION_REPORT.md`](../../docs/visualization/PHASE1_COMPLETION_REPORT.md) - Foundation completion
+- **Phase 2 Report**: [`../../docs/visualization/PHASE2_COMPLETION_REPORT.md`](../../docs/visualization/PHASE2_COMPLETION_REPORT.md) - Slicing animation completion
+- **Format Decision**: [`../../docs/visualization/ANIMATION_FORMAT_DECISION.md`](../../docs/visualization/ANIMATION_FORMAT_DECISION.md) - Design rationale
+- **K3D Complete Guide**: [`volume/k3d/FINAL_WORKING_SOLUTION.md`](volume/k3d/FINAL_WORKING_SOLUTION.md) - Comprehensive documentation
+- **Main Project Guide**: [`../../CLAUDE.md`](../../CLAUDE.md) - Integration with eryx project
 
 ## Quick Troubleshooting
 
