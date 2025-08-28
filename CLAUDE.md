@@ -126,14 +126,93 @@ intensity = model_torch.apply_disorder()
 ## Visualization Development
 
 ### Planning Documents
-- **Architecture Specification**: `VISUALIZATION_ARCHITECTURE.md` - Detailed component design and technical specifications
-- **Implementation Plan**: `IMPLEMENTATION_PLAN.md` - Phased development plan with checkpoints
+
+#### K3D Production System (Complete) ✅
+- **📚 K3D Complete Guide**: [`eryx/visualization/volume/k3d/FINAL_WORKING_SOLUTION.md`](./eryx/visualization/volume/k3d/FINAL_WORKING_SOLUTION.md) - **START HERE for production K3D usage**
+- **K3D Module README**: [`eryx/visualization/README.md`](./eryx/visualization/README.md) - Quick start and architecture overview
+- **Interactive Notebooks**: [`eryx/visualization/volume/k3d/`](./eryx/visualization/volume/k3d/) - Jupyter notebooks with real-time controls
+
+#### Matplotlib Animation Development (In Progress)
+- **Architecture Specification**: `VISUALIZATION_ARCHITECTURE.md` - Technical specifications for slicing animation
+- **Implementation Plan**: `IMPLEMENTATION_PLAN.md` - Phased development plan with checkpoints  
 - **Format Decision**: `ANIMATION_FORMAT_DECISION.md` - Rationale for standalone vs Jupyter approaches
 
-### Visualization Features (In Development)
+**Note**: The K3D system is production-ready and should be the primary choice for new visualization work. The matplotlib animation system provides an alternative for environments without WebGL or for specific publication requirements.
+
+### Visualization Features
+
+#### Production-Ready K3D Clipping ✅ 
+**Status**: Complete and fully functional
+- **Interactive 3D Volume Rendering**: WebGL-based visualization with real-time clipping planes
+- **Multiple Clipping Modes**: Spherical and planar clipping for anisotropy analysis  
+- **Browser-based Animation**: Smooth interactive controls and JavaScript animation
+- **Production Quality**: Ready for research publications and presentations
+
+#### In Development
 - **Progressive Slicing Animation**: Animated GIF/MP4 showing 3D data slicing along arbitrary planes
-- **Interactive Volume Rendering**: WebGL-based 3D heatmap with dynamic controls
-- **Dual Implementation**: Standalone formats (primary) + Jupyter widgets (enhancement)
+- **Matplotlib Backend**: Alternative rendering for environments without WebGL
+- **Jupyter Integration**: Native notebook widgets for interactive analysis
+
+### K3D Visualization Quick Start
+
+```python
+from eryx.visualization.volume.k3d import create_clipped_visualization
+import numpy as np
+
+# Load diffuse intensity data 
+data = np.load('torch_diffuse_intensity.npy')
+volume_3d = data.reshape(41, 41, 41)  # Your data: 68921 elements = 41³
+
+# Create interactive visualization
+plot = create_clipped_visualization(
+    volume_3d,
+    bounds=[-2, 2, -2, 2, -2, 2],      # q-space bounds
+    clipping_planes=[[1, 0, 0, 0]],    # qx > 0 half-space
+    color_range_percentile=80,         # Auto-adjust intensity range
+    alpha_coef=15.0                    # Transparency control
+)
+
+# Export interactive HTML
+with open('diffuse_intensity_clipped.html', 'w') as f:
+    f.write(plot.get_snapshot())
+```
+
+#### K3D Clipping Plane Examples
+
+```python
+# Basic clipping planes [nx, ny, nz, d] format
+plot.clipping_planes = [[1, 0, 0, 0]]        # qx > 0 half-space
+plot.clipping_planes = [[0, 0, 1, 0.5]]      # qz > 0.5 plane  
+plot.clipping_planes = [[1, 1, 1, 0]]        # Diagonal cut
+plot.clipping_planes = [[1,0,0,0], [0,1,0,0]] # Multiple planes
+
+# Animated clipping (Python frame sequence)
+for frame in range(30):
+    pos = -2 + 4 * (frame / 29)  # Sweep from -2 to +2
+    plot.clipping_planes = [[1, 0, 0, pos]]
+    with open(f'frame_{frame:02d}.html', 'w') as f:
+        f.write(plot.get_snapshot())
+```
+
+#### Browser Interactive Controls
+
+```javascript
+// In browser console (dev tools):
+plot.set('clipping_planes', [[1, 0, 0, 0.5]]);
+
+// Real-time animation:
+function animateSlice() {
+    let frame = 0;
+    const animate = () => {
+        const pos = -2 + 4 * ((frame % 100) / 99);
+        plot.set('clipping_planes', [[1, 0, 0, pos]]);
+        frame++;
+        requestAnimationFrame(animate);
+    };
+    animate();
+}
+animateSlice();
+```
 
 ### Visualization Module Structure
 ```
@@ -141,11 +220,27 @@ eryx/visualization/
 ├── core/           # Data handling, coordinates, NaN processing
 ├── slicing/        # Plane calculations and animation
 ├── volume/         # 3D rendering backends
+│   ├── k3d_backend.py              # Base k3d renderer
+│   └── k3d/                        # Specialized k3d implementations
+│       ├── k3d_spherical_clipping.py/.ipynb    # Spherical clipping
+│       ├── k3d_interactive_clipping.py/.ipynb  # Interactive controls
+│       ├── final_k3d_clipping_solution.py      # Production implementation
+│       └── FINAL_WORKING_SOLUTION.md           # Complete documentation
 └── interactive/    # Controls and widgets
 ```
+
+### K3D Files and Usage
+
+| File | Purpose | When to Use |
+|------|---------|-------------|
+| `final_k3d_clipping_solution.py` | Production implementation | Main integration into eryx pipeline |
+| `k3d_spherical_clipping.py/.ipynb` | Spherical/radial clipping | Isotropic analysis, powder diffraction |
+| `k3d_interactive_clipping.py/.ipynb` | GUI controls | Interactive exploration, presentations |
+| `FINAL_WORKING_SOLUTION.md` | Complete documentation | Reference, examples, troubleshooting |
 
 ### Testing Visualization Code
 - Use subagents for all testing/debugging tasks
 - Verify against existing visualization functions
 - Test with synthetic data before real datasets
 - Check NaN handling at lattice points
+- **K3D Requirements**: Works in Jupyter, exports to standalone HTML
