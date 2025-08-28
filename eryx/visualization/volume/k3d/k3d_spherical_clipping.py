@@ -12,31 +12,79 @@ import numpy as np
 import k3d
 from scipy.spatial import SphericalVoronoi
 import time
+import os
+from eryx.visualization.core.data_handler import IntensityDataHandler
 
 
 class SphericalClippingController:
     """Controller for spherical clipping of k3d volumes."""
     
-    def __init__(self, data_path='torch_grid_results.npz'):
-        """Initialize the spherical clipping controller."""
-        self.load_data(data_path)
+    def __init__(self, data_source='torch'):
+        """Initialize the spherical clipping controller.
+        
+        Args:
+            data_source: Data source identifier. Can be:
+                        - 'torch': torch_diffuse_intensity.npy or torch_grid_results.npz
+                        - 'np': np_diffuse_intensity.npy or np_results.npz  
+                        - 'arbq': arb_q_diffuse_intensity.npy or torch_arbq_results.npz
+                        - Path to specific file (NPZ or NPY)
+                        - numpy array
+        """
+        self.load_data(data_source)
         self.setup_parameters()
         self.create_plot()
         
-    def load_data(self, data_path):
-        """Load and prepare the data."""
+    def load_data(self, data_source):
+        """Load and prepare the data using DataHandler infrastructure."""
         print("Loading data...")
-        data = np.load(data_path)
-        intensity = data['intensity'].reshape(data['map_shape'])
+        
+        # Use DataHandler to load the data
+        handler = IntensityDataHandler(data_source)
+        q_vectors, intensity, map_shape = handler.load_data()
+        
+        if intensity is None:
+            # Fallback for backward compatibility
+            if isinstance(data_source, str) and os.path.exists(data_source):
+                print("DataHandler failed, falling back to direct NPZ loading...")
+                data = np.load(data_source)
+                if 'intensity' in data and 'map_shape' in data:
+                    intensity = data['intensity']
+                    map_shape = data['map_shape']
+                else:
+                    raise ValueError(f"Could not load data from {data_source}")
+            else:
+                raise ValueError(f"Could not load data from {data_source}")
+        
+        # Reshape if needed
+        if intensity.ndim == 1:
+            if map_shape is not None:
+                intensity = intensity.reshape(map_shape)
+                print(f"Reshaped data using map_shape: {map_shape}")
+            else:
+                # Try to detect cubic shape
+                cube_size = int(round(len(intensity) ** (1/3)))
+                if cube_size ** 3 == len(intensity):
+                    intensity = intensity.reshape(cube_size, cube_size, cube_size)
+                    print(f"Auto-detected cubic shape: {intensity.shape}")
+                else:
+                    raise ValueError(f"Cannot determine 3D shape for {len(intensity)} elements")
         
         # Clean data
         valid = intensity[~np.isnan(intensity)]
-        vmin, vmax = np.percentile(valid, [1, 99])
-        intensity = np.clip(intensity, vmin, vmax)
-        intensity = np.nan_to_num(intensity, nan=vmin)
+        if len(valid) == 0:
+            print("Warning: All values are NaN, using zeros")
+            intensity = np.zeros_like(intensity)
+            vmin, vmax = 0.0, 1.0
+        else:
+            vmin, vmax = np.percentile(valid, [1, 99])
+            intensity = np.clip(intensity, vmin, vmax)
+            intensity = np.nan_to_num(intensity, nan=vmin)
         
         # Normalize and store
-        self.intensity_original = ((intensity - vmin) / (vmax - vmin)).astype(np.float32)
+        if vmax > vmin:
+            self.intensity_original = ((intensity - vmin) / (vmax - vmin)).astype(np.float32)
+        else:
+            self.intensity_original = intensity.astype(np.float32)
         self.intensity = self.intensity_original.copy()
         self.h, self.k, self.l = self.intensity.shape
         
@@ -48,10 +96,19 @@ class SphericalClippingController:
         self.sphere_center = [self.h/2, self.k/2, self.l/2]  # Center of volume
         self.sphere_radius = min(self.h, self.k, self.l) / 4  # Initial radius
         self.clip_inside = True  # True = show inside sphere, False = show outside
-        self.method = 'polyhedron'  # 'polyhedron', 'masking', or 'hybrid'
-        self.polyhedron_resolution = 2  # Subdivision level for polyhedron
+        self.method = 'masking'  # 'masking' (default), 'hybrid', or 'polyhedron' (deprecated)
+        self.polyhedron_resolution = 2  # Subdivision level for polyhedron (kept for backwards compat)
         
-        # Generate polyhedron vertices for approximation
+        # Octant cutting parameters
+        self.octant_cut = False  # Enable octant cutting
+        self.octant_mode = 'first'  # 'first' (x>0, y>0, z>0) or 'custom'
+        self.octant_signs = [1, 1, 1]  # Signs for custom octant selection
+        
+        # Intensity scaling parameters
+        self.log_scale = False  # Enable log scaling for better dynamic range
+        self.log_dynamic_range = 100  # Dynamic range factor for log scaling
+        
+        # Generate polyhedron vertices for approximation (deprecated but kept for compatibility)
         self.generate_polyhedron_planes()
         
     def generate_polyhedron_planes(self):
@@ -120,6 +177,9 @@ class SphericalClippingController:
         # Create sphere guide (initially invisible)
         self.create_sphere_guide()
         
+        # Create octant boundary indicators
+        self.octant_planes = []
+        
     def create_sphere_guide(self):
         """Create a visual sphere guide."""
         # Generate sphere mesh
@@ -180,36 +240,117 @@ class SphericalClippingController:
         
         self.plot.clipping_planes = planes
         
+    def apply_intensity_scaling(self):
+        """Apply log or linear scaling to intensity data.
+        
+        Log scaling helps visualize weak diffuse scattering by compressing
+        the dynamic range of the data. Uses log(1 + x*range) transformation
+        to avoid log(0) issues.
+        """
+        if self.log_scale:
+            # Apply safe log transform with dynamic range control
+            # Using log1p (log(1+x)) to handle zeros gracefully
+            scaled = np.log1p(self.intensity_original * self.log_dynamic_range)
+            max_log = np.log1p(self.log_dynamic_range)
+            self.intensity = (scaled / max_log).astype(np.float32)
+            
+            print(f"Applied log scaling with dynamic range: {self.log_dynamic_range}")
+        else:
+            # Use original linear scaling
+            self.intensity = self.intensity_original.copy()
+        
     def apply_data_masking(self):
-        """Apply spherical clipping by masking the data."""
+        """Apply spherical and/or octant clipping by masking the data."""
+        # Apply intensity scaling first (log or linear)
+        self.apply_intensity_scaling()
+        
         # Create coordinate grids
         x = np.arange(self.h)
         y = np.arange(self.k)
         z = np.arange(self.l)
         X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
         
-        # Calculate distance from center
+        # Apply spherical masking
         dist = np.sqrt(
             (X - self.sphere_center[0])**2 + 
             (Y - self.sphere_center[1])**2 + 
             (Z - self.sphere_center[2])**2
         )
         
-        # Apply masking
-        self.intensity = self.intensity_original.copy()
-        
         if self.clip_inside:
             # Show only inside sphere
-            self.intensity[dist > self.sphere_radius] = 0
+            sphere_mask = dist <= self.sphere_radius
         else:
             # Show only outside sphere
-            self.intensity[dist < self.sphere_radius] = 0
+            sphere_mask = dist >= self.sphere_radius
         
-        # Update volume
-        self.volume.volume = self.intensity
+        # Apply octant masking if enabled
+        if self.octant_cut:
+            octant_mask = self.get_octant_mask(X, Y, Z)
+            # Invert to EXCLUDE the octant instead of keeping only it
+            octant_mask = ~octant_mask  # This excludes the selected octant
+            # Combine masks (intersection - both conditions must be true)
+            final_mask = sphere_mask & octant_mask
+        else:
+            final_mask = sphere_mask
+        
+        # Apply combined mask
+        self.intensity[~final_mask] = 0
+        
+        # Update volume with the masked data
+        # Force update by reassigning (k3d sometimes needs this for proper update)
+        self.volume.volume = self.intensity.astype(np.float32)
+        
+        # Also update color range to match the new data range
+        valid_data = self.intensity[self.intensity > 0]
+        if len(valid_data) > 0:
+            self.volume.color_range = [0, np.max(valid_data)]
         
         # Clear clipping planes when using masking
         self.plot.clipping_planes = []
+        
+        # Debug output
+        if self.octant_cut:
+            print(f"Octant cutting active: {np.sum(final_mask)} voxels visible out of {final_mask.size}")
+    
+    def get_octant_mask(self, X, Y, Z):
+        """Get mask for octant cutting.
+        
+        Args:
+            X, Y, Z: Coordinate grids
+            
+        Returns:
+            Boolean mask for octant selection
+        """
+        if self.octant_mode == 'first':
+            # First octant: x > center, y > center, z > center
+            mask = (X > self.sphere_center[0]) & \
+                   (Y > self.sphere_center[1]) & \
+                   (Z > self.sphere_center[2])
+        elif self.octant_mode == 'custom':
+            # Custom octant based on signs
+            masks = []
+            if self.octant_signs[0] > 0:
+                masks.append(X > self.sphere_center[0])
+            else:
+                masks.append(X <= self.sphere_center[0])
+            
+            if self.octant_signs[1] > 0:
+                masks.append(Y > self.sphere_center[1])
+            else:
+                masks.append(Y <= self.sphere_center[1])
+                
+            if self.octant_signs[2] > 0:
+                masks.append(Z > self.sphere_center[2])
+            else:
+                masks.append(Z <= self.sphere_center[2])
+            
+            mask = masks[0] & masks[1] & masks[2]
+        else:
+            # No octant cutting
+            mask = np.ones_like(X, dtype=bool)
+        
+        return mask
         
     def apply_hybrid_visualization(self):
         """Apply hybrid visualization with sphere guide."""
@@ -262,6 +403,22 @@ class SphericalClippingController:
         if inside is not None:
             self.clip_inside = inside
         self.update_clipping()
+    
+    def set_octant_params(self, enabled=None, mode=None, signs=None):
+        """Set octant cutting parameters.
+        
+        Args:
+            enabled: Boolean to enable/disable octant cutting
+            mode: 'first' for x>0,y>0,z>0 or 'custom' for custom signs
+            signs: List of [x_sign, y_sign, z_sign] for custom mode (1 or -1)
+        """
+        if enabled is not None:
+            self.octant_cut = enabled
+        if mode is not None:
+            self.octant_mode = mode
+        if signs is not None:
+            self.octant_signs = signs
+        self.update_clipping()
         
     def animate_radius(self, min_radius=5, max_radius=None, steps=50, delay=0.05):
         """Animate sphere radius."""
@@ -283,23 +440,23 @@ class SphericalClippingController:
             time.sleep(delay)
             
     def demo(self):
-        """Run a demonstration of spherical clipping."""
+        """Run a demonstration of spherical and octant clipping."""
         print("\n" + "="*60)
-        print("SPHERICAL CLIPPING DEMONSTRATION")
+        print("SPHERICAL & OCTANT CLIPPING DEMONSTRATION")
         print("="*60)
         
         demos = [
-            ("Polyhedron approximation - Inside", 'polyhedron', True),
-            ("Polyhedron approximation - Outside", 'polyhedron', False),
-            ("Data masking - Inside", 'masking', True),
-            ("Data masking - Outside", 'masking', False),
-            ("Hybrid visualization", 'hybrid', True),
+            ("Sphere masking - Inside", 'masking', True, False),
+            ("Sphere masking - Outside", 'masking', False, False),
+            ("Sphere + First octant (x>0, y>0, z>0)", 'masking', True, True),
+            ("Hybrid visualization", 'hybrid', True, False),
         ]
         
-        for name, method, inside in demos:
+        for name, method, inside, octant in demos:
             print(f"\n{name}")
             self.method = method
             self.clip_inside = inside
+            self.octant_cut = octant
             self.sphere_radius = min(self.h, self.k, self.l) / 3
             self.update_clipping()
             time.sleep(2)
@@ -307,6 +464,10 @@ class SphericalClippingController:
             # Animate radius
             self.animate_radius(steps=20, delay=0.03)
             
+        # Reset octant cutting
+        self.octant_cut = False
+        self.update_clipping()
+        
         print("\nDemo complete!")
 
 
@@ -362,20 +523,22 @@ def create_interactive_notebook():
    "metadata": {},
    "outputs": [],
    "source": [
-    "def update_sphere(method, radius, center_x, center_y, center_z, clip_inside, resolution):\\n",
+    "def update_sphere(method, radius, center_x, center_y, center_z, clip_inside, \\n",
+    "                   octant_enabled, octant_x_sign, octant_y_sign, octant_z_sign):\\n",
     "    controller.method = method\\n",
     "    controller.sphere_radius = radius\\n",
     "    controller.sphere_center = [center_x, center_y, center_z]\\n",
     "    controller.clip_inside = clip_inside\\n",
-    "    controller.polyhedron_resolution = resolution\\n",
-    "    if method == 'polyhedron':\\n",
-    "        controller.generate_polyhedron_planes()\\n",
+    "    controller.octant_cut = octant_enabled\\n",
+    "    if octant_enabled:\\n",
+    "        controller.octant_mode = 'custom'\\n",
+    "        controller.octant_signs = [octant_x_sign, octant_y_sign, octant_z_sign]\\n",
     "    controller.update_clipping()\\n",
     "    \\n",
     "interact(update_sphere,\\n",
     "    method=widgets.RadioButtons(\\n",
-    "        options=['polyhedron', 'masking', 'hybrid'],\\n",
-    "        value='polyhedron',\\n",
+    "        options=['masking', 'hybrid'],\\n",
+    "        value='masking',\\n",
     "        description='Method:'\\n",
     "    ),\\n",
     "    radius=widgets.FloatSlider(\\n",
@@ -393,8 +556,17 @@ def create_interactive_notebook():
     "    clip_inside=widgets.Checkbox(\\n",
     "        value=True, description='Show Inside'\\n",
     "    ),\\n",
-    "    resolution=widgets.IntSlider(\\n",
-    "        min=0, max=3, value=2, description='Resolution:'\\n",
+    "    octant_enabled=widgets.Checkbox(\\n",
+    "        value=False, description='Enable Octant'\\n",
+    "    ),\\n",
+    "    octant_x_sign=widgets.RadioButtons(\\n",
+    "        options=[1, -1], value=1, description='X sign:'\\n",
+    "    ),\\n",
+    "    octant_y_sign=widgets.RadioButtons(\\n",
+    "        options=[1, -1], value=1, description='Y sign:'\\n",
+    "    ),\\n",
+    "    octant_z_sign=widgets.RadioButtons(\\n",
+    "        options=[1, -1], value=1, description='Z sign:'\\n",
     "    )\\n",
     ");"
    ]
@@ -459,16 +631,21 @@ if __name__ == "__main__":
         controller.plot.display()
         
         print("\n" + "="*60)
-        print("SPHERICAL CLIPPING CONTROLLER")
+        print("SPHERICAL & OCTANT CLIPPING CONTROLLER")
         print("="*60)
-        print("\nCommands:")
-        print("  r <radius>  - Set sphere radius")
-        print("  c <x> <y> <z> - Set sphere center")
-        print("  i/o        - Toggle inside/outside clipping")
-        print("  m <method> - Set method (polyhedron/masking/hybrid)")
-        print("  a          - Animate radius")
-        print("  d          - Run demo")
-        print("  q          - Quit")
+        print("\nSphere Commands:")
+        print("  r <radius>     - Set sphere radius")
+        print("  c <x> <y> <z>  - Set sphere center")
+        print("  i/o            - Toggle inside/outside sphere")
+        print("\nOctant Commands:")
+        print("  oct            - Toggle first octant (x>0,y>0,z>0)")
+        print("  oct off        - Disable octant cutting")
+        print("  oct <sx sy sz> - Custom octant (signs: 1 or -1)")
+        print("\nOther Commands:")
+        print("  m <method>     - Set method (masking/hybrid)")
+        print("  a              - Animate radius")
+        print("  d              - Run demo")
+        print("  q              - Quit")
         print("="*60)
         
         while True:
@@ -495,10 +672,36 @@ if __name__ == "__main__":
                     controller.clip_inside = False
                     controller.update_clipping()
                     print("Showing outside sphere")
+                elif cmd[0] == 'oct':
+                    if len(cmd) == 1:
+                        # Toggle first octant
+                        controller.octant_cut = not controller.octant_cut
+                        controller.octant_mode = 'first'
+                        controller.update_clipping()
+                        status = "enabled" if controller.octant_cut else "disabled"
+                        print(f"First octant (x>0,y>0,z>0) {status}")
+                    elif len(cmd) == 2 and cmd[1] == 'off':
+                        controller.octant_cut = False
+                        controller.update_clipping()
+                        print("Octant cutting disabled")
+                    elif len(cmd) == 4:
+                        # Custom octant with signs
+                        try:
+                            signs = [int(cmd[1]), int(cmd[2]), int(cmd[3])]
+                            controller.octant_cut = True
+                            controller.octant_mode = 'custom'
+                            controller.octant_signs = signs
+                            controller.update_clipping()
+                            print(f"Custom octant set with signs {signs}")
+                        except ValueError:
+                            print("Invalid signs. Use 1 or -1 for each axis")
                 elif cmd[0] == 'm' and len(cmd) > 1:
-                    controller.method = cmd[1]
-                    controller.update_clipping()
-                    print(f"Method set to {controller.method}")
+                    if cmd[1] in ['masking', 'hybrid']:
+                        controller.method = cmd[1]
+                        controller.update_clipping()
+                        print(f"Method set to {controller.method}")
+                    else:
+                        print("Method must be 'masking' or 'hybrid' (polyhedron is deprecated)")
                 elif cmd[0] == 'a':
                     controller.animate_radius()
                 elif cmd[0] == 'd':

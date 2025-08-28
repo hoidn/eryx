@@ -21,47 +21,132 @@ import k3d
 import numpy as np
 import os
 import time
+from eryx.visualization.core.data_handler import IntensityDataHandler
 
 
-def load_and_clean_data():
-    """Load your diffuse intensity data and handle NaN values."""
+def auto_detect_shape(data):
+    """Auto-detect valid 3D shapes for volume data.
+    
+    Tries:
+    1. Perfect cube (n³)
+    2. Common rectangular grids
+    3. Factorizations that minimize aspect ratio
+    """
+    n_total = len(data)
+    
+    # Try perfect cube first
+    cube_size = int(round(n_total ** (1/3)))
+    if cube_size ** 3 == n_total:
+        return (cube_size, cube_size, cube_size)
+    
+    # Try to find valid 3D factorizations
+    possible_shapes = []
+    max_dim = min(int(n_total ** (1/3)) * 2, 200)  # Reasonable upper bound
+    
+    for a in range(1, max_dim):
+        if n_total % a == 0:
+            remaining = n_total // a
+            for b in range(a, min(int(remaining ** 0.5) + 1, max_dim)):
+                if remaining % b == 0:
+                    c = remaining // b
+                    if b <= c:  # Keep shapes ordered a <= b <= c
+                        possible_shapes.append((a, b, c))
+    
+    if possible_shapes:
+        # Return shape closest to cube (minimize max/min aspect ratio)
+        best_shape = min(possible_shapes, 
+                        key=lambda s: max(s)/min(s) if min(s) > 0 else float('inf'))
+        return best_shape
+    
+    # If no exact factorization, suggest padding to nearest cube
+    cube_size = int(np.ceil(n_total ** (1/3)))
+    print(f"Warning: No exact 3D factorization for {n_total} elements")
+    print(f"Consider padding to {cube_size}³ = {cube_size**3} elements")
+    return None
+
+
+def load_and_clean_data(data_source='torch', target_shape=None):
+    """Load diffuse intensity data using DataHandler infrastructure.
+    
+    Args:
+        data_source: Data source identifier. Can be:
+                     - 'torch': torch_diffuse_intensity.npy or torch_grid_results.npz
+                     - 'np': np_diffuse_intensity.npy or np_results.npz
+                     - 'arbq': arb_q_diffuse_intensity.npy or torch_arbq_results.npz
+                     - Path to specific file (NPZ or NPY)
+                     - numpy array
+        target_shape: Optional tuple (h, k, l) to specify desired shape.
+                     If None, uses shape from NPZ metadata or auto-detection.
+    """
     print("Loading and cleaning diffuse intensity data...")
     
-    # Load your actual data
-    if os.path.exists('torch_diffuse_intensity.npy'):
-        data = np.load('torch_diffuse_intensity.npy')
-        print(f"Loaded: {data.shape}, dtype: {data.dtype}")
+    # Try DataHandler first
+    handler = IntensityDataHandler(data_source)
+    q_vectors, intensity, map_shape = handler.load_data()
+    
+    if intensity is not None:
+        print(f"Loaded via DataHandler: shape={intensity.shape}, dtype={intensity.dtype}")
         
         # Handle NaN values
-        nan_count = np.isnan(data).sum()
+        nan_count = np.isnan(intensity).sum()
         if nan_count > 0:
-            print(f"Warning: Found {nan_count} NaN values ({100*nan_count/len(data):.1f}%)")
+            print(f"Warning: Found {nan_count} NaN values ({100*nan_count/intensity.size:.1f}%)")
             print("Replacing NaN values with zeros...")
-            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+            intensity = np.nan_to_num(intensity, nan=0.0, posinf=0.0, neginf=0.0)
         
         # Ensure positive values for better visualization
-        data = np.maximum(data, 0.0)
+        intensity = np.maximum(intensity, 0.0)
+        print(f"Cleaned data range: [{intensity.min():.6f}, {intensity.max():.6f}]")
         
-        print(f"Cleaned data range: [{data.min():.6f}, {data.max():.6f}]")
-        
-        # Reshape to 3D (41³ = 68921)
-        if len(data) == 68921:
-            volume_data = data.reshape(41, 41, 41)
-            print(f"Reshaped to 3D: {volume_data.shape}")
-        else:
-            print(f"Unexpected data length: {len(data)}")
-            print("Creating fallback cube...")
-            cube_size = int(round(len(data) ** (1/3)))
-            if cube_size ** 3 <= len(data):
-                volume_data = data[:cube_size**3].reshape(cube_size, cube_size, cube_size)
+        # Handle reshaping if needed
+        if intensity.ndim == 1:
+            # Use map_shape from metadata if available
+            if map_shape is not None and target_shape is None:
+                target_shape = map_shape
+                print(f"Using map_shape from metadata: {map_shape}")
+            
+            # If still no shape, try auto-detection
+            if target_shape is None:
+                target_shape = auto_detect_shape(intensity)
+                if target_shape is None:
+                    # Fallback: pad to nearest cube
+                    cube_size = int(np.ceil(len(intensity) ** (1/3)))
+                    target_shape = (cube_size, cube_size, cube_size)
+                    print(f"Padding to cube: {target_shape}")
+                else:
+                    print(f"Auto-detected shape: {target_shape}")
             else:
-                padded = np.pad(data, (0, cube_size**3 - len(data)), 'constant')
-                volume_data = padded.reshape(cube_size, cube_size, cube_size)
+                print(f"Using specified shape: {target_shape}")
+            
+            # Reshape the data
+            target_size = np.prod(target_shape)
+            if target_size == len(intensity):
+                volume_data = intensity.reshape(target_shape)
+                print(f"Reshaped to 3D: {volume_data.shape}")
+            elif target_size > len(intensity):
+                # Pad with zeros
+                padded = np.pad(intensity, (0, target_size - len(intensity)), 'constant')
+                volume_data = padded.reshape(target_shape)
+                print(f"Padded and reshaped to: {volume_data.shape}")
+            else:
+                # Truncate
+                volume_data = intensity[:target_size].reshape(target_shape)
+                print(f"Truncated and reshaped to: {volume_data.shape}")
+        else:
+            # Already 3D
+            volume_data = intensity
+            print(f"Data is already 3D: {volume_data.shape}")
         
         return volume_data.astype(np.float32)
     
+    # Fallback to direct file loading if DataHandler failed
+    elif os.path.exists('torch_diffuse_intensity.npy'):
+        print("DataHandler failed, falling back to direct NPY loading...")
+        data = np.load('torch_diffuse_intensity.npy')
+        return load_and_clean_data(data, target_shape)
+    
     else:
-        print("torch_diffuse_intensity.npy not found, creating simulated data...")
+        print("No data found, creating simulated data...")
         return create_simulated_data()
 
 
@@ -550,16 +635,20 @@ Generated: {timestamp}
     print("📚 Created comprehensive documentation: FINAL_K3D_SOLUTION_DOCS.md")
 
 
-def main():
-    """Main function - complete production solution."""
+def main(data_source='torch'):
+    """Main function - complete production solution.
+    
+    Args:
+        data_source: Data source identifier ('torch', 'np', 'arbq', or file path)
+    """
     print("🎯 K3D CLIPPING PLANES - FINAL PRODUCTION SOLUTION")
     print("=" * 60)
     print("Creating complete, tested solution for your diffuse intensity data...")
     print()
     
     try:
-        # Load and prepare data
-        volume_data = load_and_clean_data()
+        # Load and prepare data using DataHandler infrastructure
+        volume_data = load_and_clean_data(data_source)
         print(f"✅ Data ready: {volume_data.shape}, range [{volume_data.min():.4f}, {volume_data.max():.4f}]")
         
         # Create base visualization
@@ -606,7 +695,10 @@ def main():
 
 
 if __name__ == "__main__":
-    success = main()
+    import sys
+    # Check if data source argument provided
+    data_source = sys.argv[1] if len(sys.argv) > 1 else 'torch'
+    success = main(data_source)
     if success:
         print("\n🎊 SUCCESS: K3D clipping planes are ready for your research! 🎊")
     else:

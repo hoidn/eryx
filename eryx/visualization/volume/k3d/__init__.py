@@ -48,5 +48,7 @@ __all__ = ['K3D_AVAILABLE']
 
 if K3D_AVAILABLE:
     # Import main functions when k3d is available
-    from .final_k3d_clipping_solution import create_clipped_visualization
-    __all__.extend(['create_clipped_visualization'])
+    from .final_k3d_clipping_solution import create_production_visualization
+    # Also create an alias for backwards compatibility
+    create_clipped_visualization = create_production_visualization
+    __all__.extend(['create_production_visualization', 'create_clipped_visualization'])
