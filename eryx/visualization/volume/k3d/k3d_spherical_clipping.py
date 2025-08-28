@@ -38,9 +38,16 @@ class SphericalClippingController:
         """Load and prepare the data using DataHandler infrastructure."""
         print("Loading data...")
         
-        # Use DataHandler to load the data
-        handler = IntensityDataHandler(data_source)
-        q_vectors, intensity, map_shape = handler.load_data()
+        # Handle numpy arrays directly
+        if isinstance(data_source, np.ndarray):
+            print("Using provided numpy array directly")
+            intensity = data_source
+            q_vectors = None
+            map_shape = data_source.shape if data_source.ndim == 3 else None
+        else:
+            # Use DataHandler to load the data
+            handler = IntensityDataHandler(data_source)
+            q_vectors, intensity, map_shape = handler.load_data()
         
         if intensity is None:
             # Fallback for backward compatibility
@@ -107,6 +114,11 @@ class SphericalClippingController:
         # Intensity scaling parameters
         self.log_scale = False  # Enable log scaling for better dynamic range
         self.log_dynamic_range = 100  # Dynamic range factor for log scaling
+        
+        # Camera state management
+        self.camera_initial = None  # Will store initial camera position
+        self.is_animating = False  # Track animation state
+        self.animation_type = None  # Current animation type
         
         # Generate polyhedron vertices for approximation (deprecated but kept for compatibility)
         self.generate_polyhedron_planes()
@@ -180,6 +192,657 @@ class SphericalClippingController:
         # Create octant boundary indicators
         self.octant_planes = []
         
+    # ========== COORDINATE SYSTEM UTILITIES ==========
+    
+    def voxel_to_world(self, voxel_coord):
+        """Convert voxel coordinates to world space.
+        
+        Args:
+            voxel_coord: [x, y, z] in voxel indices
+            
+        Returns:
+            [x, y, z] in world space coordinates
+        """
+        bounds = self.volume.transform.bounds  # [xmin, xmax, ymin, ymax, zmin, zmax]
+        
+        x = bounds[0] + (voxel_coord[0] / self.h) * (bounds[1] - bounds[0])
+        y = bounds[2] + (voxel_coord[1] / self.k) * (bounds[3] - bounds[2])
+        z = bounds[4] + (voxel_coord[2] / self.l) * (bounds[5] - bounds[4])
+        
+        return [x, y, z]
+    
+    def get_world_sphere_center(self):
+        """Get sphere center in world coordinates.
+        
+        Returns:
+            [x, y, z] world coordinates of sphere center
+        """
+        return self.voxel_to_world(self.sphere_center)
+    
+    def get_world_bounds(self):
+        """Get the world space bounds of the volume.
+        
+        Returns:
+            [xmin, xmax, ymin, ymax, zmin, zmax] in world space
+        """
+        return self.volume.transform.bounds
+    
+    def get_optimal_camera_distance(self, fov_degrees=30, scale_factor=2.5):
+        """Calculate optimal camera distance based on data bounds.
+        
+        Args:
+            fov_degrees: Field of view in degrees
+            scale_factor: Multiplier for distance (higher = farther)
+            
+        Returns:
+            Optimal camera distance from center
+        """
+        bounds = self.get_world_bounds()
+        
+        # Find maximum dimension
+        max_dim = max(
+            bounds[1] - bounds[0],  # x size
+            bounds[3] - bounds[2],  # y size
+            bounds[5] - bounds[4]   # z size
+        )
+        
+        # Calculate distance using FOV
+        import math
+        fov_rad = math.radians(fov_degrees)
+        distance = (max_dim / 2) / math.tan(fov_rad / 2)
+        
+        return distance * scale_factor
+    
+    # ========== CAMERA STATE MANAGEMENT ==========
+    
+    def store_initial_camera(self):
+        """Store the initial camera position for later reset."""
+        if self.plot and hasattr(self.plot, 'camera'):
+            self.camera_initial = list(self.plot.camera)
+            
+    def reset_camera(self):
+        """Reset camera to initial position."""
+        if self.camera_initial:
+            self.plot.camera = self.camera_initial
+            self.is_animating = False
+            self.animation_type = None
+            
+    def get_default_camera(self, elevation=30, azimuth=45):
+        """Calculate default camera position.
+        
+        Args:
+            elevation: Vertical angle in degrees (0=horizon, 90=top)
+            azimuth: Horizontal angle in degrees
+            
+        Returns:
+            Camera array [pos_x, pos_y, pos_z, target_x, target_y, target_z, up_x, up_y, up_z]
+        """
+        import math
+        
+        center = self.get_world_sphere_center()
+        distance = self.get_optimal_camera_distance()
+        
+        # Convert angles to radians
+        elev_rad = math.radians(elevation)
+        azim_rad = math.radians(azimuth)
+        
+        # Calculate camera position
+        x = distance * math.cos(elev_rad) * math.cos(azim_rad)
+        y = distance * math.cos(elev_rad) * math.sin(azim_rad)
+        z = distance * math.sin(elev_rad)
+        
+        # Camera array format
+        camera = [
+            x + center[0], y + center[1], z + center[2],  # Position
+            center[0], center[1], center[2],              # Target
+            0, 0, 1                                       # Up vector
+        ]
+        
+        return camera
+    
+    # ========== CAMERA ANIMATIONS ==========
+    
+    def add_orbital_camera(self, duration=6.0, radius_factor=2.5, elevation=45, num_frames=60):
+        """Add smooth orbital camera animation around sphere center.
+        
+        Args:
+            duration: Animation duration in seconds
+            radius_factor: Distance multiplier from optimal distance
+            elevation: Vertical angle in degrees (0-90)
+            num_frames: Number of keyframes to generate
+        """
+        import math
+        
+        world_center = self.get_world_sphere_center()
+        distance = self.get_optimal_camera_distance(scale_factor=radius_factor)
+        
+        # Generate orbital path
+        frames = []
+        for i in range(num_frames + 1):  # +1 to close loop
+            t = duration * i / num_frames
+            theta = 2 * math.pi * i / num_frames
+            phi = math.radians(elevation)
+            
+            # Spherical to Cartesian
+            x = distance * math.sin(phi) * math.cos(theta)
+            y = distance * math.sin(phi) * math.sin(theta)
+            z = distance * math.cos(phi)
+            
+            camera = [
+                x + world_center[0], y + world_center[1], z + world_center[2],  # Position
+                world_center[0], world_center[1], world_center[2],              # Target
+                0, 0, 1                                                         # Up vector
+            ]
+            frames.append([t, camera])
+        
+        self.plot.camera_animation = frames
+        self.is_animating = True
+        self.animation_type = 'orbital'
+        self.plot.start_auto_play()
+    
+    def add_zoom_animation(self, start_distance=None, end_distance=None, duration=4.0, 
+                          elevation=30, azimuth=45, num_frames=50):
+        """Create smooth zoom in/out animation.
+        
+        Args:
+            start_distance: Starting distance (None = current)
+            end_distance: Ending distance (None = optimal)
+            duration: Animation duration in seconds
+            elevation: Camera elevation angle
+            azimuth: Camera azimuth angle
+            num_frames: Number of keyframes
+        """
+        import math
+        
+        world_center = self.get_world_sphere_center()
+        
+        if start_distance is None:
+            start_distance = self.get_optimal_camera_distance(scale_factor=3.0)
+        if end_distance is None:
+            end_distance = self.get_optimal_camera_distance(scale_factor=1.0)
+        
+        # Convert angles to radians
+        elev_rad = math.radians(elevation)
+        azim_rad = math.radians(azimuth)
+        
+        # Generate zoom path
+        frames = []
+        for i in range(num_frames):
+            t = duration * i / (num_frames - 1)
+            progress = i / (num_frames - 1)
+            
+            # Smooth interpolation (ease-in-out)
+            smooth_progress = 0.5 * (1 - math.cos(math.pi * progress))
+            distance = start_distance + (end_distance - start_distance) * smooth_progress
+            
+            # Optional rotation during zoom
+            theta = azim_rad + math.pi * progress / 6  # Slight rotation
+            
+            x = distance * math.cos(elev_rad) * math.cos(theta)
+            y = distance * math.cos(elev_rad) * math.sin(theta)
+            z = distance * math.sin(elev_rad)
+            
+            camera = [
+                x + world_center[0], y + world_center[1], z + world_center[2],
+                world_center[0], world_center[1], world_center[2],
+                0, 0, 1
+            ]
+            frames.append([t, camera])
+        
+        self.plot.camera_animation = frames
+        self.is_animating = True
+        self.animation_type = 'zoom'
+        self.plot.start_auto_play()
+    
+    def set_preset_view(self, view_name='isometric', transition_duration=1.0):
+        """Set camera to a preset viewpoint with smooth transition.
+        
+        Args:
+            view_name: Preset name ('front', 'back', 'left', 'right', 'top', 'bottom', 'isometric')
+            transition_duration: Time to transition to new view
+        """
+        import math
+        
+        world_center = self.get_world_sphere_center()
+        distance = self.get_optimal_camera_distance()
+        
+        # Define preset views (azimuth, elevation)
+        presets = {
+            'front': (0, 0),
+            'back': (180, 0),
+            'left': (-90, 0),
+            'right': (90, 0),
+            'top': (0, 90),
+            'bottom': (0, -90),
+            'isometric': (45, 35.264),  # Classic isometric angle
+            'optimal': (45, 30)
+        }
+        
+        if view_name not in presets:
+            view_name = 'isometric'
+        
+        azimuth, elevation = presets[view_name]
+        azim_rad = math.radians(azimuth)
+        elev_rad = math.radians(elevation)
+        
+        # Calculate camera position
+        x = distance * math.cos(elev_rad) * math.cos(azim_rad)
+        y = distance * math.cos(elev_rad) * math.sin(azim_rad)
+        z = distance * math.sin(elev_rad)
+        
+        target_camera = [
+            x + world_center[0], y + world_center[1], z + world_center[2],
+            world_center[0], world_center[1], world_center[2],
+            0, 0, 1
+        ]
+        
+        if transition_duration > 0 and hasattr(self.plot, 'camera') and self.plot.camera is not None:
+            # Smooth transition from current to target
+            current_camera = list(self.plot.camera)
+            
+            # Ensure current camera has correct length
+            if len(current_camera) != 9:
+                # If camera not properly initialized, use default
+                current_camera = self.get_default_camera()
+                
+            frames = []
+            
+            for i in range(20):
+                t = transition_duration * i / 19
+                progress = i / 19
+                smooth_progress = 0.5 * (1 - math.cos(math.pi * progress))
+                
+                # Interpolate each camera component
+                camera = []
+                for j in range(9):
+                    val = current_camera[j] + (target_camera[j] - current_camera[j]) * smooth_progress
+                    camera.append(val)
+                
+                frames.append([t, camera])
+            
+            self.plot.camera_animation = frames
+            self.plot.start_auto_play()
+        else:
+            # Instant transition
+            self.plot.camera = target_camera
+    
+    # ========== SYNCHRONIZED ANIMATIONS ==========
+    
+    def create_zoom_reveal_animation(self, duration=5.0, final_radius_ratio=0.2, num_frames=50):
+        """Zoom in while shrinking sphere to reveal internal structure.
+        
+        Args:
+            duration: Total animation duration in seconds
+            final_radius_ratio: Final sphere radius as ratio of initial (0.2 = 20%)
+            num_frames: Number of animation frames
+        """
+        import threading
+        import time
+        import math
+        
+        world_center = self.get_world_sphere_center()
+        
+        # Camera animation (automatic via time series)
+        camera_frames = []
+        for i in range(num_frames):
+            t = duration * i / (num_frames - 1)
+            progress = i / (num_frames - 1)
+            
+            # Smooth progress (ease-in-out)
+            smooth_progress = 0.5 * (1 - math.cos(math.pi * progress))
+            
+            # Zoom from far to close
+            distance = self.get_optimal_camera_distance(scale_factor=3.0 - 2.0 * smooth_progress)
+            theta = math.pi * progress / 3  # Slight rotation during zoom
+            elevation = math.radians(30 + 15 * smooth_progress)  # Rise slightly
+            
+            x = distance * math.cos(elevation) * math.cos(theta)
+            y = distance * math.cos(elevation) * math.sin(theta)
+            z = distance * math.sin(elevation)
+            
+            camera = [
+                x + world_center[0], y + world_center[1], z + world_center[2],
+                world_center[0], world_center[1], world_center[2],
+                0, 0, 1
+            ]
+            camera_frames.append([t, camera])
+        
+        self.plot.camera_animation = camera_frames
+        
+        # Sphere animation (manual in separate thread)
+        original_radius = self.sphere_radius
+        
+        def animate_sphere():
+            for i in range(num_frames):
+                progress = i / (num_frames - 1)
+                smooth_progress = 0.5 * (1 - math.cos(math.pi * progress))
+                
+                self.sphere_radius = original_radius * (1 - (1 - final_radius_ratio) * smooth_progress)
+                self.update_clipping()
+                time.sleep(duration / num_frames)
+            
+            # Reset after animation
+            self.sphere_radius = original_radius
+            self.update_clipping()
+        
+        # Start both animations
+        self.is_animating = True
+        self.animation_type = 'zoom_reveal'
+        self.plot.start_auto_play()
+        threading.Thread(target=animate_sphere, daemon=True).start()
+    
+    def create_octant_inspection_animation(self, duration=8.0, pause_per_octant=0.5):
+        """Camera tour visiting each octant for comprehensive inspection.
+        
+        Args:
+            duration: Total animation duration
+            pause_per_octant: Pause time at each octant view
+        """
+        import math
+        
+        world_center = self.get_world_sphere_center()
+        radius = self.get_optimal_camera_distance(scale_factor=2.0)
+        
+        frames = []
+        octant_views = []
+        
+        # Generate octant viewing positions
+        for x_sign in [1, -1]:
+            for y_sign in [1, -1]:
+                for z_sign in [1, -1]:
+                    # Position camera in each octant
+                    theta = math.atan2(y_sign, x_sign)
+                    phi = math.acos(z_sign / math.sqrt(3))
+                    
+                    x = radius * math.sin(phi) * math.cos(theta)
+                    y = radius * math.sin(phi) * math.sin(theta)
+                    z = radius * math.cos(phi)
+                    
+                    octant_views.append([x, y, z])
+        
+        # Create smooth path through octant views
+        time_per_octant = duration / len(octant_views)
+        
+        for i, pos in enumerate(octant_views):
+            # Add transition to octant
+            for j in range(10):
+                t = i * time_per_octant + (time_per_octant - pause_per_octant) * j / 9
+                
+                if i == 0 and j == 0:
+                    # Start from current position
+                    camera = [
+                        pos[0] + world_center[0],
+                        pos[1] + world_center[1],
+                        pos[2] + world_center[2],
+                        world_center[0], world_center[1], world_center[2],
+                        0, 0, 1
+                    ]
+                else:
+                    # Interpolate to next position
+                    prev_pos = octant_views[i-1] if j == 0 else pos
+                    progress = j / 9
+                    
+                    x = prev_pos[0] + (pos[0] - prev_pos[0]) * progress
+                    y = prev_pos[1] + (pos[1] - prev_pos[1]) * progress
+                    z = prev_pos[2] + (pos[2] - prev_pos[2]) * progress
+                    
+                    camera = [
+                        x + world_center[0],
+                        y + world_center[1],
+                        z + world_center[2],
+                        world_center[0], world_center[1], world_center[2],
+                        0, 0, 1
+                    ]
+                
+                frames.append([t, camera])
+            
+            # Optional: Sync octant exclusion with camera position
+            if self.octant_cut:
+                import threading
+                import time
+                
+                def update_octant():
+                    time.sleep(t)
+                    self.octant_signs = [
+                        1 if pos[0] > 0 else -1,
+                        1 if pos[1] > 0 else -1,
+                        1 if pos[2] > 0 else -1
+                    ]
+                    self.update_clipping()
+                
+                threading.Thread(target=update_octant, daemon=True).start()
+        
+        self.plot.camera_animation = frames
+        self.is_animating = True
+        self.animation_type = 'octant_tour'
+        self.plot.start_auto_play()
+    
+    def add_anisotropy_showcase_animation(self, duration=10.0, elevations=None, 
+                                         points_per_elevation=20):
+        """Multi-elevation orbital animation to highlight anisotropic features.
+        
+        Args:
+            duration: Total animation duration
+            elevations: List of elevation angles in degrees (None = default sequence)
+            points_per_elevation: Number of orbital points at each elevation
+        """
+        import math
+        
+        if elevations is None:
+            elevations = [15, 30, 45, 60, 75, 60, 45, 30, 15]  # Up and down sweep
+        
+        world_center = self.get_world_sphere_center()
+        base_radius = self.get_optimal_camera_distance(scale_factor=2.0)
+        
+        frames = []
+        t = 0
+        time_increment = duration / (len(elevations) * points_per_elevation)
+        
+        for elevation in elevations:
+            phi = math.radians(elevation)
+            
+            for i in range(points_per_elevation):
+                theta = 2 * math.pi * i / points_per_elevation
+                
+                # Variable radius for visual interest
+                radius = base_radius * (1 + 0.2 * math.sin(theta * 2))
+                
+                x = radius * math.sin(phi) * math.cos(theta)
+                y = radius * math.sin(phi) * math.sin(theta)
+                z = radius * math.cos(phi)
+                
+                camera = [
+                    x + world_center[0], y + world_center[1], z + world_center[2],
+                    world_center[0], world_center[1], world_center[2],
+                    0, 0, 1
+                ]
+                frames.append([t, camera])
+                t += time_increment
+        
+        self.plot.camera_animation = frames
+        self.is_animating = True
+        self.animation_type = 'anisotropy_showcase'
+        self.plot.start_auto_play()
+    
+    def stop_animation(self):
+        """Stop any running animation and clear animation state."""
+        if hasattr(self.plot, 'stop_auto_play'):
+            self.plot.stop_auto_play()
+        self.is_animating = False
+        self.animation_type = None
+    
+    # ========== SYNCHRONIZED ANIMATIONS ==========
+    
+    def create_zoom_reveal_animation(self, duration=5.0, final_radius_factor=0.2):
+        """Zoom in while shrinking sphere to reveal internal structure.
+        
+        Args:
+            duration: Total animation duration in seconds
+            final_radius_factor: Final sphere radius as fraction of initial
+        """
+        import threading
+        import time
+        import math
+        
+        world_center = self.get_world_sphere_center()
+        steps = 50
+        
+        # Camera animation (zoom in)
+        camera_frames = []
+        start_distance = self.get_optimal_camera_distance(scale_factor=3.0)
+        end_distance = self.get_optimal_camera_distance(scale_factor=1.0)
+        
+        for i in range(steps):
+            t = duration * i / (steps - 1)
+            progress = i / (steps - 1)
+            smooth_progress = 0.5 * (1 - math.cos(math.pi * progress))
+            
+            # Camera zooms in
+            distance = start_distance + (end_distance - start_distance) * smooth_progress
+            theta = math.pi * progress / 6  # Slight rotation
+            
+            x = distance * math.cos(theta)
+            y = distance * math.sin(theta)
+            z = distance * 0.5  # Elevated view
+            
+            camera = [
+                x + world_center[0], y + world_center[1], z + world_center[2],
+                world_center[0], world_center[1], world_center[2],
+                0, 0, 1
+            ]
+            camera_frames.append([t, camera])
+        
+        self.plot.camera_animation = camera_frames
+        
+        # Sphere animation (shrink in parallel)
+        original_radius = self.sphere_radius
+        
+        def animate_sphere():
+            for i in range(steps):
+                progress = i / (steps - 1)
+                self.sphere_radius = original_radius * (1 - (1 - final_radius_factor) * progress)
+                self.update_clipping()
+                time.sleep(duration / steps)
+            # Optionally restore
+            # self.sphere_radius = original_radius
+        
+        # Start both animations
+        self.plot.start_auto_play()
+        self.is_animating = True
+        self.animation_type = 'zoom_reveal'
+        threading.Thread(target=animate_sphere).start()
+    
+    def create_octant_inspection_animation(self, duration=8.0, pause_duration=0.5):
+        """Camera tours each octant for comprehensive inspection.
+        
+        Args:
+            duration: Total animation duration
+            pause_duration: Pause at each octant position
+        """
+        import math
+        
+        world_center = self.get_world_sphere_center()
+        distance = self.get_optimal_camera_distance(scale_factor=2.0)
+        
+        frames = []
+        
+        # Visit each octant's optimal viewing angle
+        octant_positions = []
+        for x_sign in [1, -1]:
+            for y_sign in [1, -1]:
+                for z_sign in [1, -1]:
+                    # Calculate viewing angle for this octant
+                    theta = math.atan2(y_sign, x_sign)
+                    phi = math.acos(z_sign / math.sqrt(3))
+                    
+                    x = distance * math.sin(phi) * math.cos(theta)
+                    y = distance * math.sin(phi) * math.sin(theta)
+                    z = distance * math.cos(phi)
+                    
+                    octant_positions.append([x, y, z])
+        
+        # Create smooth path through octant views
+        time_per_octant = duration / len(octant_positions)
+        current_time = 0
+        
+        for i, pos in enumerate(octant_positions):
+            camera = [
+                pos[0] + world_center[0],
+                pos[1] + world_center[1],
+                pos[2] + world_center[2],
+                world_center[0], world_center[1], world_center[2],
+                0, 0, 1
+            ]
+            
+            # Add keyframe
+            frames.append([current_time, camera])
+            
+            # Add pause frame (same position, later time)
+            if pause_duration > 0:
+                current_time += pause_duration
+                frames.append([current_time, camera])
+            
+            current_time += time_per_octant - pause_duration
+            
+            # Optionally sync octant exclusion
+            if self.octant_cut:
+                # This would need to be in a separate thread
+                # self.octant_signs = [1 if pos[j] > 0 else -1 for j in range(3)]
+                # self.update_clipping()
+                pass
+        
+        self.plot.camera_animation = frames
+        self.is_animating = True
+        self.animation_type = 'octant_tour'
+        self.plot.start_auto_play()
+    
+    def add_anisotropy_showcase_animation(self, duration=10.0):
+        """Multi-elevation orbital animation to highlight anisotropic features.
+        
+        Args:
+            duration: Total animation duration
+        """
+        import math
+        
+        world_center = self.get_world_sphere_center()
+        base_distance = self.get_optimal_camera_distance(scale_factor=2.5)
+        
+        frames = []
+        
+        # Multiple elevation levels to showcase
+        elevations = [30, 60, 90, 60, 30]  # degrees
+        points_per_elevation = 20
+        
+        t = 0
+        time_per_point = duration / (len(elevations) * points_per_elevation)
+        
+        for elevation in elevations:
+            phi = math.radians(elevation)
+            
+            for i in range(points_per_elevation):
+                theta = 2 * math.pi * i / points_per_elevation
+                
+                # Variable radius for visual interest
+                radius = base_distance * (1 + 0.2 * math.sin(theta * 2))
+                
+                x = radius * math.sin(phi) * math.cos(theta)
+                y = radius * math.sin(phi) * math.sin(theta)
+                z = radius * math.cos(phi)
+                
+                camera = [
+                    x + world_center[0], y + world_center[1], z + world_center[2],
+                    world_center[0], world_center[1], world_center[2],
+                    0, 0, 1
+                ]
+                
+                frames.append([t, camera])
+                t += time_per_point
+        
+        self.plot.camera_animation = frames
+        self.is_animating = True
+        self.animation_type = 'anisotropy'
+        self.plot.start_auto_play()
+    
     def create_sphere_guide(self):
         """Create a visual sphere guide."""
         # Generate sphere mesh
