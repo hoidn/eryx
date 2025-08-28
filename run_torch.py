@@ -36,10 +36,11 @@ def run_torch(device=None):
         logging.info(f"Starting PyTorch branch computation on {device}")
         
         # Use the same parameters as in run_np
-        pdb_path = "tests/pdbs/5zck_p1.pdb"
+        #pdb_path = "tests/pdbs/5zck_p1.pdb"
+        pdb_path = "tests/pdbs/6o2h_clean.pdb"
         onephonon_torch = OnePhonon(
             pdb_path,
-            [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
+            [-5, 5, 8], [-5, 5, 8], [-5, 5, 8],
             expand_p1=True,
             res_limit=0.0,
             gnm_cutoff=4.0,
