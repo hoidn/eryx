@@ -125,6 +125,117 @@ intensity = model_torch.apply_disorder()
 
 ## Visualization Development
 
+### 🚨 CRITICAL: JavaScript Integration Patterns for K3D
+
+Before working with K3D visualizations, you MUST understand these patterns to avoid common pitfalls:
+
+#### JavaScript Execution Context Rules
+
+**Rule 1: Functions must be globally accessible for HTML onclick**
+```javascript
+// ❌ WRONG - Function not accessible from HTML onclick
+function myFunction() { }
+
+// ✅ CORRECT - Attached to window for global access
+window.myFunction = function() { }
+```
+
+**Rule 2: K3DInstance is a Promise, not the plot object**
+```javascript
+// ❌ WRONG - Direct property access
+K3DInstance.camera = [1, 2, 3, 0, 0, 0, 0, 1, 0];
+
+// ✅ CORRECT - Await the Promise first
+async function updateCamera() {
+    const plot = await window.K3DInstance;
+    plot.setCamera([1, 2, 3, 0, 0, 0, 0, 1, 0]);
+    plot.render();  // Always call render() after changes!
+}
+```
+
+**Rule 3: Use K3D setter methods, not direct assignment**
+```javascript
+// ❌ WRONG - These patterns don't work
+plot.parameters.camera = [...];
+plot.camera = [...];
+
+// ✅ CORRECT - Use official API methods
+plot.setCamera([...]);
+plot.setClippingPlanes([...]);
+plot.render();  // Required after any changes
+```
+
+**Rule 4: HTML exports have different structure than Python K3D**
+```javascript
+// ❌ WRONG - plot.objects doesn't exist in HTML exports
+const volumes = plot.objects.filter(obj => obj.type === 'Volume');
+
+// ✅ CORRECT - Use getWorld() to access objects
+const world = plot.getWorld();
+const volumeConfig = world.ObjectsListJson[volumeId];
+const volumeData = volumeConfig.volume.data;
+```
+
+#### 📚 Complete API Reference
+**See [`docs/visualization/k3d/api/HTML_JAVASCRIPT_API.md`](./docs/visualization/k3d/api/HTML_JAVASCRIPT_API.md) for:**
+- Full K3D HTML export object structure
+- Volume data access patterns
+- Performance optimization (avoid 60+ clipping planes!)
+- Debugging techniques and console commands
+- Working code examples with K3DVolumeMasker class
+
+#### Safe K3D Access Pattern (use this template)
+```javascript
+async function safeK3DOperation() {
+    let plot;
+    
+    // Handle different K3D exposure methods
+    if (window.K3DInstance) {
+        if (window.K3DInstance instanceof Promise) {
+            plot = await window.K3DInstance;
+        } else {
+            plot = window.K3DInstance;
+        }
+    } else if (window.k3d) {
+        plot = window.k3d;
+    } else {
+        console.error('No K3D instance found');
+        return;
+    }
+    
+    // Now safe to use plot
+    plot.setCamera([...]);
+    plot.render();
+}
+
+// Make globally accessible
+window.safeK3DOperation = safeK3DOperation;
+```
+
+#### Testing JavaScript Before Integration
+
+**The 5-Minute Test Pattern:**
+1. Open browser console in your K3D visualization
+2. Test your JavaScript manually:
+   ```javascript
+   // Check what you're working with
+   console.log('Is Promise?', K3DInstance instanceof Promise);
+   
+   // Test your operation
+   const plot = await K3DInstance;
+   plot.setCamera([5,5,5,0,0,0,0,1,0]);
+   plot.render();
+   
+   // Did it work visually? If not, debug here first!
+   ```
+3. Only after console testing works, integrate into Python
+
+**📚 For detailed patterns and examples**: See [`docs/visualization/k3d/api/JAVASCRIPT_PATTERNS.md`](./docs/visualization/k3d/api/JAVASCRIPT_PATTERNS.md) for battle-tested solutions including:
+- Animation state management patterns
+- Debug wrapper implementations  
+- HTML generation testing framework
+- Common error messages and fixes
+
 ### Planning Documents
 
 #### K3D Production System (Complete) ✅

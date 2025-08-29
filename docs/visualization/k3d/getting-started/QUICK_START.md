@@ -227,6 +227,17 @@ You now have a **production-ready 3D visualization system** with animated clippi
 
 ---
 
+## Troubleshooting & Advanced Topics
+
+### JavaScript Debugging
+- **Patterns & Examples**: See [`JAVASCRIPT_PATTERNS.md`](../api/JAVASCRIPT_PATTERNS.md) for battle-tested JavaScript patterns
+- **Technical API Reference**: See [`HTML_JAVASCRIPT_API.md`](../api/HTML_JAVASCRIPT_API.md) for HTML export structure details
+- **Performance Issues**: If animations are slow, check the API reference for optimization guidelines (avoid 60+ clipping planes!)
+
+### Project Integration
+- **Eryx Integration**: See [`CLAUDE.md`](../../../../CLAUDE.md) for project-specific patterns
+- **Module Architecture**: See [`README.md`](../../../../eryx/visualization/README.md) for visualization module structure
+
 ## 🎊 CONCLUSION: SUCCESS! 🎊
 
 Your k3d clipping planes are **fully functional and ready for research use**. The comprehensive testing has created a robust, documented solution that handles your specific data format and provides multiple working animation approaches.
