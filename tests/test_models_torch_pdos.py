@@ -591,6 +591,92 @@ class TestPDOSNumericalAccuracy:
         )
 
 
+class TestGetFrequenciesTHz:
+    """Test suite for the get_frequencies_thz method."""
+    
+    def test_get_frequencies_thz_unit_conversion(self):
+        """Test that get_frequencies_thz correctly converts Winv to THz."""
+        # Create a mock OnePhonon instance with known Winv values
+        model = type('MockModel', (), {})()
+        
+        # Set up a known Winv tensor where we know the expected frequency
+        # If Winv = 1/(ω²) and we want freq = 1.0 THz, then:
+        # ω = 2π × 10¹² rad/s (for 1 THz)
+        # ω² = (2π × 10¹²)²
+        # Winv = 1/ω² = 1/(2π × 10¹²)²
+        omega_for_1thz = 2 * np.pi * 1e12  # rad/s for 1 THz
+        winv_for_1thz = 1.0 / (omega_for_1thz ** 2)
+        
+        # Create a tensor with multiple known values
+        model.Winv = torch.tensor([
+            [winv_for_1thz, winv_for_1thz * 4],  # 1 THz, 0.5 THz
+            [winv_for_1thz / 4, winv_for_1thz / 9]  # 2 THz, 3 THz
+        ], dtype=torch.float64)
+        
+        # Bind the method to our mock model
+        from eryx.models_torch import OnePhonon
+        model.get_frequencies_thz = OnePhonon.get_frequencies_thz.__get__(model)
+        
+        # Call the method
+        frequencies = model.get_frequencies_thz()
+        
+        # Expected frequencies in THz
+        expected_freqs = np.array([1.0, 0.5, 2.0, 3.0])
+        
+        # Sort both arrays for comparison (order doesn't matter)
+        frequencies_sorted = np.sort(frequencies)
+        expected_sorted = np.sort(expected_freqs)
+        
+        # Check that the conversion is correct within numerical tolerance
+        np.testing.assert_allclose(
+            frequencies_sorted, 
+            expected_sorted, 
+            rtol=1e-10,
+            atol=1e-12,
+            err_msg="Frequency conversion from Winv to THz is incorrect"
+        )
+    
+    def test_get_frequencies_thz_filters_nan(self):
+        """Test that get_frequencies_thz correctly filters out NaN values."""
+        model = type('MockModel', (), {})()
+        
+        # Create Winv with some problematic values
+        model.Winv = torch.tensor([
+            [1e-20, -1.0],  # First will give huge freq, second is negative (invalid)
+            [0.0, 1e-15]     # Zero will give inf, last is valid
+        ], dtype=torch.float64)
+        
+        # Bind the method
+        from eryx.models_torch import OnePhonon
+        model.get_frequencies_thz = OnePhonon.get_frequencies_thz.__get__(model)
+        
+        # Call the method
+        frequencies = model.get_frequencies_thz()
+        
+        # Check that all returned values are finite
+        assert np.all(np.isfinite(frequencies)), "Method should filter out NaN/inf values"
+        
+        # Should have at least some valid frequencies
+        assert len(frequencies) > 0, "Should return at least some valid frequencies"
+    
+    def test_get_frequencies_thz_error_without_winv(self):
+        """Test that get_frequencies_thz raises error when Winv is not computed."""
+        model = type('MockModel', (), {})()
+        
+        # Bind the method without setting Winv
+        from eryx.models_torch import OnePhonon
+        model.get_frequencies_thz = OnePhonon.get_frequencies_thz.__get__(model)
+        
+        # Should raise RuntimeError
+        with pytest.raises(RuntimeError, match="Phonon modes must be computed"):
+            model.get_frequencies_thz()
+        
+        # Also test with Winv = None
+        model.Winv = None
+        with pytest.raises(RuntimeError, match="Phonon modes must be computed"):
+            model.get_frequencies_thz()
+
+
 class TestGeneratePDOS:
     """Test suite for the generate_pdos method."""
     

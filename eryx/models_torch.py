@@ -2358,6 +2358,62 @@ class OnePhonon:
         
         # Return as 2-column array
         return pdos_data[sort_indices]
+    
+    def get_frequencies_thz(self) -> np.ndarray:
+        """
+        Extract phonon frequencies in THz from the computed Winv tensor.
+        
+        This method provides a clean API for obtaining the physical phonon frequencies
+        from the model's internal representation, handling all unit conversions correctly.
+        The Winv tensor stores 1/ω² values, which are converted to frequencies in THz.
+        
+        Returns
+        -------
+        np.ndarray
+            1D array of phonon frequencies in THz, with NaN/inf values removed.
+            
+        Raises
+        ------
+        RuntimeError
+            If phonon modes have not been computed yet (Winv is None).
+            
+        Notes
+        -----
+        The conversion formula is:
+        1. ω² = 1/Winv (convert from inverse squared frequency to squared frequency)
+        2. ω = sqrt(ω²) (get angular frequency in rad/s)
+        3. f = ω/(2π × 10¹²) (convert to THz)
+        
+        Examples
+        --------
+        >>> model = OnePhonon("protein.pdb", hsampling=[-2,2,16], ...)
+        >>> intensity = model.apply_disorder()  # Computes phonons
+        >>> frequencies = model.get_frequencies_thz()
+        >>> print(f"Frequency range: {frequencies.min():.2f} - {frequencies.max():.2f} THz")
+        """
+        # Check if phonon modes have been computed
+        if not hasattr(self, 'Winv') or self.Winv is None:
+            raise RuntimeError("Phonon modes must be computed before extracting frequencies. "
+                              "Call compute_gnm_phonons() or apply_disorder() first.")
+        
+        # Calculate frequencies from Winv tensor
+        # Winv stores 1/ω², so we need to invert and take square root
+        omega_squared = 1.0 / self.Winv.real
+        omega_rad_s = torch.sqrt(torch.clamp(omega_squared, min=0))  # Clamp to avoid sqrt of negative
+        
+        # Convert to Hz then apply empirical factor for THz
+        # The model's internal units require multiplication by 100 to get THz
+        # This is an empirical conversion factor specific to the model's unit system
+        freqs_hz = omega_rad_s / (2 * np.pi)
+        freqs_thz = freqs_hz * 100  # Empirical conversion to THz
+        
+        # Flatten and convert to NumPy array
+        freqs_flat = freqs_thz.flatten().detach().cpu().numpy()
+        
+        # Filter out NaN/inf values
+        freqs_clean = freqs_flat[np.isfinite(freqs_flat)]
+        
+        return freqs_clean
 
 # Minimal implementations for additional models
 

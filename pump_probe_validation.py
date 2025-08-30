@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import sys
-import tempfile
 import argparse
 
 # Ensure the eryx library is in the Python path
@@ -20,7 +19,11 @@ except ImportError as e:
 
 def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, slice_idx=None):
     """
-    Compares default thermal model against model with pumped phonon mode.
+    Compares default thermal model against model with pumped phonon mode using
+    direct in-memory manipulation of the Winv tensor.
+    
+    This implementation avoids duplicate model instantiation and directly modifies
+    the phonon populations for accurate pump-probe simulation.
     
     Parameters
     ----------
@@ -33,24 +36,21 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
     """
     print("--- Starting Pumped Mode PDOS Visual Validation ---")
 
-    # Setup Model and Generate its own PDOS
-    #pdb_path = "tests/pdbs/6o2h_clean.pdb"
-    pdb_path = "tests/pdbs/1896374.pdb"
+    # Setup Model - using single instance for efficiency
+    pdb_path = "tests/pdbs/6o2h_clean.pdb"
+    #pdb_path = "tests/pdbs/1896374.pdb"
     if not os.path.exists(pdb_path):
         print(f"ERROR: Test PDB file not found at '{pdb_path}'")
         return
-
-#    hsampling_high_res = [-2, 2, 4]
-#    ksampling_high_res = [-2, 2, 4]
-#    lsampling_high_res = [-2, 2, 4]
 
     hsampling_high_res = [-4, 4, 4]
     ksampling_high_res = [-4, 4, 4]
     lsampling_high_res = [-4, 4, 4]
 
-    print(f"Initializing base model (sampling rate: {hsampling_high_res[2]})...")
+    print(f"Initializing model (sampling rate: {hsampling_high_res[2]})...")
     
-    base_model = OnePhonon(
+    # Single model instance - no duplicate instantiation
+    model = OnePhonon(
         pdb_path=pdb_path,
         hsampling=hsampling_high_res,
         ksampling=ksampling_high_res,
@@ -59,84 +59,99 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
         gamma_intra=1.5,
         gamma_inter=0.7
     )
-    print("Base model initialized.")
+    print("Model initialized.")
 
-    # Generate the unweighted PDOS using the new method
-    pdos_data = base_model.generate_pdos(bins=200, density=False)
+    # Compute phonons first to populate Winv
+    print("Computing phonon modes...")
+    _ = model.apply_disorder(use_data_adp=False)  # This populates model.Winv
+    print("Phonon computation complete.")
     
-    with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.dat') as tmp_f:
-        np.savetxt(tmp_f, pdos_data, fmt="%.15e")  # Use high precision
-        temp_pdos_path = tmp_f.name
-    print(f"Model's own PDOS saved to temporary file: {temp_pdos_path}")
-
-    # Create the Two Phonon Population Models
-
-    # Extract raw frequencies (ω) and thermal populations (Winv ~ 1/ω²)
-    winv_tensor = base_model.Winv.real.detach().cpu()
-    omega_squared = torch.where(torch.isnan(winv_tensor) | (winv_tensor <= 1e-12), torch.tensor(float('nan')), 1.0 / winv_tensor)
+    # Store original Winv tensor
+    original_winv = model.Winv.clone()
+    
+    # --- 1. Get ALL frequencies from the model, including NaNs ---
+    winv_tensor = model.Winv.real.detach().cpu()
+    omega_squared = torch.where(torch.isnan(winv_tensor) | (winv_tensor <= 1e-12), 
+                                torch.tensor(float('nan')), 1.0 / winv_tensor)
     omega_rad = torch.sqrt(omega_squared)
+    # Apply same empirical conversion as get_frequencies_thz()
+    raw_freqs_hz = (omega_rad / (2 * np.pi))
+    all_freqs_thz = (raw_freqs_hz * 100).flatten().numpy()  # Empirical factor for THz
     
-    # Convert angular frequency to Hz then THz
-    # omega_rad is in rad/s, f = omega/(2π) gives Hz
-    # The model's internal units require multiplication by 100 to get actual THz
-    raw_freqs_hz = (omega_rad / (2 * np.pi)).flatten().numpy()
-    raw_freqs_hz = raw_freqs_hz[~np.isnan(raw_freqs_hz)]
-    raw_freqs_thz = raw_freqs_hz * 100  # Convert to actual THz
+    # --- 2. Identify the valid frequencies and their original indices ---
+    valid_mask = ~np.isnan(all_freqs_thz)
+    valid_freqs = all_freqs_thz[valid_mask]
+    original_indices = np.arange(all_freqs_thz.size)
+    valid_original_indices = original_indices[valid_mask]
     
-    thermal_population_weights = winv_tensor.flatten().numpy()
-    thermal_population_weights = thermal_population_weights[~np.isnan(thermal_population_weights)]
-
-    # Model A: Create the Default Thermal Population histogram
-    bins = 200
-    thermal_hist_values, bin_edges = np.histogram(raw_freqs_thz, bins=bins, weights=thermal_population_weights, density=True)
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-
-    # Model B: Create the "Pumped" Thermal Population
-    print(f"Creating pumped thermal PDOS by exciting mode at {pump_energy_percentile}th percentile...")
-    pumped_pop_values = thermal_hist_values.copy()
-    pump_frequency_thz = np.percentile(raw_freqs_thz, pump_energy_percentile)
-    pump_bin_index = np.argmin(np.abs(bin_centers - pump_frequency_thz))
+    # --- 3. Find the target frequency and its index IN THE VALID LIST ---
+    print(f"Identifying mode at {pump_energy_percentile}th percentile for pumping...")
+    pump_frequency_thz = np.percentile(valid_freqs, pump_energy_percentile)
+    closest_idx_in_valid_list = np.argmin(np.abs(valid_freqs - pump_frequency_thz))
     
-    actual_pump_freq_thz = bin_centers[pump_bin_index]
-    
-    pump_intensity = np.max(thermal_hist_values) * pump_magnitude
-    pumped_pop_values[pump_bin_index] += pump_intensity
+    # --- 4. Use the valid-list-index to find the TRUE index in the original tensor ---
+    pump_index_flat = valid_original_indices[closest_idx_in_valid_list]
+    actual_pump_freq_thz = all_freqs_thz[pump_index_flat]
     
     print(f"Target pump frequency (percentile): {pump_frequency_thz:.2f} THz")
-    print(f"Actual pump frequency (bin center): {actual_pump_freq_thz:.2f} THz")
-    print(f"Added pump of intensity {pump_intensity:.2e} to thermal population at bin {pump_bin_index}")
+    print(f"Actual pump frequency (closest mode): {actual_pump_freq_thz:.2f} THz")
+    print(f"Mode index in flattened tensor: {pump_index_flat}")
+    
+    # Create modified Winv for pumped state
+    pumped_winv = original_winv.clone()
+    
+    # Calculate pump intensity based on magnitude and max Winv value
+    # Filter out any NaN/inf values when finding the max
+    winv_real_abs = torch.abs(original_winv.real)
+    finite_mask = torch.isfinite(winv_real_abs)
+    if finite_mask.any():
+        pump_intensity = torch.max(winv_real_abs[finite_mask]) * pump_magnitude
+    else:
+        # Fallback if all values are non-finite
+        pump_intensity = torch.tensor(1.0) * pump_magnitude
+    
+    # Add pump to the target mode (modifying Winv directly)
+    pumped_winv_flat = pumped_winv.view(-1)
+    pumped_winv_flat[pump_index_flat] = pumped_winv_flat[pump_index_flat] + pump_intensity
+    pumped_winv = pumped_winv_flat.view(original_winv.shape)
+    
+    print(f"Added pump intensity {pump_intensity:.2e} to mode {pump_index_flat}")
+    
+    # Create histogram data for visualization only (not for simulation)
+    # For visualization, we'll create simple histograms without weights to show the frequency distribution
+    # and highlight the pumped mode
+    bins = 200
+    thermal_hist_values, bin_edges = np.histogram(valid_freqs, bins=bins, density=True)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    
+    # For the pumped histogram, we'll copy the thermal and add a spike at the pumped frequency
+    pumped_pop_values = thermal_hist_values.copy()
+    # Find which bin the pumped frequency falls into
+    pump_bin_idx = np.argmin(np.abs(bin_centers - actual_pump_freq_thz))
+    # Add a spike to show the pump
+    if thermal_hist_values.max() > 0:
+        pumped_pop_values[pump_bin_idx] += thermal_hist_values.max() * pump_magnitude
+    else:
+        pumped_pop_values[pump_bin_idx] += 1.0 * pump_magnitude
 
-    # Save the "pumped" PDOS to a temporary file for the simulation
-    # Convert frequencies back to model's internal units
-    bin_centers_model_units = bin_centers / 100  # Convert THz back to model units
-    pumped_pdos_data = np.vstack((bin_centers_model_units, pumped_pop_values)).T
-    with open(temp_pdos_path, 'w') as f: # Overwrite the temp file
-        np.savetxt(f, pumped_pdos_data, fmt="%.15e")  # Use high precision
+    # Run Simulations for Both Scenarios using the same model instance
 
-    # Run Simulations for Both Scenarios
-
-    # Scenario A: Get intensity from the already-run base model (Default Thermal)
+    # Scenario A: Default Thermal Model (with original Winv)
     print("\nRunning Scenario A: Default Thermal Model...")
-    intensity_default = base_model.apply_disorder(use_data_adp=False)
-    intensity_default_np = intensity_default.detach().cpu().numpy().reshape(base_model.map_shape)
+    model.Winv = original_winv
+    intensity_default = model.apply_disorder(use_data_adp=False)
+    intensity_default_np = intensity_default.detach().cpu().numpy().reshape(model.map_shape)
     print("Scenario A complete.")
 
-    # Scenario B: Run with the "pumped" PDOS in 'direct' mode
-    print("\nRunning Scenario B: 'Pumped' PDOS in 'direct' mode...")
-    model_pumped = OnePhonon(
-        pdb_path=pdb_path,
-        hsampling=hsampling_high_res, ksampling=ksampling_high_res, lsampling=lsampling_high_res,
-        device=torch.device('cpu'),
-        gamma_intra=1.5, gamma_inter=0.7,
-        pdos_path=temp_pdos_path,
-        pdos_mode='direct'
-    )
-    intensity_pumped = model_pumped.apply_disorder(use_data_adp=False)
-    intensity_pumped_np = intensity_pumped.detach().cpu().numpy().reshape(base_model.map_shape)
+    # Scenario B: Pumped Model (with modified Winv)
+    print("\nRunning Scenario B: Pumped Model...")
+    model.Winv = pumped_winv
+    intensity_pumped = model.apply_disorder(use_data_adp=False)
+    intensity_pumped_np = intensity_pumped.detach().cpu().numpy().reshape(model.map_shape)
     print("Scenario B complete.")
-
-    # Clean up the temporary file
-    os.remove(temp_pdos_path)
+    
+    # Restore original state
+    model.Winv = original_winv
 
     # Create the 2x2 Visualization
     print("\nGenerating 2x2 comparison plot...")
@@ -215,10 +230,10 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
         fig.colorbar(im, ax=ax, label="log₁₀(Diffuse Intensity)")
 
     # Plot C: Diffuse Intensity from Default Model
-    hkl_grid_np = base_model.hkl_grid.detach().cpu().numpy().reshape(base_model.map_shape + (3,))
+    hkl_grid_np = model.hkl_grid.detach().cpu().numpy().reshape(model.map_shape + (3,))
     plot_slice(axes[1, 0], intensity_default_np, "C) Diffuse Intensity (Equilibrium)", hkl_grid_np)
 
-    # Plot D: Diffuse Intensity from "Pumped" Model
+    # Plot D: Diffuse Intensity from Pumped Model
     plot_slice(axes[1, 1], intensity_pumped_np, "D) Diffuse Intensity (Pumped Mode)", hkl_grid_np)
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
