@@ -380,3 +380,34 @@ eryx/visualization/
 - **`RuntimeWarning: divide by zero`**: Check for zero-norm vectors in calculations
 - **`TraitError: 'grid' trait`**: Use `grid_visible=False` not `grid=False`
 - **Clipping planes not working**: Stay in Python/Jupyter, don't export to HTML
+
+### Recent Performance Breakthroughs (Aug 2024)
+
+#### Critical Performance Discovery: Direct Data Masking vs Clipping Planes
+**10x Performance Improvement Achieved**
+
+- **Problem**: Using 60+ clipping planes for spherical masking → 5-10 FPS, laggy interaction
+- **Solution**: Direct manipulation of volume data in JavaScript → 60 FPS, smooth interaction
+- **Key Insight**: K3D clipping planes scale poorly; direct data manipulation scales well
+
+```javascript
+// ❌ SLOW: 62 clipping planes for spherical mask
+plot.setClippingPlanes(manyPlanes); // ~5 FPS
+
+// ✅ FAST: Direct data manipulation
+const masked = originalData.map((value, i) => {
+    return withinSphere(i, radius) ? value : 0;
+}); // ~60 FPS
+```
+
+#### K3D HTML Export Limitations Discovered
+- **Cannot decouple opacity from intensity**: Fundamentally coupled through transfer functions
+- **Axis labels cannot be completely hidden**: Only workaround is matching label color to background
+- **Single K3D instance per page**: Use multiple volumes in one plot, not multiple plots
+- **Volume data access pattern**: `world.ObjectsListJson[id].volume.data`, NOT `plot.objects`
+
+#### Multi-Panel Visualization Best Practices
+- **Prefer single plot with multiple volumes** over iframe-based approaches
+- **Filter K3D objects properly**: `volumes.filter(v => v.alpha_coef !== undefined)`
+- **Synchronize updates**: Update all volumes before calling `plot.render()`
+- **Use higher resolution data**: 81×81×81 provides much better visual quality than 41×41×41
