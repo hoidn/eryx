@@ -52,6 +52,31 @@ class SphericalClippingController:
             q_vectors = None
             map_shape = data_source.shape if data_source.ndim == 3 else None
         else:
+            # For dataset identifiers like 'torch', 'np', 'arbq', convert to absolute paths
+            if isinstance(data_source, str) and data_source in ['torch', 'np', 'arbq']:
+                # Get the project root directory (4 levels up from this file)
+                project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
+                
+                # Try NPZ file first (contains metadata)
+                dataset_files = {
+                    'torch': {'npz': 'torch_grid_results.npz', 'npy': 'torch_diffuse_intensity.npy'},
+                    'np': {'npz': 'np_results.npz', 'npy': 'np_diffuse_intensity.npy'},
+                    'arbq': {'npz': 'torch_arbq_results.npz', 'npy': 'arb_q_diffuse_intensity.npy'}
+                }
+                
+                npz_file = os.path.join(project_root, dataset_files[data_source]['npz'])
+                npy_file = os.path.join(project_root, dataset_files[data_source]['npy'])
+                
+                # Use the NPZ file if it exists, otherwise the NPY file
+                if os.path.exists(npz_file):
+                    data_source = npz_file
+                    print(f"Using absolute path: {npz_file}")
+                elif os.path.exists(npy_file):
+                    data_source = npy_file
+                    print(f"Using absolute path: {npy_file}")
+                else:
+                    print(f"Warning: Neither {npz_file} nor {npy_file} found")
+            
             # Use DataHandler to load the data
             handler = IntensityDataHandler(data_source)
             q_vectors, intensity, map_shape = handler.load_data()
