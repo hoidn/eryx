@@ -142,6 +142,20 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
     intensity_default = model.apply_disorder(use_data_adp=False)
     intensity_default_np = intensity_default.detach().cpu().numpy().reshape(model.map_shape)
     print("Scenario A complete.")
+    
+    # Save thermal state (same format as run_torch.py)
+    q_vectors_thermal = model.q_grid.detach().cpu().numpy()
+    intensity_thermal_flat = intensity_default.detach().cpu().numpy()
+    
+    np.savez_compressed("thermal_grid_results.npz",
+                        q_vectors=q_vectors_thermal,
+                        intensity=intensity_thermal_flat,
+                        map_shape=model.map_shape)
+    
+    np.save("thermal_diffuse_intensity.npy", intensity_thermal_flat)
+    torch.save(intensity_default, "thermal_diffuse_intensity.pt")
+    print(f"Saved thermal results: thermal_grid_results.npz ({intensity_thermal_flat.shape})")
+    print(f"Thermal intensity range: [{np.min(intensity_thermal_flat):.2e}, {np.max(intensity_thermal_flat):.2e}]")
 
     # Scenario B: Pumped Model (with modified Winv)
     print("\nRunning Scenario B: Pumped Model...")
@@ -152,6 +166,32 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
     
     # Restore original state
     model.Winv = original_winv
+    
+    # Save pumped state (same format as run_torch.py)
+    q_vectors_pumped = model.q_grid.detach().cpu().numpy()  # Same q-grid as thermal
+    intensity_pumped_flat = intensity_pumped.detach().cpu().numpy()
+    
+    np.savez_compressed("pumped_grid_results.npz",
+                        q_vectors=q_vectors_pumped,
+                        intensity=intensity_pumped_flat,
+                        map_shape=model.map_shape)
+    
+    np.save("pumped_diffuse_intensity.npy", intensity_pumped_flat)
+    torch.save(intensity_pumped, "pumped_diffuse_intensity.pt")
+    print(f"Saved pumped results: pumped_grid_results.npz ({intensity_pumped_flat.shape})")
+    print(f"Pumped intensity range: [{np.min(intensity_pumped_flat):.2e}, {np.max(intensity_pumped_flat):.2e}]")
+    
+    # Calculate and save difference (pump-probe signal)
+    intensity_difference = intensity_pumped_flat - intensity_thermal_flat
+    
+    np.savez_compressed("difference_grid_results.npz",
+                        q_vectors=q_vectors_thermal,  # Same q-grid
+                        intensity=intensity_difference,
+                        map_shape=model.map_shape)
+    
+    np.save("difference_diffuse_intensity.npy", intensity_difference)
+    print(f"Saved difference map: difference_grid_results.npz ({intensity_difference.shape})")
+    print(f"Difference range: [{np.min(intensity_difference):.2e}, {np.max(intensity_difference):.2e}]")
 
     # Create the 2x2 Visualization
     print("\nGenerating 2x2 comparison plot...")
