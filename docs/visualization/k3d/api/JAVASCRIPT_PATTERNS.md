@@ -529,6 +529,190 @@ plot.render();
 
 ---
 
+## Recent Patterns from Performance Optimization Session
+
+### Pattern: Direct Data Masking for Performance
+```javascript
+// PATTERN: High-performance volume masking
+// WHY: 60+ clipping planes = 5 FPS, direct data = 60 FPS
+// WHEN: Real-time interactive masking needed
+
+class K3DDataMasker {
+    constructor() {
+        this.originalData = null;
+        this.currentMask = null;
+        this.volumeInfo = null;
+    }
+    
+    async initialize() {
+        const plot = await window.K3DInstance;
+        const world = plot.getWorld();
+        
+        // Find and cache volume info
+        for (const id in world.ObjectsListJson) {
+            if (world.ObjectsListJson[id].type === 'Volume') {
+                this.volumeInfo = {
+                    id: id,
+                    config: world.ObjectsListJson[id],
+                    mesh: world.ObjectsById[id]
+                };
+                this.originalData = new Float32Array(this.volumeInfo.config.volume.data);
+                console.log('✅ DataMasker initialized, data size:', this.originalData.length);
+                break;
+            }
+        }
+    }
+    
+    createSphericalMask(radiusPercent) {
+        const shape = this.volumeInfo.config.volume.shape;
+        const [h, k, l] = shape;
+        const center = [h/2, k/2, l/2];
+        const radius = Math.min(h, k, l) * 0.5 * (radiusPercent / 100);
+        
+        const mask = new Float32Array(this.originalData.length);
+        let idx = 0;
+        
+        for (let i = 0; i < h; i++) {
+            for (let j = 0; j < k; j++) {
+                for (let m = 0; m < l; m++) {
+                    const dist = Math.sqrt(
+                        (i - center[0])**2 + 
+                        (j - center[1])**2 + 
+                        (m - center[2])**2
+                    );
+                    mask[idx] = (dist <= radius) ? 1.0 : 0.0;
+                    idx++;
+                }
+            }
+        }
+        
+        return mask;
+    }
+    
+    async applyMask(mask) {
+        const plot = await window.K3DInstance;
+        
+        // Apply mask to data
+        const maskedData = new Float32Array(this.originalData.length);
+        for (let i = 0; i < this.originalData.length; i++) {
+            maskedData[i] = this.originalData[i] * mask[i];
+        }
+        
+        // Update K3D visualization
+        this.volumeInfo.config.volume.data = maskedData;
+        
+        // Update THREE.js texture if exists
+        const texture = this.volumeInfo.mesh?.material?.uniforms?.volumeTexture?.value;
+        if (texture?.image?.data) {
+            texture.image.data.set(maskedData);
+            texture.needsUpdate = true;
+        }
+        
+        this.currentMask = mask;
+        plot.rebuildSceneData();
+        plot.render();
+    }
+    
+    async clearMask() {
+        const plot = await window.K3DInstance;
+        
+        // Restore original data
+        this.volumeInfo.config.volume.data = new Float32Array(this.originalData);
+        
+        const texture = this.volumeInfo.mesh?.material?.uniforms?.volumeTexture?.value;
+        if (texture?.image?.data) {
+            texture.image.data.set(this.originalData);
+            texture.needsUpdate = true;
+        }
+        
+        this.currentMask = null;
+        plot.rebuildSceneData();
+        plot.render();
+    }
+}
+
+// Global instance for HTML access
+window.dataMasker = new K3DDataMasker();
+window.dataMasker.initialize();
+```
+
+### Pattern: Multi-Volume Synchronized Updates
+```javascript
+// PATTERN: Synchronized multi-volume updates
+// WHY: Multiple render() calls cause flickering
+// WHEN: Comparing multiple datasets side-by-side
+
+class K3DMultiVolumeController {
+    constructor() {
+        this.volumes = [];
+        this.updateQueue = [];
+    }
+    
+    async findAllVolumes() {
+        const plot = await window.K3DInstance;
+        const world = plot.getWorld();
+        
+        this.volumes = [];
+        for (const id in world.ObjectsListJson) {
+            if (world.ObjectsListJson[id].type === 'Volume') {
+                this.volumes.push({
+                    id: id,
+                    config: world.ObjectsListJson[id],
+                    mesh: world.ObjectsById[id],
+                    originalData: new Float32Array(world.ObjectsListJson[id].volume.data)
+                });
+            }
+        }
+        
+        console.log(`✅ Found ${this.volumes.length} volumes`);
+        return this.volumes;
+    }
+    
+    queueUpdate(volumeIndex, newData) {
+        this.updateQueue.push({ volumeIndex, newData });
+    }
+    
+    async flushUpdates() {
+        const plot = await window.K3DInstance;
+        
+        // Apply all queued updates
+        for (const update of this.updateQueue) {
+            const volume = this.volumes[update.volumeIndex];
+            volume.config.volume.data = update.newData;
+            
+            const texture = volume.mesh?.material?.uniforms?.volumeTexture?.value;
+            if (texture?.image?.data) {
+                texture.image.data.set(update.newData);
+                texture.needsUpdate = true;
+            }
+        }
+        
+        // Single render call for all updates
+        this.updateQueue = [];
+        plot.rebuildSceneData();
+        plot.render();
+    }
+    
+    async synchronizedMask(mask) {
+        // Apply same mask to all volumes
+        for (let i = 0; i < this.volumes.length; i++) {
+            const volume = this.volumes[i];
+            const maskedData = new Float32Array(volume.originalData.length);
+            for (let j = 0; j < volume.originalData.length; j++) {
+                maskedData[j] = volume.originalData[j] * mask[j];
+            }
+            this.queueUpdate(i, maskedData);
+        }
+        
+        await this.flushUpdates();
+    }
+}
+
+// Global instance
+window.multiVolumeController = new K3DMultiVolumeController();
+window.multiVolumeController.findAllVolumes();
+```
+
 ## Summary
 
 These patterns represent ~30 hours of debugging distilled into reusable solutions. Always:
@@ -538,5 +722,16 @@ These patterns represent ~30 hours of debugging distilled into reusable solution
 3. **Await K3D Promises**
 4. **Use setter methods with `.render()`**
 5. **Wrap in debug logging during development**
+6. **Prefer direct data manipulation over clipping planes** (10x performance gain)
+7. **Batch updates and render once** for multi-volume scenarios
+8. **Cache volume references** to avoid repeated world traversal
 
 When in doubt, return to the golden rule: **Test where it will run!**
+
+## Performance Lessons
+
+- **60+ clipping planes**: Unusable performance (~5 FPS)
+- **Direct data masking**: Excellent performance (~60 FPS) 
+- **Single render() call**: Prevents flickering in multi-volume updates
+- **Float32Array operations**: Much faster than regular arrays
+- **Cached references**: Avoid repeated `getWorld()` calls

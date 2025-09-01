@@ -18,11 +18,14 @@
 │       Production-ready examples, working code, proven patterns
 │
 ├── 💻 For Developers
-│   ├── docs/visualization/K3D_JAVASCRIPT_PATTERNS.md
+│   ├── api/JAVASCRIPT_PATTERNS.md
 │   │   Practical JavaScript patterns, common pitfalls, solutions
 │   │
-│   └── docs/visualization/K3D_HTML_JAVASCRIPT_API_REFERENCE.md
-│       Deep technical details, HTML export structure, debugging
+│   ├── api/HTML_JAVASCRIPT_API.md
+│   │   Deep technical details, HTML export structure, debugging
+│   │
+│   └── api/PERFORMANCE_OPTIMIZATION_LESSONS.md
+│       🆕 Performance breakthroughs, 10x improvement lessons
 │
 ├── 🔧 For Project Integration
 │   └── CLAUDE.md (K3D sections)
@@ -44,16 +47,20 @@
 - Tested with real data
 
 ### "My K3D animation is broken/slow"  
-**Start here**: [`K3D_HTML_JAVASCRIPT_API_REFERENCE.md`](./K3D_HTML_JAVASCRIPT_API_REFERENCE.md)
-- Performance optimization (avoid 60+ clipping planes!)
-- Debugging techniques
-- Console commands for troubleshooting
+**Start here**: [`PERFORMANCE_OPTIMIZATION_LESSONS.md`](./api/PERFORMANCE_OPTIMIZATION_LESSONS.md)
+- **NEW**: 10x performance improvement techniques
+- Critical discovery: Direct data masking vs clipping planes
+- Memory management and resolution trade-offs
+
+**Then**: [`HTML_JAVASCRIPT_API.md`](./api/HTML_JAVASCRIPT_API.md)
+- Debugging techniques and console commands
+- HTML export structure understanding
 
 ### "I need to add JavaScript animations"
-**Start here**: [`K3D_JAVASCRIPT_PATTERNS.md`](./K3D_JAVASCRIPT_PATTERNS.md)
+**Start here**: [`JAVASCRIPT_PATTERNS.md`](./api/JAVASCRIPT_PATTERNS.md)
 - Global function patterns
 - Animation state management
-- Common JavaScript pitfalls
+- **NEW**: Direct data masking patterns for performance
 
 ### "I'm new to the visualization module"
 **Start here**: [`README.md`](../../eryx/visualization/README.md)
@@ -74,8 +81,9 @@
 |----------|---------|----------|------------|-----------|
 | **README.md** | Module overview & architecture | All users | Beginner | 5 min |
 | **FINAL_WORKING_SOLUTION.md** | Production usage guide | Researchers | Beginner | 10 min |
-| **K3D_JAVASCRIPT_PATTERNS.md** | JavaScript implementation | Developers | Intermediate | 15 min |
-| **K3D_HTML_JAVASCRIPT_API_REFERENCE.md** | Technical API details | Advanced devs | Advanced | 20 min |
+| **JAVASCRIPT_PATTERNS.md** | JavaScript implementation | Developers | Intermediate | 15 min |
+| **HTML_JAVASCRIPT_API.md** | Technical API details | Advanced devs | Advanced | 20 min |
+| **PERFORMANCE_OPTIMIZATION_LESSONS.md** | Performance breakthroughs | All developers | Intermediate | 12 min |
 | **CLAUDE.md** (K3D sections) | Project integration | All developers | Intermediate | 10 min |
 
 ---
@@ -91,18 +99,18 @@
 
 ### Journey 2: Debug Slow Animation
 ```
-1. K3D_HTML_JAVASCRIPT_API_REFERENCE.md → Find performance section
-2. Discover 60+ clipping planes issue
-3. Switch to data masking approach
-4. 10x performance improvement! ✅
+1. PERFORMANCE_OPTIMIZATION_LESSONS.md → Learn from real optimization
+2. Discover 60+ clipping planes = 5 FPS, data masking = 60 FPS
+3. Implement K3DDataMasker class patterns
+4. 12x performance improvement! ✅
 ```
 
 ### Journey 3: Add Custom Animation
 ```
-1. K3D_JAVASCRIPT_PATTERNS.md → Learn patterns
-2. K3D_HTML_JAVASCRIPT_API_REFERENCE.md → Understand structure
-3. Implement with global functions
-4. Animation works! ✅
+1. JAVASCRIPT_PATTERNS.md → Learn battle-tested patterns
+2. HTML_JAVASCRIPT_API.md → Understand K3D structure
+3. Use K3DAnimationController class pattern
+4. Smooth animation achieved! ✅
 ```
 
 ---
@@ -110,9 +118,10 @@
 ## ⚠️ Common Mistakes to Avoid
 
 ### Don't Start With:
-- ❌ **K3D_HTML_JAVASCRIPT_API_REFERENCE.md** if you just want to visualize data
+- ❌ **HTML_JAVASCRIPT_API.md** if you just want to visualize data
 - ❌ **CLAUDE.md** if you're not integrating with Eryx
 - ❌ **JavaScript patterns** if you're just using Python
+- ❌ **Performance lessons** if you haven't tried basic approach first
 
 ### Critical Knowledge:
 - 🔴 **HTML exports have different structure than Python K3D**
@@ -124,7 +133,7 @@
 
 ## 📊 Documentation Statistics
 
-- **Total Lines**: ~1,500 lines of K3D documentation
+- **Total Lines**: ~2,200 lines of K3D documentation (+700 from recent session)
 - **Code Examples**: 50+ working examples
 - **Debugging Commands**: 20+ console commands
 - **Performance Tips**: 10+ optimization patterns
@@ -140,23 +149,25 @@ const world = plot.getWorld();
 const volumeConfig = world.ObjectsListJson[volumeId];
 const volumeData = volumeConfig.volume.data;  // Float32Array
 ```
-See: [K3D_HTML_JAVASCRIPT_API_REFERENCE.md](./K3D_HTML_JAVASCRIPT_API_REFERENCE.md#accessing-volume-data-in-javascript)
+See: [HTML_JAVASCRIPT_API.md](./api/HTML_JAVASCRIPT_API.md#accessing-volume-data-in-javascript)
 
 ### Performance issue with clipping?
-Use data masking instead of clipping planes!
-See: [K3D_HTML_JAVASCRIPT_API_REFERENCE.md](./K3D_HTML_JAVASCRIPT_API_REFERENCE.md#performance-optimization-guidelines)
+**NEW BREAKTHROUGH**: Direct data masking = 10x faster than clipping planes!
+See: [PERFORMANCE_OPTIMIZATION_LESSONS.md](./api/PERFORMANCE_OPTIMIZATION_LESSONS.md#critical-performance-discoveries)
 
 ### Animation not working?
-Check global function scope!
-See: [K3D_JAVASCRIPT_PATTERNS.md](./K3D_JAVASCRIPT_PATTERNS.md#global-function-registration-pattern)
+Check global function scope and K3D Promise handling!
+See: [JAVASCRIPT_PATTERNS.md](./api/JAVASCRIPT_PATTERNS.md#global-function-registration-pattern)
 
 ---
 
 ## 📝 Maintenance Notes
 
-### Recently Updated
-- **K3D_HTML_JAVASCRIPT_API_REFERENCE.md** - Created Nov 2024 from debugging session
-- **Cross-references** - Added Nov 2024 to connect all documents
+### Recently Updated (August 2024)
+- **PERFORMANCE_OPTIMIZATION_LESSONS.md** - **NEW**: Captures 12x performance breakthrough
+- **HTML_JAVASCRIPT_API.md** - Enhanced with performance patterns
+- **JAVASCRIPT_PATTERNS.md** - Added direct data masking patterns
+- **Cross-references** - Updated for new performance documentation
 
 ### Needs Consolidation
 - JavaScript patterns duplicated in CLAUDE.md → Should reference K3D_JAVASCRIPT_PATTERNS.md
