@@ -65,35 +65,80 @@ def create_advanced_multi_panel(
         axes_helper=0.0,
         axes=['', '', ''],
         label_color=0x1e1e1e,
-        camera_auto_fit=False
+        camera_auto_fit=False,
+        camera_fov=35.0
     )
     
     # Position volumes side by side
     x_positions = {'thermal': -8, 'pumped': 0, 'difference': 8}
     volume_info = {}
     
+    # Calculate shared scale for thermal and pumped for absolute comparison
+    thermal_clean = np.nan_to_num(datasets['thermal'], nan=0.0)
+    pumped_clean = np.nan_to_num(datasets['pumped'], nan=0.0)
+    
+    # Find global min/max across thermal and pumped (excluding zeros)
+    thermal_valid = thermal_clean[thermal_clean > 0]
+    pumped_valid = pumped_clean[pumped_clean > 0]
+    
+    global_min = min(
+        np.min(thermal_valid) if len(thermal_valid) > 0 else 0,
+        np.min(pumped_valid) if len(pumped_valid) > 0 else 0
+    )
+    global_max = max(
+        np.max(thermal_clean),
+        np.max(pumped_clean)
+    )
+    
+    # Calculate shared vmin/vmax for thermal and pumped AFTER normalization
+    # This ensures they use identical color mapping
+    thermal_normalized = (thermal_clean - global_min) / (global_max - global_min) if global_max > global_min else thermal_clean
+    pumped_normalized = (pumped_clean - global_min) / (global_max - global_min) if global_max > global_min else pumped_clean
+    
+    # Combine valid values from both for percentile calculation
+    combined_valid = np.concatenate([
+        thermal_normalized[thermal_normalized > 0],
+        pumped_normalized[pumped_normalized > 0]
+    ])
+    
+    if len(combined_valid) > 0:
+        shared_vmin, shared_vmax = np.percentile(combined_valid, [100 - color_range_percentile, color_range_percentile])
+    else:
+        shared_vmin, shared_vmax = 0, 1
+    
+    # Process each volume
     for name, data in datasets.items():
-        # Clean and normalize data
         clean_data = np.nan_to_num(data, nan=0.0)
         
-        # Normalize to [0, 1] range
-        data_min = np.min(clean_data[clean_data > 0]) if np.any(clean_data > 0) else 0
-        data_max = np.max(clean_data)
-        
-        if data_max > data_min:
-            normalized = (clean_data - data_min) / (data_max - data_min)
-        else:
-            normalized = clean_data
+        if name in ['thermal', 'pumped']:
+            # Use shared global scaling for thermal and pumped
+            if global_max > global_min:
+                normalized = (clean_data - global_min) / (global_max - global_min)
+            else:
+                normalized = clean_data
+            
+            # Use the pre-calculated shared vmin/vmax for both thermal and pumped
+            vmin, vmax = shared_vmin, shared_vmax
+                
+        else:  # difference volume
+            # Original independent scaling for difference
+            data_min = np.min(clean_data[clean_data > 0]) if np.any(clean_data > 0) else 0
+            data_max = np.max(clean_data)
+            
+            if data_max > data_min:
+                normalized = (clean_data - data_min) / (data_max - data_min)
+            else:
+                normalized = clean_data
+            
+            # Calculate color range for difference
+            valid = normalized[normalized > 0]
+            if len(valid) > 0:
+                vmin, vmax = np.percentile(valid, [100 - color_range_percentile, color_range_percentile])
+            else:
+                vmin, vmax = 0, 1
         
         # Store as float32
         normalized = normalized.astype(np.float32)
-        
-        # Calculate color range for this dataset
-        valid = normalized[normalized > 0]
-        if len(valid) > 0:
-            vmin, vmax = np.percentile(valid, [100 - color_range_percentile, color_range_percentile])
-        else:
-            vmin, vmax = 0, 1
         
         # Create volume at position
         x_off = x_positions[name]
@@ -109,12 +154,22 @@ def create_advanced_multi_panel(
         plot += volume
         
         # Store volume info for JavaScript
-        volume_info[name] = {
-            'shape': normalized.shape,
-            'bounds': bounds,
-            'original_min': float(data_min),
-            'original_max': float(data_max)
-        }
+        if name in ['thermal', 'pumped']:
+            volume_info[name] = {
+                'shape': normalized.shape,
+                'bounds': bounds,
+                'original_min': float(global_min),
+                'original_max': float(global_max),
+                'shared_scale': True
+            }
+        else:
+            volume_info[name] = {
+                'shape': normalized.shape,
+                'bounds': bounds,
+                'original_min': float(data_min),
+                'original_max': float(data_max),
+                'shared_scale': False
+            }
     
     # Set camera to see all three volumes
     plot.camera = [0, -25, 12, 0, 0, 0, 0, 0, 1]

@@ -73,9 +73,13 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
         print(f"ERROR: Test PDB file not found at '{pdb_path}'")
         return
 
-    hsampling_high_res = [-4, 4, 4]
-    ksampling_high_res = [-4, 4, 4]
-    lsampling_high_res = [-4, 4, 4]
+#    hsampling_high_res = [-4, 4, 4]
+#    ksampling_high_res = [-4, 4, 4]
+#    lsampling_high_res = [-4, 4, 4]
+
+    hsampling_high_res = [-4, 4, 8]
+    ksampling_high_res = [-4, 4, 8]
+    lsampling_high_res = [-4, 4, 8]
 
     print(f"Initializing model (sampling rate: {hsampling_high_res[2]})...")
     
@@ -279,6 +283,11 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
     fig, axes = plt.subplots(2, 2, figsize=(16, 14), gridspec_kw={'height_ratios': [1, 2]})
     fig.suptitle("Default Thermal vs. Pumped Phonon Population", fontsize=18)
 
+    # Calculate global y-axis limits for absolute scale comparison
+    # This ensures thermal and pumped populations are on the same scale
+    global_y_max = max(np.max(thermal_hist_values), np.max(pumped_pop_values))
+    y_limits = (0, global_y_max * 1.05)  # Add 5% padding at top
+
     # Plot A: Default Thermal Population Model
     ax = axes[0, 0]
     ax.plot(bin_centers, thermal_hist_values, color='royalblue', lw=2)
@@ -288,6 +297,7 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
     ax.set_ylabel("Phonon Population (arb. units)")
     ax.grid(True, linestyle='--', alpha=0.6)
     ax.set_xlim(left=0)
+    ax.set_ylim(y_limits)  # Set consistent y-axis scale
     # FIX: Prevent matplotlib offset notation artifacts
     ax.xaxis.get_major_formatter().set_useOffset(False)
     ax.ticklabel_format(style='plain', axis='x')
@@ -302,6 +312,7 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
     ax.set_ylabel("Phonon Population (arb. units)")
     ax.grid(True, linestyle='--', alpha=0.6)
     ax.set_xlim(left=0)
+    ax.set_ylim(y_limits)  # Set consistent y-axis scale
     # FIX: Prevent matplotlib offset notation artifacts
     ax.xaxis.get_major_formatter().set_useOffset(False)
     ax.ticklabel_format(style='plain', axis='x')
