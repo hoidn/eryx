@@ -178,11 +178,19 @@ function applySphericalMask(data, shape, radius) {
 ```
 
 ### Performance Comparison
-| Method | Planes | FPS | Recommendation |
-|--------|--------|-----|----------------|
-| 60+ Clipping Planes | 62 | ~5 fps | ❌ Never use |
-| 8 Octahedral Planes | 8 | ~30 fps | ⚠️ OK for simple cases |
-| Direct Data Masking | 0 | ~60 fps | ✅ Always prefer |
+| Method | Planes | FPS | Recommendation | Use Case |
+|--------|--------|-----|----------------|----------|
+| 60+ Clipping Planes | 62 | ~5 fps | ❌ Never use | None - fundamentally flawed |
+| 8 Octahedral Planes | 8 | ~30 fps | ⚠️ OK for simple cases | Static views only |
+| Direct Data Masking | 0 | ~60 fps | ✅ Always prefer | Real-time interaction |
+| Hybrid Approach | 4-6 | ~45 fps | ✅ Good compromise | Complex multi-region masking |
+
+### Memory Usage Patterns
+| Data Type | Original Size | K3D Memory | Browser Memory | Notes |
+|-----------|---------------|------------|----------------|-------|
+| 41³ Float32 | ~270KB | ~540KB | ~1.1MB | Minimum viable resolution |
+| 81³ Float32 | ~2.1MB | ~4.2MB | ~8.4MB | Recommended for quality |
+| 161³ Float32 | ~16.8MB | ~33.6MB | ~67MB | High-end desktop only |
 
 ---
 
@@ -504,6 +512,29 @@ K3DInstance.then(plot => {
 5. **Update both config and texture** when modifying volume data
 6. **Use `plot.rebuildSceneData()` and `plot.render()`** after updates
 7. **Global function scope is required** for HTML onclick handlers
+
+## Additional Key Findings (From Recent Session)
+
+8. **Fundamental K3D Limitations**:
+   - Cannot decouple opacity from intensity (coupled through transfer functions)
+   - Cannot completely hide axis tick labels (only color matching workaround)
+   - Only one K3D instance per HTML page (use single plot with multiple volumes)
+
+9. **Multi-Panel Visualization Patterns**:
+   - Single K3D plot + multiple volumes > multiple iframes
+   - Filter K3D objects: `Object.values(world.K3DObjects).filter(v => v.alpha_coef !== undefined)`
+   - Synchronize all volume updates before calling `plot.render()`
+
+10. **Data Quality Impact**:
+    - Higher resolution significantly improves visual quality (81³ vs 41³)
+    - Always normalize data to [0,1] before applying transformations
+    - Handle NaN values with `np.nan_to_num()` before K3D processing
+
+11. **JavaScript Integration Gotchas**:
+    - Functions must be attached to `window` for HTML onclick handlers
+    - K3DInstance Promise resolution varies by environment
+    - Always use K3D setter methods (not direct property assignment)
+    - Call `render()` after ANY property change to see visual updates
 
 ---
 
