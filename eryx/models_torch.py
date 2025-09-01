@@ -2342,7 +2342,8 @@ class OnePhonon:
         # Reference: np.sqrt(1. / np.real(self.phonon.Winv).flatten())
         omega_squared = 1.0 / self.Winv.real  # Convert from Winv (1/ω²) to ω²
         omega = torch.sqrt(torch.clamp(omega_squared, min=0))  # Avoid sqrt of negative
-        freq_thz = omega / (2 * np.pi * 1e12)  # Convert rad/s to THz
+        # Use the same empirical conversion as get_frequencies_thz()
+        freq_thz = (omega / (2 * np.pi)) * 100  # Empirical conversion to THz
         
         # Flatten and clean data
         freq_flat = freq_thz.flatten().detach().cpu().numpy()

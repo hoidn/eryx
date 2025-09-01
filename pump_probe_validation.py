@@ -1,3 +1,29 @@
+#!/usr/bin/env python
+"""Pump-probe spectroscopy validation for the Eryx phonon modeling package.
+
+This module simulates pump-probe experiments on protein crystals by comparing
+thermal equilibrium phonon populations with non-equilibrium pumped states.
+It demonstrates how selective excitation of phonon modes affects diffuse
+scattering patterns in X-ray crystallography.
+
+Key Features:
+- Single model instance for efficient computation
+- Direct Winv tensor manipulation for accurate physics
+- Support for both delta function and Gaussian pump profiles
+- Visual comparison of equilibrium vs pumped states
+- Weighted population histograms showing actual phonon occupancies
+
+Physics Background:
+- Winv tensor represents 1/ω² scaled by thermal occupation factors
+- Pumping increases specific mode populations above thermal equilibrium
+- Changes in phonon populations modify the diffuse scattering intensity
+- The difference maps reveal pump-induced structural dynamics
+
+Usage:
+    python pump_probe_validation.py [options]
+    python pump_probe_validation.py --list-examples
+"""
+
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,7 +43,8 @@ except ImportError as e:
     print(f"Details: {e}")
     sys.exit(1)
 
-def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, slice_idx=None):
+def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, slice_idx=None, 
+                           pump_type='delta', pump_width=0.5):
     """
     Compares default thermal model against model with pumped phonon mode using
     direct in-memory manipulation of the Winv tensor.
@@ -33,12 +60,15 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
         Percentile of frequency distribution to pump (default: 50.0)
     slice_idx : int, optional
         Index of the slice to plot along the k-axis (default: shape[1]//4)
+    pump_type : str
+        Type of pump profile: 'delta' for single mode, 'gaussian' for finite bandwidth (default: 'delta')
+    pump_width : float
+        Width of Gaussian pump in THz (sigma parameter) (default: 0.5)
     """
     print("--- Starting Pumped Mode PDOS Visual Validation ---")
 
     # Setup Model - using single instance for efficiency
     pdb_path = "tests/pdbs/6o2h_clean.pdb"
-    #pdb_path = "tests/pdbs/1896374.pdb"
     if not os.path.exists(pdb_path):
         print(f"ERROR: Test PDB file not found at '{pdb_path}'")
         return
@@ -70,6 +100,8 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
     original_winv = model.Winv.clone()
     
     # --- 1. Get ALL frequencies from the model, including NaNs ---
+    # Extract frequencies from Winv tensor: ω = sqrt(1/Winv)
+    # NaN values indicate singular modes (zero frequency)
     winv_tensor = model.Winv.real.detach().cpu()
     omega_squared = torch.where(torch.isnan(winv_tensor) | (winv_tensor <= 1e-12), 
                                 torch.tensor(float('nan')), 1.0 / winv_tensor)
@@ -79,6 +111,7 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
     all_freqs_thz = (raw_freqs_hz * 100).flatten().numpy()  # Empirical factor for THz
     
     # --- 2. Identify the valid frequencies and their original indices ---
+    # Filter out singular modes for frequency-based operations
     valid_mask = ~np.isnan(all_freqs_thz)
     valid_freqs = all_freqs_thz[valid_mask]
     original_indices = np.arange(all_freqs_thz.size)
@@ -102,6 +135,7 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
     
     # Calculate pump intensity based on magnitude and max Winv value
     # Filter out any NaN/inf values when finding the max
+    # Pump intensity scales with the thermal population maximum
     winv_real_abs = torch.abs(original_winv.real)
     finite_mask = torch.isfinite(winv_real_abs)
     if finite_mask.any():
@@ -110,29 +144,76 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
         # Fallback if all values are non-finite
         pump_intensity = torch.tensor(1.0) * pump_magnitude
     
-    # Add pump to the target mode (modifying Winv directly)
+    # Apply pump based on profile type
     pumped_winv_flat = pumped_winv.view(-1)
-    pumped_winv_flat[pump_index_flat] = pumped_winv_flat[pump_index_flat] + pump_intensity
+    
+    if pump_type == 'delta':
+        # Delta function pump - single mode excitation
+        # Models ideal monochromatic pump (e.g., single-frequency laser)
+        pumped_winv_flat[pump_index_flat] = pumped_winv_flat[pump_index_flat] + pump_intensity
+        print(f"Applied delta pump: intensity {pump_intensity:.2e} to mode {pump_index_flat}")
+        
+    elif pump_type == 'gaussian':
+        # Gaussian pump - affects multiple modes with finite bandwidth
+        # Models realistic pump pulse with spectral width
+        # Width parameter controls selectivity vs mode coverage tradeoff
+        print(f"Applying Gaussian pump: center={pump_frequency_thz:.2f} THz, width={pump_width:.2f} THz")
+        
+        # Apply Gaussian weighting to all valid modes
+        modes_affected = 0
+        total_added = 0.0
+        
+        for i in range(len(all_freqs_thz)):
+            if not np.isnan(all_freqs_thz[i]):
+                # Calculate frequency distance from pump center
+                freq_diff = all_freqs_thz[i] - pump_frequency_thz
+                
+                # Gaussian weight: exp(-0.5 * (Δf/σ)²)
+                # Standard Gaussian profile centered at pump frequency
+                weight = np.exp(-0.5 * (freq_diff / pump_width)**2)
+                
+                # Apply weighted pump intensity (with cutoff for efficiency)
+                if weight > 0.01:  # Only affect modes with >1% contribution
+                    pump_contribution = pump_intensity * weight
+                    pumped_winv_flat[i] = pumped_winv_flat[i] + pump_contribution
+                    modes_affected += 1
+                    total_added += pump_contribution.item() if torch.is_tensor(pump_contribution) else pump_contribution
+        
+        print(f"Gaussian pump affected {modes_affected} modes, total intensity added: {total_added:.2e}")
+    
+    else:
+        raise ValueError(f"Unknown pump_type: {pump_type}. Use 'delta' or 'gaussian'")
+    
     pumped_winv = pumped_winv_flat.view(original_winv.shape)
     
-    print(f"Added pump intensity {pump_intensity:.2e} to mode {pump_index_flat}")
+    # Create histogram data showing actual phonon populations (not just density of states)
+    # The Winv values represent the actual mode populations that determine scattering
+    # This is a key improvement: using Winv weights gives true occupancies
     
-    # Create histogram data for visualization only (not for simulation)
-    # For visualization, we'll create simple histograms without weights to show the frequency distribution
-    # and highlight the pumped mode
+    # Extract thermal populations from original Winv
+    winv_values_thermal = original_winv.real.flatten().detach().cpu().numpy()
+    # Extract pumped populations from modified Winv
+    winv_values_pumped = pumped_winv.real.flatten().detach().cpu().numpy()
+    
+    # Create histograms weighted by actual populations
+    # We need to ensure weights match the valid frequencies
+    # Higher Winv = higher thermal population for that mode
     bins = 200
-    thermal_hist_values, bin_edges = np.histogram(valid_freqs, bins=bins, density=True)
+    thermal_hist_values, bin_edges = np.histogram(
+        valid_freqs,  # Only valid frequencies
+        weights=winv_values_thermal[valid_mask],  # Corresponding Winv values
+        bins=bins, 
+        density=False  # Don't normalize - keep absolute population values
+    )
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     
-    # For the pumped histogram, we'll copy the thermal and add a spike at the pumped frequency
-    pumped_pop_values = thermal_hist_values.copy()
-    # Find which bin the pumped frequency falls into
-    pump_bin_idx = np.argmin(np.abs(bin_centers - actual_pump_freq_thz))
-    # Add a spike to show the pump
-    if thermal_hist_values.max() > 0:
-        pumped_pop_values[pump_bin_idx] += thermal_hist_values.max() * pump_magnitude
-    else:
-        pumped_pop_values[pump_bin_idx] += 1.0 * pump_magnitude
+    # Create pumped histogram with modified populations
+    pumped_pop_values, _ = np.histogram(
+        valid_freqs,  # Same frequencies
+        weights=winv_values_pumped[valid_mask],  # Modified Winv values
+        bins=bins,
+        density=False  # Keep absolute values to see pump effect
+    )
 
     # Run Simulations for Both Scenarios using the same model instance
 
@@ -202,9 +283,9 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
     ax = axes[0, 0]
     ax.plot(bin_centers, thermal_hist_values, color='royalblue', lw=2)
     ax.fill_between(bin_centers, thermal_hist_values, color='royalblue', alpha=0.2)
-    ax.set_title("A) Effective Thermal Population (Equilibrium)", fontsize=14)
+    ax.set_title("A) Thermal Phonon Population (Equilibrium)", fontsize=14)
     ax.set_xlabel("Frequency (THz)")
-    ax.set_ylabel("Weighted Density (Population)")
+    ax.set_ylabel("Phonon Population (arb. units)")
     ax.grid(True, linestyle='--', alpha=0.6)
     ax.set_xlim(left=0)
     # FIX: Prevent matplotlib offset notation artifacts
@@ -216,9 +297,9 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
     ax.plot(bin_centers, pumped_pop_values, color='orangered', lw=2)
     ax.fill_between(bin_centers, pumped_pop_values, color='orangered', alpha=0.2)
     ax.axvline(actual_pump_freq_thz, color='red', linestyle='--', lw=2, label=f'Pumped Mode ({actual_pump_freq_thz:.2f} THz)')
-    ax.set_title("B) Pumped Thermal Population (Non-Equilibrium)", fontsize=14)
+    ax.set_title("B) Pumped Phonon Population (Non-Equilibrium)", fontsize=14)
     ax.set_xlabel("Frequency (THz)")
-    ax.set_ylabel("Population (Arbitrary Units)")
+    ax.set_ylabel("Phonon Population (arb. units)")
     ax.grid(True, linestyle='--', alpha=0.6)
     ax.set_xlim(left=0)
     # FIX: Prevent matplotlib offset notation artifacts
@@ -228,6 +309,14 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
 
     # Helper function for plotting intensity slices with log scaling
     def plot_slice(ax, intensity_map, title, hkl_grid):
+        """Plot 2D slice of 3D diffuse intensity with Miller index labels.
+        
+        Args:
+            ax: Matplotlib axis to plot on
+            intensity_map: 3D array of diffuse intensities
+            title: Plot title string
+            hkl_grid: 4D array of Miller indices (h,k,l) at each grid point
+        """
         nonlocal slice_idx
         if slice_idx is None:
             slice_idx = intensity_map.shape[1] // 4
@@ -247,6 +336,7 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
         
         # Apply log scaling for better visualization
         # Add small epsilon to avoid log(0)
+        # Log scale reveals weak features in diffuse scattering
         epsilon = 1e-10
         log_slice_data = np.log10(slice_data + epsilon)
         
@@ -259,6 +349,7 @@ def run_high_res_validation(pump_magnitude=3.0, pump_energy_percentile=50.0, sli
             vmin, vmax = 0, 1
 
         # FIX: Replace NaN values with vmin to prevent blank regions in imshow
+        # This ensures proper visualization even with singular modes
         log_slice_data_fixed = log_slice_data.copy()
         log_slice_data_fixed[~np.isfinite(log_slice_data_fixed)] = vmin
 
@@ -289,9 +380,13 @@ def main():
     parser.add_argument('--pump-magnitude', '-m', type=float, default=3.0,
                         help='Pump intensity multiplier relative to thermal maximum (default: 3.0)')
     parser.add_argument('--pump-energy-percentile', '-p', type=float, default=50.0,
-                        help='Percentile of frequency distribution to pump (default: 95.0)')
+                        help='Percentile of frequency distribution to pump (default: 50.0)')
     parser.add_argument('--slice-idx', '-s', type=int, default=None,
                         help='Index of the slice to plot along the k-axis (default: shape[1]//4)')
+    parser.add_argument('--pump-type', '-t', type=str, choices=['delta', 'gaussian'], default='delta',
+                        help='Type of pump profile: delta (single mode) or gaussian (finite bandwidth) (default: delta)')
+    parser.add_argument('--pump-width', '-w', type=float, default=0.5,
+                        help='Width of Gaussian pump in THz (sigma parameter) (default: 0.5)')
     parser.add_argument('--list-examples', action='store_true',
                         help='Show example usage and exit')
     
@@ -299,8 +394,10 @@ def main():
     
     if args.list_examples:
         print("Example usage:")
-        print("  python pump_probe_validation.py                        # Default: 3x pump at 50 percentile, auto slice")
-        print("  python pump_probe_validation.py -m 5.0 -p 90          # 5x pump at 90th percentile")
+        print("  python pump_probe_validation.py                        # Default: 3x delta pump at 50 percentile")
+        print("  python pump_probe_validation.py -m 5.0 -p 90          # 5x delta pump at 90th percentile")
+        print("  python pump_probe_validation.py -t gaussian -w 0.5    # Gaussian pump with 0.5 THz width")
+        print("  python pump_probe_validation.py -t gaussian -w 1.0 -m 10  # Strong Gaussian pump, 1 THz width")
         print("  python pump_probe_validation.py -m 1.5 -p 50 -s 0     # 1.5x pump at median frequency, first slice")
         print("  python pump_probe_validation.py -m 10.0 -p 99 -s 3    # 10x pump at highest frequencies, slice 3")
         sys.exit(0)
@@ -312,18 +409,25 @@ def main():
     if not (0 <= args.pump_energy_percentile <= 100):
         print("ERROR: Pump energy percentile must be between 0 and 100")
         sys.exit(1)
+    if args.pump_width <= 0:
+        print("ERROR: Pump width must be positive")
+        sys.exit(1)
     if args.slice_idx is not None and args.slice_idx < 0:
         print("ERROR: Slice index must be non-negative")
         sys.exit(1)
     
     print(f"Running with pump magnitude: {args.pump_magnitude}x")
     print(f"Running with pump energy percentile: {args.pump_energy_percentile}%")
+    print(f"Running with pump type: {args.pump_type}")
+    if args.pump_type == 'gaussian':
+        print(f"Running with Gaussian width: {args.pump_width} THz")
     if args.slice_idx is not None:
         print(f"Running with slice index: {args.slice_idx}")
     else:
         print("Running with slice index: auto (shape[1]//4)")
     
-    run_high_res_validation(args.pump_magnitude, args.pump_energy_percentile, args.slice_idx)
+    run_high_res_validation(args.pump_magnitude, args.pump_energy_percentile, args.slice_idx,
+                          args.pump_type, args.pump_width)
 
 if __name__ == "__main__":
     main()
