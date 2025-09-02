@@ -245,6 +245,23 @@ controller.update_clipping()
 - **Blank visualization**: Check data range, try `np.nan_to_num(data)`
 - **Slow performance**: Reduce data size or adjust `alpha_coef`
 - **Browser issues**: Try Chrome/Firefox with WebGL enabled
+- **Opacity not changing in HTML exports**: Use `plot.reload(json, changes)` method only
+
+### K3D HTML Export Opacity Control
+**🚨 CRITICAL: Different API than Python K3D**
+
+```javascript
+// ❌ WRONG - These methods don't exist in HTML exports:
+plot.setAttributes({alpha_coef: 0.5});
+plot.objects[0].alpha_coef = 0.5;
+
+// ✅ CORRECT - Always use reload() method:
+const plot = await window.K3DInstance;
+const world = plot.getWorld();
+const json = world.ObjectsListJson[volumeId];
+json.alpha_coef = 0.5;  // Update JSON config
+plot.reload(json, {alpha_coef: 0.5});  // Apply changes
+```
 
 ### Data Issues  
 - **Wrong shape**: Ensure 3D array, use `.reshape()` if needed

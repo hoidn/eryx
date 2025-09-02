@@ -546,6 +546,9 @@ K3DInstance.then(plot => {
 
 ## Summary of Key Learnings
 
+### 🚨 MOST CRITICAL FINDING: setAttributes() Does Not Exist
+**IGNORE any test files or documentation that mention `plot.setAttributes()` - this method does not exist in K3D HTML exports and will always fail.**
+
 1. **K3D HTML exports have a completely different API** than Python K3D
 2. **Always await K3DInstance** - it's a Promise
 3. **Volume data lives in `world.ObjectsListJson[id].volume.data`**, not `plot.objects`
@@ -553,15 +556,16 @@ K3DInstance.then(plot => {
 5. **Update both config and texture** when modifying volume data
 6. **Use `plot.rebuildSceneData()` and `plot.render()`** after updates
 7. **Global function scope is required** for HTML onclick handlers
-8. **Volume properties CAN be updated**: Use `plot.reload(json, changes)` method
+8. **Volume properties CAN be updated**: Use `plot.reload(json, changes)` method ONLY
 9. **setAttributes method does NOT exist**: Use reload() instead for all property updates
 
 ## Additional Key Findings (From Recent Session)
 
 8. **K3D Property Updates**:
-   - **Opacity CAN be changed**: Use `plot.reload(json, changes)` method to update alpha_coef
-   - **Correct pattern**: `json.alpha_coef = newValue; plot.reload(json, {alpha_coef: newValue})`
-   - **setAttributes method DOES NOT EXIST**: Use reload() instead
+   - **🚨 CRITICAL: setAttributes() method DOES NOT EXIST in HTML exports**
+   - **Opacity CAN be changed**: Use `plot.reload(json, changes)` method to update alpha_coef  
+   - **ONLY correct pattern**: `json.alpha_coef = newValue; plot.reload(json, {alpha_coef: newValue})`
+   - **Any test files mentioning setAttributes() are WRONG** - ignore them completely
    - Cannot completely hide axis tick labels (only color matching workaround)
    - Only one K3D instance per HTML page (use single plot with multiple volumes)
 

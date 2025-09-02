@@ -381,6 +381,62 @@ eryx/visualization/
 - **`TraitError: 'grid' trait`**: Use `grid_visible=False` not `grid=False`
 - **Clipping planes not working**: Stay in Python/Jupyter, don't export to HTML
 
+### K3D HTML Export API - Critical Information
+
+**⚠️ HTML exports have different API than Python K3D!**
+
+#### Methods That DON'T Exist in HTML Exports:
+- ❌ `plot.setAttributes()` - This method does not exist in HTML exports
+- ❌ `plot.objects` - Use `world.ObjectsListJson` instead
+- ❌ Direct property assignment - Property changes don't trigger updates
+
+#### The Correct Pattern for Property Updates:
+```javascript
+// ALWAYS use reload() for property changes
+const plot = await window.K3DInstance;
+const world = plot.getWorld();
+const json = world.ObjectsListJson[volumeId];
+
+// Update property in JSON configuration
+json.alpha_coef = newValue;
+
+// Apply changes using K3D's reload() method
+const changes = { alpha_coef: newValue };
+plot.reload(json, changes);
+
+// Note: reload() handles rendering automatically
+```
+
+#### K3D HTML Export vs Python API Comparison:
+
+| Feature | Python K3D | HTML Export JavaScript |
+|---------|------------|------------------------|
+| **Plot Access** | `plot = k3d.plot()` | `const plot = await window.K3DInstance` |
+| **Objects Array** | `plot.objects` ✅ | `plot.objects` ❌ **DOES NOT EXIST** |
+| **Volume Data Location** | `volume.volume` | `world.ObjectsListJson[id].volume.data` |
+| **Property Updates** | `volume.alpha_coef = val` | `json.alpha_coef = val; plot.reload(json, changes)` |
+| **Opacity Control** | Direct assignment | Use `reload()` method only |
+| **Rendering** | Automatic | Manual `plot.render()` or via `reload()` |
+
+#### Debugging K3D in Browser:
+1. Open browser console
+2. Check available methods: `Object.getOwnPropertyNames(Object.getPrototypeOf(plot))`
+3. Test with reload() pattern first: `plot.reload(json, {alpha_coef: newValue})`
+4. If K3D's control panel can do it, examine the pattern (always uses reload())
+
+#### Common JavaScript Integration Issues:
+```javascript
+// ❌ WRONG - These patterns don't work in HTML exports
+plot.setAttributes({alpha_coef: 0.5});  // Method doesn't exist
+plot.objects[0].alpha_coef = 0.5;       // Objects array doesn't exist
+json.alpha_coef = 0.5;                  // Won't update visualization
+
+// ✅ CORRECT - Always use this pattern
+const json = world.ObjectsListJson[volumeId];
+json.alpha_coef = 0.5;
+plot.reload(json, {alpha_coef: 0.5});
+```
+
 ### Recent Performance Breakthroughs (Aug 2024)
 
 #### Critical Performance Discovery: Direct Data Masking vs Clipping Planes
