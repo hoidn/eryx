@@ -962,8 +962,8 @@ def create_advanced_multi_panel(
             <!-- Alpha Controls -->
             <div class="control-group">
                 <h4>Opacity</h4>
-                <input type="range" id="alpha-slider" min="0.1" max="50" step="0.1" value="{alpha_coef}"
-                       oninput="updateAlphaCoef(this.value)" disabled>
+                <input type="range" id="alpha-slider" min="0.1" max="100" step="0.1" value="{alpha_coef}"
+                       oninput="updateAlphaCoef(this.value)">
                 <div class="value-display">Alpha: <span id="alpha-value">{alpha_coef}</span></div>
             </div>
             
