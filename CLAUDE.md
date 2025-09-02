@@ -401,7 +401,7 @@ const masked = originalData.map((value, i) => {
 ```
 
 #### K3D HTML Export Limitations Discovered
-- **Cannot decouple opacity from intensity**: Fundamentally coupled through transfer functions
+- **Opacity CAN be changed**: Use `plot.reload(json, changes)` method to update alpha_coef in HTML exports
 - **Axis labels cannot be completely hidden**: Only workaround is matching label color to background
 - **Single K3D instance per page**: Use multiple volumes in one plot, not multiple plots
 - **Volume data access pattern**: `world.ObjectsListJson[id].volume.data`, NOT `plot.objects`

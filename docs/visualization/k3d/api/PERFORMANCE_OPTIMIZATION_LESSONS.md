@@ -104,11 +104,23 @@ async function updateVolumeData(newData) {
 }
 ```
 
-### 3. Fundamental K3D Limitations
+### 3. K3D Property Updates and Limitations
 
-**Opacity-Intensity Coupling**: Cannot decouple opacity from intensity values
-- K3D uses transfer functions that inherently couple these properties
-- Workarounds require data preprocessing, not runtime manipulation
+**Opacity CAN be updated in HTML exports**: Use `plot.reload(json, changes)` method
+```javascript
+// CORRECT: Update alpha_coef using reload method
+async function updateOpacity(volumeId, newAlpha) {
+    const plot = await window.K3DInstance;
+    const world = plot.getWorld();
+    const json = world.ObjectsListJson[volumeId];
+    
+    json.alpha_coef = newAlpha;
+    const changes = { alpha_coef: newAlpha };
+    plot.reload(json, changes); // K3D's official API
+}
+```
+- **setAttributes method does NOT exist**: Common misconception, use reload() instead
+- K3D's internal control panel uses this same reload() method
 
 **Axis Label Limitations**: Cannot completely hide axis tick labels (0, 1, -1)
 - Only workaround is setting label color to match background color

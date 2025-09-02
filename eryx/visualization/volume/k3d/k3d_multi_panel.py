@@ -20,8 +20,8 @@ def create_advanced_multi_panel(
     Features:
     - Three volumes side by side (thermal, pumped, difference)
     - Spherical masking with radius slider
-    - Octant masking (8 options to hide 1/8 of volume)
-    - Plane slicing animation
+    - Interactive volume slicing with position slider and axis selection
+    - Animated slicing with real-time slider feedback
     - Log scaling with controls
     - Alpha coefficient control
     - Synchronized camera controls
@@ -64,9 +64,10 @@ def create_advanced_multi_panel(
         grid_visible=False,
         axes_helper=0.0,
         axes=['', '', ''],
-        label_color=0x1e1e1e,
+        label_color=0x000000,  # Black labels to hide against black background
         camera_auto_fit=False,
-        camera_fov=35.0
+        camera_fov=35.0,
+        background_color=0x000000  # Ensure background is black
     )
     
     # Position volumes side by side
@@ -197,8 +198,7 @@ def create_advanced_multi_panel(
     // Mask state for all volumes
     let maskState = {{
         spherical: {{ enabled: false, radius: 50 }},
-        octant: {{ enabled: false, selection: '+++' }},
-        slicing: {{ enabled: false, position: 0, axis: 'x' }},
+        slicing: {{ enabled: false, position: {h//2}, axis: 'x', animating: false }},
         logScale: {{ enabled: false, dynamicRange: 100, offset: 0.001 }}
     }};
     
@@ -318,6 +318,13 @@ def create_advanced_multi_panel(
             // Single render call for all updates
             this.updateQueue = [];
             k3dPlot.rebuildSceneData();
+            
+            // Force hide axes after data update - make labels invisible with black color
+            k3dPlot.parameters.axesHelper = 0.0;
+            k3dPlot.parameters.axes = ['', '', ''];
+            k3dPlot.parameters.gridVisible = false;
+            k3dPlot.parameters.labelColor = 0x000000;  // Critical: black labels invisible on black background
+            
             k3dPlot.render();
         }}
         
@@ -371,18 +378,7 @@ def create_advanced_multi_panel(
                             keepVoxel = keepVoxel && (dist <= radius);
                         }}
                         
-                        // Octant mask (hide selected octant)
-                        if (maskState.octant.enabled) {{
-                            const signs = maskState.octant.selection.split('').map(s => s === '+' ? 1 : -1);
-                            const [signX, signY, signZ] = signs;
-                            
-                            const xMatch = signX > 0 ? (i > centerX) : (i <= centerX);
-                            const yMatch = signY > 0 ? (j > centerY) : (j <= centerY);
-                            const zMatch = signZ > 0 ? (m > centerZ) : (m <= centerZ);
-                            
-                            const inSelectedOctant = xMatch && yMatch && zMatch;
-                            keepVoxel = keepVoxel && !inSelectedOctant;
-                        }}
+                        // Removed octant mask - replaced with enhanced slicing
                         
                         // Slicing plane
                         if (maskState.slicing.enabled) {{
@@ -425,15 +421,38 @@ def create_advanced_multi_panel(
         
         async updateAlphaCoefficient(value) {{
             const alpha = parseFloat(value);
+            console.log('Updating alpha to:', alpha);
             
-            // Update all volume meshes
-            allVolumes.forEach(volume => {{
-                if (volume.alpha_coef !== undefined) {{
-                    volume.alpha_coef = alpha;
+            // Use K3D's reload method - the same one the K3D panel uses
+            const world = k3dPlot.getWorld();
+            let volumeCount = 0;
+            
+            if (world && world.ObjectsListJson) {{
+                for (let id in world.ObjectsListJson) {{
+                    const json = world.ObjectsListJson[id];
+                    if (json && json.type === 'Volume') {{
+                        volumeCount++;
+                        
+                        // Update the JSON property
+                        json.alpha_coef = alpha;
+                        
+                        // Create changes object
+                        const changes = {{ alpha_coef: alpha }};
+                        
+                        // Use K3D's reload method - this is what the panel uses!
+                        if (typeof k3dPlot.reload === 'function') {{
+                            k3dPlot.reload(json, changes);
+                            console.log(`✅ Updated volume ${{id}} alpha to ${{alpha}} using reload()`);
+                        }} else {{
+                            console.error('reload method not found on k3dPlot!');
+                        }}
+                    }}
                 }}
-            }});
+            }} else {{
+                console.error('World or ObjectsListJson not found!');
+            }}
             
-            if (k3dPlot) k3dPlot.render();
+            console.log(`Updated alpha for ${{volumeCount}} volumes`);
         }}
         
         updateStatus() {{
@@ -441,8 +460,9 @@ def create_advanced_multi_panel(
             if (maskState.spherical.enabled) {{
                 status.push(`Sphere: ${{maskState.spherical.radius}}%`);
             }}
-            if (maskState.octant.enabled) {{
-                status.push(`Hidden: ${{maskState.octant.selection}}`);
+            if (maskState.slicing.enabled) {{
+                const animText = maskState.slicing.animating ? ' (Animating)' : '';
+                status.push(`Slice ${{maskState.slicing.axis.toUpperCase()}}: ${{Math.round(maskState.slicing.position)}}${{animText}}`);
             }}
             if (maskState.logScale.enabled) {{
                 status.push('Log Scale');
@@ -481,20 +501,30 @@ def create_advanced_multi_panel(
         }}
     }};
     
-    window.toggleOctantMask = function(enabled) {{
-        maskState.octant.enabled = enabled;
+    window.toggleSlicing = function(enabled) {{
+        maskState.slicing.enabled = enabled;
         if (enabled) {{
-            const select = document.getElementById('octant-select');
-            if (select) {{
-                maskState.octant.selection = select.value;
-            }}
+            const slider = document.getElementById('slice-position');
+            const axis = document.getElementById('slice-axis');
+            if (slider) maskState.slicing.position = parseFloat(slider.value);
+            if (axis) maskState.slicing.axis = axis.value;
         }}
         multiController.applyAllMasks();
     }};
     
-    window.updateOctantSelection = function(value) {{
-        maskState.octant.selection = value;
-        if (maskState.octant.enabled) {{
+    window.updateSliceAxis = function(axis) {{
+        maskState.slicing.axis = axis;
+        if (maskState.slicing.enabled && !maskState.slicing.animating) {{
+            multiController.applyAllMasks();
+        }}
+    }};
+    
+    window.updateSlicePosition = function(position) {{
+        const pos = parseFloat(position);
+        maskState.slicing.position = pos;
+        document.getElementById('slice-display').textContent = Math.round(pos);
+        
+        if (maskState.slicing.enabled && !maskState.slicing.animating) {{
             multiController.applyAllMasks();
         }}
     }};
@@ -532,14 +562,14 @@ def create_advanced_multi_panel(
     window.clearAllMasks = function() {{
         // Reset all mask states
         maskState.spherical.enabled = false;
-        maskState.octant.enabled = false;
         maskState.slicing.enabled = false;
+        maskState.slicing.animating = false;
         
         // Update UI
         const sphereCheck = document.getElementById('sphere-enable');
-        const octantCheck = document.getElementById('octant-enable');
+        const sliceCheck = document.getElementById('slice-enable');
         if (sphereCheck) sphereCheck.checked = false;
-        if (octantCheck) octantCheck.checked = false;
+        if (sliceCheck) sliceCheck.checked = false;
         
         multiController.applyAllMasks();
     }};
@@ -589,13 +619,26 @@ def create_advanced_multi_panel(
     window.startSliceAnimation = function() {{
         if (sliceAnimationFrame) stopSliceAnimation();
         
+        maskState.slicing.animating = true;
+        maskState.slicing.enabled = true;
+        
         let t = 0;
         const maxPos = {h} - 1;
+        const slider = document.getElementById('slice-position');
+        const sliceCheck = document.getElementById('slice-enable');
+        
+        if (sliceCheck) sliceCheck.checked = true;
         
         function animate() {{
             t += 0.015;
-            maskState.slicing.position = maxPos * (0.5 + 0.5 * Math.sin(t));
-            maskState.slicing.enabled = true;
+            const position = maxPos * (0.5 + 0.5 * Math.sin(t));
+            maskState.slicing.position = position;
+            
+            // Update slider position for visual feedback
+            if (slider) {{
+                slider.value = position;
+                document.getElementById('slice-display').textContent = Math.round(position);
+            }}
             
             multiController.applyAllMasks();
             sliceAnimationFrame = requestAnimationFrame(animate);
@@ -609,8 +652,8 @@ def create_advanced_multi_panel(
         if (sliceAnimationFrame) {{
             cancelAnimationFrame(sliceAnimationFrame);
             sliceAnimationFrame = null;
-            maskState.slicing.enabled = false;
-            multiController.applyAllMasks();
+            maskState.slicing.animating = false;
+            // Keep slicing enabled but allow manual control
             updateAnimationStatus();
         }}
     }};
@@ -872,23 +915,23 @@ def create_advanced_multi_panel(
                 <div class="value-display"><span id="radius-display">50%</span></div>
             </div>
             
-            <!-- Octant Controls -->
+            <!-- Slicing Controls -->
             <div class="control-group">
-                <h4>Octant Hide</h4>
+                <h4>Volume Slicing</h4>
                 <label class="checkbox-label">
-                    <input type="checkbox" id="octant-enable" onchange="toggleOctantMask(this.checked)" disabled>
+                    <input type="checkbox" id="slice-enable" onchange="toggleSlicing(this.checked)" disabled>
                     Enable
                 </label>
-                <select id="octant-select" onchange="updateOctantSelection(this.value)" disabled>
-                    <option value="+++">+X +Y +Z</option>
-                    <option value="++-">+X +Y -Z</option>
-                    <option value="+-+">+X -Y +Z</option>
-                    <option value="+--">+X -Y -Z</option>
-                    <option value="-++">-X +Y +Z</option>
-                    <option value="-+-">-X +Y -Z</option>
-                    <option value="--+">-X -Y +Z</option>
-                    <option value="---">-X -Y -Z</option>
+                <select id="slice-axis" onchange="updateSliceAxis(this.value)" disabled>
+                    <option value="x">X-axis</option>
+                    <option value="y">Y-axis</option>
+                    <option value="z">Z-axis</option>
                 </select>
+                <div class="slider-container">
+                    <label>Position: <span id="slice-display">{h//2}</span></label>
+                    <input type="range" id="slice-position" min="0" max="{h-1}" value="{h//2}" 
+                           oninput="updateSlicePosition(this.value)" disabled>
+                </div>
             </div>
             
             <!-- Scaling Controls -->
@@ -996,9 +1039,9 @@ def create_advanced_multi_panel(
     print("Features:")
     print("  • Three synchronized volumes (thermal, pumped, difference)")
     print("  • Spherical masking with radius control")
-    print("  • Octant masking (hide 1/8 of each volume)")
+    print("  • Interactive volume slicing with position control")
     print("  • Log scaling with dynamic range and offset")
-    print("  • Plane slicing animation")
+    print("  • Animated slicing with real-time feedback")
     print("  • Camera rotation animation")
     print("  • Alpha coefficient control")
     print("  • Direct data masking (10x performance vs clipping)")

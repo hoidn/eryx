@@ -132,6 +132,47 @@ async function updateVolumeData(newData) {
 }
 ```
 
+### Updating Volume Properties (Opacity, Color Range, etc.)
+```javascript
+async function updateVolumeOpacity(volumeId, newAlpha) {
+    const plot = await window.K3DInstance;
+    const world = plot.getWorld();
+    
+    // Get volume configuration
+    const json = world.ObjectsListJson[volumeId];
+    
+    // Update alpha_coef in the configuration
+    json.alpha_coef = newAlpha;
+    
+    // Create changes object for reload
+    const changes = { alpha_coef: newAlpha };
+    
+    // Use K3D's official reload method
+    plot.reload(json, changes);
+    
+    // Note: reload() handles rendering automatically
+}
+
+// Generic property update function
+async function updateVolumeProperty(volumeId, property, value) {
+    const plot = await window.K3DInstance;
+    const world = plot.getWorld();
+    
+    const json = world.ObjectsListJson[volumeId];
+    json[property] = value;
+    
+    const changes = {};
+    changes[property] = value;
+    
+    plot.reload(json, changes);
+}
+
+// Examples of other properties you can update:
+// updateVolumeProperty(volumeId, 'color_range', [0.0, 1.0]);
+// updateVolumeProperty(volumeId, 'samples', 512);  
+// updateVolumeProperty(volumeId, 'gradient_step', 0.005);
+```
+
 ---
 
 ## Performance Optimization Guidelines
@@ -512,11 +553,15 @@ K3DInstance.then(plot => {
 5. **Update both config and texture** when modifying volume data
 6. **Use `plot.rebuildSceneData()` and `plot.render()`** after updates
 7. **Global function scope is required** for HTML onclick handlers
+8. **Volume properties CAN be updated**: Use `plot.reload(json, changes)` method
+9. **setAttributes method does NOT exist**: Use reload() instead for all property updates
 
 ## Additional Key Findings (From Recent Session)
 
-8. **Fundamental K3D Limitations**:
-   - Cannot decouple opacity from intensity (coupled through transfer functions)
+8. **K3D Property Updates**:
+   - **Opacity CAN be changed**: Use `plot.reload(json, changes)` method to update alpha_coef
+   - **Correct pattern**: `json.alpha_coef = newValue; plot.reload(json, {alpha_coef: newValue})`
+   - **setAttributes method DOES NOT EXIST**: Use reload() instead
    - Cannot completely hide axis tick labels (only color matching workaround)
    - Only one K3D instance per HTML page (use single plot with multiple volumes)
 
