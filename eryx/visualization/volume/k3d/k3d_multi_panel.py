@@ -66,7 +66,7 @@ def create_advanced_multi_panel(
         axes=['', '', ''],
         label_color=0x000000,  # Black labels to hide against black background
         camera_auto_fit=False,
-        camera_fov=35.0,
+        camera_fov=26.0,
         background_color=0x000000  # Ensure background is black
     )
     
