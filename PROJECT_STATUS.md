@@ -1,5 +1,9 @@
 # PROJECT STATUS
 
+> Historical initiative snapshot (2025-01-29), retained as recorded. This is not
+> a current verification report or roadmap. Start at the [wiki](wiki/index.md)
+> for reviewed project knowledge and [open questions](wiki/open-questions.md).
+
 ## 📍 Current Active Initiative
 
 **Name:** Refactor Pump-Probe Validation Script

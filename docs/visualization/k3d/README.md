@@ -1,7 +1,7 @@
 # K3D documentation map
 
 These pages contain existing usage examples and browser integration findings.
-Start with the [visualization API](../../../eryx/visualization/README.md) for current
+Start with the [visualization topic](../../../wiki/visualization.md) for current
 repository context and dependency limits. Validate examples against your data
 shape and installed K3D version; historical results are not current benchmarks.
 
@@ -21,4 +21,4 @@ shape and installed K3D version; historical results are not current benchmarks.
 - [HTML API reference](K3D_HTML_API_REFERENCE.md)
 - [Animation engine test notes](guides/ANIMATION_ENGINE_TEST.md)
 
-[Visualization documentation](../README.md) · [PyTorch workflow](../../PYTORCH_QUICKSTART.md)
+[Visualization documentation](../README.md) · [Wiki index](../../../wiki/index.md)
