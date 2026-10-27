@@ -90,3 +90,37 @@ Navigation: [index](index.md), [sources](sources.md), [open questions](open-ques
   disabled for the check, then the server was terminated. No browser UI behavior,
   fresh dependency installation, CUDA run, full protein run, or physical
   calibration was tested. No numerical implementation changes were made.
+
+## [2026-10-26] lint | Larger scattering and PDOS notebook views
+
+- Replaced the notebook's 13³ histidine smoke-test defaults with a 65³ grid of
+  the bundled 5zck peptide crystal, following the structure/population examples
+  in [pump_probe_validation.ipynb](../pump_probe_validation.ipynb) and
+  [pump_probe_validation.py](../pump_probe_validation.py). The separate
+  [command-line smoke test](../examples/pytorch_diffuse.py) remains unchanged.
+- The [notebook](../examples/pytorch_diffuse.ipynb) now includes shared log-scale
+  slices with Miller-index axes/colorbars, unweighted PDOS and frequency-binned
+  scattering weights, a Gaussian population enhancement, matched baseline and
+  enhanced maps, a signed difference map, and radial comparison. It saves an
+  illustrative two-column direct-population file separately from the DOS histogram.
+  PDB displacement damping and mode shapes stay fixed; baseline weights are
+  restored with try/finally. No numerical library changes were made.
+- Executed all nonempty code cells with nbclient on CPU at default 65³ and finer
+  129³ sampling. Both generated four inline figures and passed saved-array,
+  finite-mask, nonnegative-response, file-format, and baseline-restoration checks.
+  Default 65³ had 273,896 finite points of 274,625; 129³ had 2,145,960 of 2,146,689.
+  Inspected the PNGs and regenerated the embedded previews after the last plot edit.
+- Loaded the generated `example_population.dat` into a separate model with
+  `pdos_mode="direct"` and recomputed the 65³ map. Finite masks matched; the
+  relative L2 difference from analytic in-memory weighting was 0.0034693.
+  The guide distinguishes sampled-file interpolation from analytic weighting.
+- Initial default execution took about 13 seconds; the later repeated run amid
+  concurrent verification took about 164 seconds, and the finer run about 47
+  seconds. These are observations on this machine, not performance guarantees.
+  One concurrent verification process was stopped and rerun sequentially.
+- Kept executed previews in the source notebook; backed up the user's prior
+  executed copy at `tmp/notebook-visual-check/before-plot-update.ipynb` and retained
+  their added empty cell. Updated the [guide](../docs/PYTORCH_QUICKSTART.md),
+  [README](../README.md), [visualization topic](visualization.md), and source catalog.
+  Notebook schema, local links, and scoped whitespace checks passed. CUDA,
+  large-protein runs, and physical frequency calibration were not tested.

@@ -16,8 +16,9 @@ and browser compatibility must be checked in the environment being used.
 
 ## Existing references
 
-- [PyTorch quickstart notebook](../examples/pytorch_diffuse.ipynb) — bundled CPU
-  simulation with editable inputs and inline slices/radial/PDOS plots; writes to
+- [PyTorch quickstart notebook](../examples/pytorch_diffuse.ipynb) — 65³ 5zck
+  peptide-crystal simulation, labeled log-scale slices, PDOS and enhanced-population
+  comparison, with executed previews and editable inputs; writes to
   `tmp/pytorch-notebook/`. Setup and launch are in the
   [quickstart guide](../docs/PYTORCH_QUICKSTART.md).
 - [Visualization documentation](../docs/visualization/README.md) — backend routes.

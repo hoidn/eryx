@@ -22,7 +22,8 @@ those example outputs.
 
 Follow the [PyTorch workflow](docs/PYTORCH_QUICKSTART.md) to use a protein PDB,
 adjust sampling, interpret outputs, and compare with experiment.
-For editable cells and inline plots, open the [quickstart notebook](examples/pytorch_diffuse.ipynb).
+For larger 65³ peptide-crystal maps, labeled log-scale plots, example PDOS, and
+population comparisons, open the [notebook](examples/pytorch_diffuse.ipynb).
 
 **Import selection matters:** `from eryx.models_torch import OnePhonon` selects
 PyTorch; `from eryx import OnePhonon` selects NumPy. The package also exports

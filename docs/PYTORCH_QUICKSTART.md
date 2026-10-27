@@ -2,7 +2,7 @@
 
 Run a small crystal simulation and inspect diffuse intensity, displacement
 correlations, and phonon diagnostics. All inputs for the first run are bundled.
-For editable cells and inline plots, use the [notebook](../examples/pytorch_diffuse.ipynb).
+For larger maps and PDOS comparisons, use the [notebook](../examples/pytorch_diffuse.ipynb).
 
 ## What the calculation produces
 
@@ -16,11 +16,10 @@ The example saves an NPZ with `intensity`, `q_vectors`, `hkl_grid`, and `map_sha
 The first three arrays share point order. Cartesian q includes the 2π factor and
 has units Å⁻¹. Reshape intensity using the stored shape, never a guessed cube.
 
-## Run the example
+## Run the small command-line example
 
-1. Obtain the repository, including `tests/pdbs/histidine.pdb`. For a protein run,
-   use the bundled `tests/pdbs/6o2h_clean.pdb` or your own PDB with valid cell and
-   symmetry information. No external dataset is required for the first run.
+1. Use the bundled `tests/pdbs/histidine.pdb` initially. Protein runs can use
+   `tests/pdbs/6o2h_clean.pdb` or a custom PDB with cell and symmetry information.
 2. Activate your Python environment and install the requirements below. Run from
    the repository root; the package is imported directly from the checkout.
 3. Run this command sequence:
@@ -31,9 +30,8 @@ has units Å⁻¹. Reshape intensity using the stored shape, never a guessed cub
    ```
 
    The complete script is [examples/pytorch_diffuse.py](../examples/pytorch_diffuse.py).
-   Its inputs are named constants at the top. It runs on CPU and saves plots
-   without requiring a display. Results go to `tmp/pytorch-quickstart/`; subsequent
-   runs overwrite files there. Runtime and memory depend on structure and sampling.
+   Edit the constants at its top. It runs on CPU without a display, writing to
+   `tmp/pytorch-quickstart/` and overwriting previous outputs.
 
 ## What happens
 
@@ -88,9 +86,16 @@ python -m jupyterlab examples/pytorch_diffuse.ipynb
 ```
 
 Select that environment's Python kernel and **Restart Kernel and Run All Cells**.
-The notebook locates the checkout from either the root or `examples/`, exposes
-the model and arrays, and displays plots inline. Its outputs go to
-`tmp/pytorch-notebook/`, separately from the script. Rerunning replaces them.
+The notebook uses the bundled **5zck peptide crystal on a 65³ grid**, with saved
+preview plots, labeled log-scale slices, a PDOS histogram, enhanced mode weights,
+and baseline/enhanced/difference maps. It runs without gradients to limit memory.
+Change its sampling to `(-4, 4, 16)` for 129³. Frequency scales remain empirical.
+
+It locates the checkout from the root or `examples/`. Outputs go to
+`tmp/pytorch-notebook/`; reruns replace them. `pdos.dat` contains unweighted mode
+density; `example_population.dat` is a two-column direct-population input example.
+The comparison applies the analytic weights directly; loading the sampled file
+instead adds interpolation error. These outputs differ from the small script's.
 
 ## Optional: other calculation and visualization routes
 
