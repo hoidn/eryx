@@ -10,7 +10,7 @@
 - [x] Remove duplicated phonon calculations; restore eigenvalue sensitivities with detached-basis Rayleigh quotients and safe handling of masked modes.
 - [x] Verify arbitrary-q intensity vectorization against the existing loop for values and gradients; benchmark representative CPU/CUDA workloads.
 - [x] Run focused regressions, relevant existing tests, and small model integration checks. Compare failures to baseline; obtain independent code review.
-- [ ] Record audit findings, measured results, and verification limits; commit reviewable changes.
+- [x] Record audit findings, measured results, and verification limits; commit reviewable changes.
 
 Regression command: `OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest tests/test_pytorch_audit.py -q`.
 
@@ -33,7 +33,7 @@ The audit assumed individual CPU/CUDA scientific simulations, including dense re
 
 ## Validation
 
-Environment: Python 3.13, PyTorch 2.7.1+cu126; CPU and available CUDA hardware.
+Environment: Python 3.13.9, PyTorch 2.7.1+cu126; CPU and NVIDIA GeForce RTX 3090.
 
 ```
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python -m pytest \
@@ -51,8 +51,9 @@ Full `tests/` runs, with `OMP_NUM_THREADS=1 MKL_NUM_THREADS=1`:
 | --- | ---: | ---: | ---: | ---: |
 | Original `e3333dd`, isolated temporary worktree | 156 | 43 | 16 | 148.68 s |
 | Updated shared checkout | 238 | 36 | 16 | 159.47 s |
+| Audit commit `42097e0` alone, isolated temporary worktree | 233 | 36 | 16 | 142.64 s |
 
-No new failed test identifiers appeared. The updated checkout includes five concurrently added workflow tests, so the passing-count increase is not exclusively attributable to this audit. The remaining failures concern unavailable state logs, outdated gradcheck/state-testing interfaces and initialization assumptions, grid/BZ shape assumptions, and direct eigenvector comparisons across decompositions. Both complete runs exited normally with pytest's test-failure status, not a timeout. The temporary baseline worktree was removed after verification.
+No new failed test identifiers appeared. The shared checkout includes five concurrently added workflow tests; the isolated audit run confirms the numerical changes do not depend on those edits. Against the original revision, seven failures are resolved and all 70 new cases pass. The remaining failures concern unavailable state logs, outdated gradcheck/state-testing interfaces and initialization assumptions, grid/BZ shape assumptions, and direct eigenvector comparisons across decompositions. All complete runs exited normally with pytest's test-failure status, not a timeout. Temporary worktrees were removed after verification.
 
 ## Measured performance
 
