@@ -2,6 +2,7 @@
 
 Run a small crystal simulation and inspect diffuse intensity, displacement
 correlations, and phonon diagnostics. All inputs for the first run are bundled.
+For editable cells and inline plots, use the [notebook](../examples/pytorch_diffuse.ipynb).
 
 ## What the calculation produces
 
@@ -20,11 +21,12 @@ has units Å⁻¹. Reshape intensity using the stored shape, never a guessed cub
 1. Obtain the repository, including `tests/pdbs/histidine.pdb`. For a protein run,
    use the bundled `tests/pdbs/6o2h_clean.pdb` or your own PDB with valid cell and
    symmetry information. No external dataset is required for the first run.
-2. Install the requirements following the [README](../README.md). Run from the
-   repository root; the package is imported directly from the checkout.
+2. Activate your Python environment and install the requirements below. Run from
+   the repository root; the package is imported directly from the checkout.
 3. Run this command sequence:
 
    ```bash
+   python -m pip install -r requirements.txt
    python -m examples.pytorch_diffuse
    ```
 
@@ -76,6 +78,20 @@ by resolution shell, and by distance from Bragg peaks. The disorder method's
 describes the selected displacement coordinates: rigid-body coordinates in this
 example, not an atom-by-atom covariance matrix.
 
+## Optional: notebook
+
+For interactive exploration, install Jupyter in the same environment and launch:
+
+```bash
+python -m pip install jupyterlab ipykernel
+python -m jupyterlab examples/pytorch_diffuse.ipynb
+```
+
+Select that environment's Python kernel and **Restart Kernel and Run All Cells**.
+The notebook locates the checkout from either the root or `examples/`, exposes
+the model and arrays, and displays plots inline. Its outputs go to
+`tmp/pytorch-notebook/`, separately from the script. Rerunning replaces them.
+
 ## Optional: other calculation and visualization routes
 
 - **Selected q points:** supply an N×3 PyTorch tensor through `q_vectors`. GNM
@@ -84,9 +100,7 @@ example, not an atom-by-atom covariance matrix.
 - **Interactive views:** follow the [K3D example](visualization/k3d/getting-started/QUICK_START.md).
 - **Population changes:** see [PDOS](PDOS.md) and the pump-probe demonstration.
 - **Legacy comparisons:** `run_torch.py` defaults to grid mode; `--arb-q` selects
-  its grid-derived arbitrary-q comparison. It and `run_numpy.py` use 5zck with
-  matching 25×103×175 grids and write fixed filenames in the current directory.
-  `eryx/run_torch.py` is an older comparison/benchmark module, not this quickstart.
+  its grid-derived arbitrary-q comparison. These larger runs write fixed filenames.
 
 PyTorch support does not imply complete derivatives: the current model detaches
 phonon eigenvectors. Check gradients for the parameters you intend to fit.

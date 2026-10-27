@@ -16,6 +16,10 @@ and browser compatibility must be checked in the environment being used.
 
 ## Existing references
 
+- [PyTorch quickstart notebook](../examples/pytorch_diffuse.ipynb) — bundled CPU
+  simulation with editable inputs and inline slices/radial/PDOS plots; writes to
+  `tmp/pytorch-notebook/`. Setup and launch are in the
+  [quickstart guide](../docs/PYTORCH_QUICKSTART.md).
 - [Visualization documentation](../docs/visualization/README.md) — backend routes.
 - [K3D quick start](../docs/visualization/k3d/getting-started/QUICK_START.md) — existing usage examples.
 - [HTML JavaScript API](../docs/visualization/k3d/api/HTML_JAVASCRIPT_API.md) and

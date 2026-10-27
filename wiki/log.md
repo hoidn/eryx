@@ -69,3 +69,24 @@ Navigation: [index](index.md), [sources](sources.md), [open questions](open-ques
 - No fresh environment installation, CUDA execution, full protein simulation,
   browser interaction, or physical calibration was verified. Snapshot generation
   is not a browser compatibility test; existing modeling questions remain open.
+
+## [2026-10-26] lint | Executable notebook quickstart
+
+- Reviewed the existing pump-probe and K3D notebook entry cells; none covers the
+  small simulation workflow. Added [examples/pytorch_diffuse.ipynb](../examples/pytorch_diffuse.ipynb)
+  with editable inputs, repository discovery, exposed model/arrays, inline plots,
+  and saved-output assertions. Linked it from the [README](../README.md),
+  [guide](../docs/PYTORCH_QUICKSTART.md), and [visualization topic](visualization.md).
+- Ran both documented pip install commands in the current environment; all
+  requirements were already installed. Ran `python -m examples.pytorch_diffuse`
+  using bundled histidine, CPU, 13×13×13 sampling: 1,872 finite points of 2,197.
+- Executed all eight notebook code cells with nbclient in separate fresh Python
+  kernels, once from the repository root and once from `examples/`. Both passed
+  the notebook assertions and produced two inline PNG plots. The notebook's NPZ
+  arrays, radial profile, and mode histogram matched the command-line outputs
+  at rtol/atol 1e-10, including missing-value masks. An executed copy is saved in
+  `tmp/pytorch-notebook/executed-quickstart.ipynb`; the source notebook is clean.
+- The documented JupyterLab launch reached server startup with browser opening
+  disabled for the check, then the server was terminated. No browser UI behavior,
+  fresh dependency installation, CUDA run, full protein run, or physical
+  calibration was tested. No numerical implementation changes were made.
