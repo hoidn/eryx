@@ -512,9 +512,9 @@ class PDBToTensor:
                 "empty_tensor": torch.tensor([], device=self.device, dtype=torch.float32)
             }
     
-    def array_to_tensor(self, array: np.ndarray, requires_grad: bool = True, dtype=None) -> torch.Tensor:
+    def array_to_tensor(self, array: Union[np.ndarray, torch.Tensor], requires_grad: bool = True, dtype=None) -> torch.Tensor:
         """
-        Convert a NumPy array to a PyTorch tensor with gradient support.
+        Copy a NumPy array or convert an existing tensor without detaching its graph.
         
         Args:
             array: NumPy array to convert. Can be of any shape or dtype.
@@ -541,12 +541,11 @@ class PDBToTensor:
         if dtype is None:
             dtype = torch.float32  # Use consistent default dtype
             
-        if array.size == 0:  # Handle empty arrays
-            tensor = torch.from_numpy(array.copy()).to(dtype=dtype, device=self.device)
+        if isinstance(array, torch.Tensor):
+            tensor = array.to(dtype=dtype, device=self.device)
         else:
-            # Use tensor constructor to specify dtype explicitly
             tensor = torch.tensor(array, dtype=dtype, device=self.device)
-        
+
         # Only set requires_grad for floating point tensors
         if requires_grad and tensor.dtype.is_floating_point:
             tensor.requires_grad_(True)

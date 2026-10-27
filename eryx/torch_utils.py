@@ -11,6 +11,107 @@ import torch
 import torch.nn.functional as F
 from typing import Tuple, List, Dict, Optional, Union, Any, Callable
 
+
+class _SpectralMatrix(torch.autograd.Function):
+    """First-order derivative of U diag(weights) U.H, including repeated modes.
+
+    The weights' existing graph supplies diagonal eigenvalue derivatives.
+    This operation supplies the missing off-diagonal divided differences.
+    """
+
+    @staticmethod
+    def forward(ctx, matrix, eigenvalues, vectors, weights, slopes):
+        ctx.known_slopes = slopes is not None
+        ctx.save_for_backward(eigenvalues, vectors, weights,
+                              torch.zeros_like(weights) if slopes is None else slopes)
+        return (vectors * weights.unsqueeze(-2)) @ vectors.mH
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        # shortcut: first-order only; add spectral second derivatives before supporting Hessian-based fitting.
+        if torch.is_grad_enabled():
+            raise RuntimeError("Mode covariance supports first-order derivatives only; create_graph=True is unsupported.")
+        eigenvalues, vectors, weights, slopes = ctx.saved_tensors
+        gradient = vectors.mH @ ((grad_output + grad_output.mH) * 0.5) @ vectors
+        grad_weights = gradient.diagonal(dim1=-2, dim2=-1).real
+        grad_matrix = None
+        if ctx.needs_input_grad[0]:
+            gap = eigenvalues.unsqueeze(-1) - eigenvalues.unsqueeze(-2)
+            weight_gap = weights.unsqueeze(-1) - weights.unsqueeze(-2)
+            eps = torch.finfo(eigenvalues.dtype).eps
+            scale = eigenvalues.abs().amax(dim=-1, keepdim=True).clamp_min(1).unsqueeze(-1)
+            weight_scale = weights.abs().amax(dim=-1, keepdim=True).clamp_min(1).unsqueeze(-1)
+            diagonal = torch.eye(gap.shape[-1], dtype=torch.bool, device=gap.device)
+            repeated = (gap.abs() <= 64 * eps * scale) & ~diagonal
+            active = grad_output.abs().amax(dim=(-2, -1))[..., None, None] > 0
+            if torch.any(repeated & active & (weight_gap.abs() > 64 * eps * weight_scale)):
+                raise RuntimeError("Unequal weights or a selected rank in a degenerate eigenspace have no unique derivative.")
+            if ctx.known_slopes:
+                slope_gap = slopes.unsqueeze(-1) - slopes.unsqueeze(-2)
+                slope_scale = slopes.abs().amax(dim=-1, keepdim=True).clamp_min(1).unsqueeze(-1)
+                if torch.any(repeated & active & (slope_gap.abs() > 64 * eps * slope_scale)):
+                    raise RuntimeError("Unequal population slopes in a degenerate eigenspace have no unique derivative.")
+                near = (gap.abs() <= eps ** 0.5 * scale) & (weight_gap.abs() <= eps ** 0.5 * weight_scale)
+                near = near | repeated | diagonal
+                limit = (slopes.unsqueeze(-1) + slopes.unsqueeze(-2)) * 0.5
+            else:
+                near = repeated | diagonal
+                limit = _SpectralMatrix._edited_limits(eigenvalues, weights, repeated, grad_weights, active)
+            divided = weight_gap / torch.where(near, torch.ones_like(gap), gap)
+            divided = torch.where(near, limit, divided).masked_fill(diagonal, 0)
+            grad_matrix = vectors @ (gradient * divided) @ vectors.mH
+        return grad_matrix, None, None, grad_weights, None
+
+    @staticmethod
+    @torch.enable_grad()
+    def _edited_limits(eigenvalues, weights, repeated, grad_weights, active):
+        """Local Jacobians handle symmetric population edits, including normalization."""
+        n = eigenvalues.shape[-1]
+        limits = eigenvalues.new_zeros(*eigenvalues.shape, n)
+        if not weights.requires_grad or not eigenvalues.requires_grad or not repeated.any():
+            return limits
+        total_derivative, = torch.autograd.grad(weights, eigenvalues, grad_weights,
+                                                retain_graph=True, allow_unused=True)
+        if total_derivative is None:
+            return limits
+        for batch in torch.where(repeated.any(dim=(-2, -1)))[0].tolist():
+            derivatives = eigenvalues.new_zeros(n, *eigenvalues.shape)
+            if active[batch]:
+                for i in range(n):
+                    derivative, = torch.autograd.grad(weights[batch, i], eigenvalues,
+                                                      retain_graph=True, allow_unused=True)
+                    if derivative is not None:
+                        derivatives[i] = derivative
+            jacobian = derivatives[:, batch]
+            external_derivative = total_derivative[batch] - grad_weights[batch] @ jacobian
+            checked = set()
+            for i in range(n):
+                if i in checked or not repeated[batch, i].any():
+                    continue
+                group = repeated[batch, i].clone()
+                group[i] = True
+                checked.update(torch.where(group)[0].tolist())
+                external = external_derivative[group]
+                if not torch.allclose(external, external[:1].expand_as(external)):
+                    raise RuntimeError("Cross-q population edits distinguish degenerate modes; their derivative is not basis-independent.")
+                if not active[batch]:
+                    continue
+                block = jacobian[group][:, group]
+                diagonal = block.diagonal()
+                off_diagonal = block[~torch.eye(len(block), device=block.device, dtype=torch.bool)]
+                external_mask = torch.ones_like(eigenvalues, dtype=torch.bool)
+                external_mask[batch, group] = False
+                external_columns = derivatives[group][:, external_mask]
+                external_rows = jacobian[~group][:, group]
+                if (not torch.allclose(diagonal, diagonal[0].expand_as(diagonal))
+                        or not torch.allclose(off_diagonal, off_diagonal[0].expand_as(off_diagonal))
+                        or not torch.allclose(external_columns, external_columns[:1].expand_as(external_columns))
+                        or not torch.allclose(external_rows, external_rows[:, :1].expand_as(external_rows))):
+                    raise RuntimeError("Population edits distinguish degenerate modes; their derivative is not basis-independent.")
+                limits[batch][group[:, None] & group[None, :]] = diagonal[0] - off_diagonal[0]
+        return limits
+
+
 class ComplexTensorOps:
     """
     Operations for complex tensors.

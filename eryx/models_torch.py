@@ -197,6 +197,7 @@ class OnePhonon:
         # Always set use_arbitrary_q to False initially
         self.use_arbitrary_q = False
         
+        self.res_limit = res_limit
         self.n_processes = n_processes
         self.model_type = model
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -218,9 +219,7 @@ class OnePhonon:
             if q_vectors.dim() != 2 or q_vectors.shape[1] != 3:
                 raise ValueError(f"q_vectors must have shape [n_points, 3], got {q_vectors.shape}")
             self.use_arbitrary_q = True
-            self.q_vectors = q_vectors.to(device=self.device) # Store input
-            if not self.q_vectors.requires_grad and self.q_vectors.dtype.is_floating_point:
-                 self.q_vectors.requires_grad_(True)
+            self.q_vectors = q_vectors
             logging.debug("[INIT] Arbitrary Q-Mode detected.")
         elif hsampling is None or ksampling is None or lsampling is None:
             # If not arbitrary mode, grid params are essential
@@ -298,7 +297,7 @@ class OnePhonon:
         if getattr(self, 'use_arbitrary_q', False):
             # In arbitrary q-vector mode, use the provided q_vectors directly.
             logging.debug("[_setup] Using user-provided q_vectors.")
-            self.q_grid = self.q_vectors.to(dtype=self.real_dtype)
+            self.q_grid = self.q_vectors.to(device=self.device, dtype=self.real_dtype)
             
             # Invert the grid convention q = 2π * hkl @ A_inv.
             A_inv_tensor = torch.as_tensor(self.model.A_inv, dtype=self.real_dtype, device=self.device)
@@ -336,9 +335,6 @@ class OnePhonon:
             self.q_grid = self.q_grid.to(dtype=self.real_dtype) # Ensure final dtype
             logging.debug(f"[_setup] Calculated q_grid shape={self.q_grid.shape}, q_grid.dtype={self.q_grid.dtype}")
 
-        # Ensure q_grid requires gradients if it's float
-        if self.q_grid.dtype.is_floating_point:
-            self.q_grid.requires_grad_(True)
         logging.debug(f"[_setup] q_grid requires_grad: {self.q_grid.requires_grad}")
         
         # Compute resolution mask using PyTorch functions
@@ -388,12 +384,12 @@ class OnePhonon:
         """
         # Store parameters as tensors with gradients
         if isinstance(gamma_intra, torch.Tensor):
-            self.gamma_intra = gamma_intra.to(dtype=self.real_dtype)
+            self.gamma_intra = gamma_intra
         else:
             self.gamma_intra = torch.tensor(gamma_intra, dtype=self.real_dtype, device=self.device, requires_grad=True)
             
         if isinstance(gamma_inter, torch.Tensor):
-            self.gamma_inter = gamma_inter.to(dtype=self.real_dtype)
+            self.gamma_inter = gamma_inter
         else:
             self.gamma_inter = torch.tensor(gamma_inter, dtype=self.real_dtype, device=self.device, requires_grad=True)
         
@@ -525,8 +521,6 @@ class OnePhonon:
             
             # Keep high precision
             
-            # Set requires_grad after construction
-            self.Amat.requires_grad_(True)
         else:
             self.Amat = None
     
@@ -588,7 +582,6 @@ class OnePhonon:
             
             # Keep high precision
             # Do NOT convert back to float32
-            self.Linv.requires_grad_(True)
     
 
     def _build_M_allatoms(self) -> torch.Tensor:
@@ -641,8 +634,6 @@ class OnePhonon:
         M_allatoms = M_block_diag.reshape(self.n_asu, self.n_dof_per_asu_actual,
                                         self.n_asu, self.n_dof_per_asu_actual)
         
-        # Set requires_grad
-        M_allatoms.requires_grad_(True)
         
         return M_allatoms
     
@@ -714,13 +705,6 @@ class OnePhonon:
             # Calculate norm based on the mapped k_BZ vectors
             self.kvec_norm = torch.linalg.norm(self.kvec, dim=1, keepdim=True).to(dtype=self.real_dtype)
 
-            # The mapping operation breaks direct gradient flow from q to k
-            # Detach to make this explicit and avoid potential gradient issues
-            self.kvec = self.kvec.detach()
-            self.kvec_norm = self.kvec_norm.detach()
-            
-            logging.debug(f"[_build_kvec_Brillouin] Arbitrary mode with BZ mapping: kvec.shape={self.kvec.shape}, "
-                         f"kvec_norm.shape={self.kvec_norm.shape}, requires_grad=False")
         else:
             # Grid-based mode
             logging.debug("[_build_kvec_Brillouin] Grid-based mode. Using Brillouin zone sampling dimensions.")
@@ -737,7 +721,7 @@ class OnePhonon:
             # Get A_inv_tensor (ensure float64)
             if isinstance(self.model.A_inv, torch.Tensor):
                 # Ensure correct dtype and device
-                A_inv_tensor = self.model.A_inv.clone().detach().to(dtype=self.real_dtype, device=self.device) 
+                A_inv_tensor = self.model.A_inv.to(dtype=self.real_dtype, device=self.device)
             else:
                 # Convert from NumPy array with correct dtype
                 A_inv_tensor = torch.tensor(self.model.A_inv, dtype=self.real_dtype, device=self.device) 
@@ -763,9 +747,6 @@ class OnePhonon:
             self.kvec = self.kvec.to(dtype=self.real_dtype)
             self.kvec_norm = self.kvec_norm.to(dtype=self.real_dtype)
             
-            # Ensure tensors require gradients
-            self.kvec.requires_grad_(True)
-            self.kvec_norm.requires_grad_(True)
             
             # Debug output for verification
             logging.debug(f"[_build_kvec_Brillouin] kvec shape={self.kvec.shape}, norm shape={self.kvec_norm.shape}")
@@ -983,7 +964,8 @@ class OnePhonon:
             same_asu = torch.eye(self.n_asu, dtype=torch.bool, device=self.device)
             self.gamma_tensor = torch.where(
                 (cells == self.id_cell_ref) & same_asu,
-                self.gamma_intra, self.gamma_inter,
+                self.gamma_intra.to(device=self.device, dtype=self.real_dtype),
+                self.gamma_inter.to(device=self.device, dtype=self.real_dtype),
             )
         if hasattr(self, 'gamma_tensor'):
             gnm_torch.gamma = self.gamma_tensor
@@ -1020,13 +1002,6 @@ class OnePhonon:
                                                      self.Amat[j_asu].to(self.complex_dtype)))
                     hessian[i_asu, :, i_cell, j_asu, :] = proj.to(self.complex_dtype) # Ensure final assignment is complex
 
-        # Ensure hessian requires gradients
-        if not hessian.requires_grad and hessian.is_complex():
-            # For complex tensors we need a different approach to enable gradients
-            # Create a dummy tensor that requires gradients, then add it to hessian
-            dummy = torch.zeros((1,), dtype=self.complex_dtype, device=self.device, requires_grad=True)
-            hessian = hessian + dummy * 0
-        
         return hessian
     
     def compute_gnm_phonons(self):
@@ -1038,7 +1013,7 @@ class OnePhonon:
         arbitrary q-vector modes with conditional PDOS-based phonon population modeling.
         
         Optimization Strategy:
-        1. Finding unique k-vectors in the first BZ
+        1. Finding unique k-vectors in the first BZ when q is fixed
         2. Computing phonons only for these unique k-vectors  
         3. Expanding the results back to match the original q-vector list
         
@@ -1061,23 +1036,36 @@ class OnePhonon:
         - **With PDOS**: population_factor = interpolate(ρ(ω)) × [exp(-ℏω/kBT) if thermal]
         - **Without PDOS**: Winv = 1/λ where λ are the GNM eigenvalues
         
-        The eigenvalues (Winv) and eigenvectors (V) are stored for intensity calculation.
-        Population gradients include eigenvalue sensitivities. Eigenvectors are held
-        fixed during backward; derivatives through changes in the mode basis are omitted.
+        Populations (Winv) and diagnostic eigenvectors (V) are stored. Intensities
+        differentiate their combined spectral matrix, including mode rotation and
+        repeated eigenvalues with smooth symmetric populations. Diagnostic V uses native eigh
+        autograd and its derivatives require distinct eigenvalues.
         
         Raises:
             RuntimeError: If Hessian computation fails or eigenvalue decomposition fails
             
         Sets:
-            self.winv (torch.Tensor): Inverse phonon populations for all q-vectors
+            self.Winv (torch.Tensor): Mode weights for all q-vectors
             self.V (torch.Tensor): Phonon eigenvectors for all q-vectors
         """
         from eryx.pdb_torch import GaussianNetworkModel as GaussianNetworkModelTorch
         from eryx.torch_utils import BrillouinZoneUtils
 
+        if self.use_arbitrary_q and hasattr(self, 'q_vectors'):
+            self.q_grid = self.q_vectors.to(device=self.device, dtype=self.real_dtype)
+            reciprocal = torch.as_tensor(self.model.A_inv, dtype=self.real_dtype, device=self.device)
+            self.hkl_grid = torch.linalg.solve(reciprocal.T, (self.q_grid / (2 * torch.pi)).T).T
+            from eryx.map_utils_torch import compute_resolution
+            cell = torch.as_tensor(self.model.cell, dtype=self.real_dtype, device=self.device)
+            self.res_mask = compute_resolution(cell, self.hkl_grid) > self.res_limit
+            self._build_kvec_Brillouin()
         hessian = self.compute_hessian()
-        # BZ grouping is discrete; phonon q-gradients are intentionally excluded.
-        unique_k_bz, inverse_indices = BrillouinZoneUtils.find_unique_k_vectors(self.kvec.detach())
+        # Equal trainable q points still need independent derivatives; do not round or share them.
+        if torch.is_grad_enabled() and self.kvec.requires_grad:
+            unique_k_bz = self.kvec
+            inverse_indices = torch.arange(len(self.kvec), device=self.device)
+        else:
+            unique_k_bz, inverse_indices = BrillouinZoneUtils.find_unique_k_vectors(self.kvec)
         n_unique_k = unique_k_bz.shape[0]
         dof_total = self.n_asu * self.n_dof_per_asu
 
@@ -1093,22 +1081,23 @@ class OnePhonon:
         Dmat = Linv @ Kmat @ Linv.mH
         Dmat = 0.5 * (Dmat + Dmat.mH)
 
-        # Keep the existing fixed mode basis to avoid undefined eigenvector gradients at degeneracies.
-        with torch.no_grad():
-            _, vectors = torch.linalg.eigh(Dmat)
-        eigenvalues = (vectors.conj() * (Dmat @ vectors)).sum(dim=-2).real
-        V_unique = (Linv.mH @ vectors).detach()
+        eigenvalues, vectors = torch.linalg.eigh(Dmat)
+        self._dynamical_matrices = Dmat[inverse_indices]
+        self._mode_vectors = vectors.detach()[inverse_indices]
+        self._mode_eigenvalues = eigenvalues[inverse_indices]
+        eigenvalues = self._mode_eigenvalues
+        self.V = Linv.mH @ vectors[inverse_indices]
 
         # Mask before reciprocal/sqrt/interpolation so excluded modes cannot poison backward.
         invalid_modes = eigenvalues < 1e-6
-        self._phonon_eigenvalues = eigenvalues.detach().masked_fill(invalid_modes, float('nan'))[inverse_indices]
-        eigenvalues_unique = torch.where(invalid_modes, torch.ones_like(eigenvalues), eigenvalues)
+        self._phonon_eigenvalues = eigenvalues.detach().masked_fill(invalid_modes, float('nan'))
+        valid_eigenvalues = torch.where(invalid_modes, torch.ones_like(eigenvalues), eigenvalues)
         eps_div = 1e-8
 
         # Check if PDOS is available for custom population calculation
         if hasattr(self, 'pdos_omega') and self.pdos_omega is not None:
             # Match the empirical THz scale used by get_frequencies_thz (100 * 1e12).
-            omega = torch.sqrt(eigenvalues_unique.clamp_min(eps_div)) * 1e14
+            omega = torch.sqrt(valid_eigenvalues.clamp_min(eps_div)) * 1e14
             
             # Interpolate population factors from PDOS
             population_factor = self._differentiable_interp(omega)
@@ -1124,23 +1113,21 @@ class OnePhonon:
                 population_factor = population_factor * boltzmann_factor
             
             # Use population factor as Winv (inverse population = inverse phonon amplitude)
-            winv_unique_real = torch.where(
+            weights_real = torch.where(
                 invalid_modes,
-                torch.tensor(float('nan'), device=eigenvalues_unique.device, dtype=self.real_dtype),
+                torch.tensor(float('nan'), device=eigenvalues.device, dtype=self.real_dtype),
                 population_factor
             ).to(dtype=self.real_dtype)
         else:
             # Default behavior: Winv = 1 / eigenvalues (original thermal equilibrium)
-            winv_unique_real = torch.where(
+            weights_real = torch.where(
                 invalid_modes,
-                torch.tensor(float('nan'), device=eigenvalues_unique.device, dtype=self.real_dtype),
-                1.0 / eigenvalues_unique.clamp_min(eps_div)
+                torch.tensor(float('nan'), device=eigenvalues.device, dtype=self.real_dtype),
+                1.0 / valid_eigenvalues.clamp_min(eps_div)
             ).to(dtype=self.real_dtype)
-        Winv_unique = winv_unique_real.to(dtype=self.complex_dtype) # Cast to complex
-        
-        # Now expand the unique results to match the original q-vector list
-        self.V = V_unique[inverse_indices].detach()
-        self.Winv = Winv_unique[inverse_indices]
+        self.Winv = weights_real.to(dtype=self.complex_dtype)
+        self._computed_winv = self.Winv
+        self._computed_winv_version = None if self.Winv.is_inference() else self.Winv._version
 
         logging.debug(f"Phonon computation complete: V.shape={self.V.shape}, Winv.shape={self.Winv.shape}")
         logging.debug(f"V requires_grad: {self.V.requires_grad}, Winv requires_grad: {self.Winv.requires_grad}")
@@ -1232,7 +1219,7 @@ class OnePhonon:
 
         # Get A_inv tensor (ensure float64)
         if isinstance(self.model.A_inv, torch.Tensor):
-            A_inv_tensor = self.model.A_inv.clone().detach().to(dtype=self.real_dtype, device=self.device)
+            A_inv_tensor = self.model.A_inv.to(dtype=self.real_dtype, device=self.device)
         else:
             A_inv_tensor = torch.tensor(self.model.A_inv, dtype=self.real_dtype, device=self.device)
 
@@ -1281,7 +1268,7 @@ class OnePhonon:
         for j_cell in range(self.n_cell):
             # Get cell origin (ensure it's a tensor with correct dtype)
             r_cell_np = self.crystal.get_unitcell_origin(self.crystal.id_to_hkl(j_cell))
-            r_cell = torch.tensor(r_cell_np, dtype=self.real_dtype, device=self.device)
+            r_cell = torch.as_tensor(r_cell_np, dtype=self.real_dtype, device=self.device)
 
             # Calculate phase factors for all BZ k-vectors
             # Batched dot product: sum over last dim (3) -> shape [total_bz_points]
@@ -1341,11 +1328,33 @@ class OnePhonon:
                                            self.n_cell, self.n_asu, self.n_dof_per_asu))
         self.covar = reshaped_covar.real
         
-        # Set requires_grad for ADP tensor
-        self.ADP.requires_grad_(True)
         
         logging.debug(f"[compute_covariance_matrix] Complete: ADP.shape={self.ADP.shape}, requires_grad={self.ADP.requires_grad}")
     
+
+    def _mode_covariance(self, rank):
+        """Combine modes before differentiating, so equal-frequency modes are basis-independent."""
+        weights = self.Winv.real.masked_fill(torch.isnan(self.Winv.real), 0)
+        if rank != -1:
+            selected = torch.zeros_like(weights)
+            selected[..., rank] = weights[..., rank]
+            weights = selected
+        if not hasattr(self, '_dynamical_matrices'):
+            return (self.V * weights.unsqueeze(-2)) @ self.V.mH
+
+        from eryx.torch_utils import _SpectralMatrix
+        slopes = None
+        if (torch.is_grad_enabled() and self._mode_eigenvalues.requires_grad
+                and weights.requires_grad and self.Winv is self._computed_winv
+                and self.Winv._version == self._computed_winv_version):
+            slopes, = torch.autograd.grad(weights.sum(), self._mode_eigenvalues,
+                                          retain_graph=True, allow_unused=True)
+        spectrum = _SpectralMatrix.apply(
+            self._dynamical_matrices, self._mode_eigenvalues,
+            self._mode_vectors, weights, slopes,
+        )
+        Linv = self.Linv.to(dtype=self.complex_dtype)
+        return Linv.mH @ spectrum @ Linv
 
     def apply_disorder(self, rank: int = -1, outdir: Optional[str] = None, 
                        use_data_adp: bool = False) -> torch.Tensor:
@@ -1383,7 +1392,7 @@ class OnePhonon:
             # Use B-factors directly from PDB data
             if hasattr(self.model, 'adp') and self.model.adp is not None and len(self.model.adp) > 0:
                 # Convert the NumPy array (assuming it's stored as such in self.model)
-                ADP_source = torch.tensor(self.model.adp[0], dtype=self.real_dtype, device=self.device)
+                ADP_source = torch.as_tensor(self.model.adp[0], dtype=self.real_dtype, device=self.device)
                 ADP = ADP_source / (8 * torch.pi * torch.pi) # Apply scaling
                 logging.debug("[apply_disorder] Using ADP from PDB data (use_data_adp=True).")
             else:
@@ -1403,23 +1412,12 @@ class OnePhonon:
                 logging.error("[apply_disorder] Internally computed self.ADP not found despite use_data_adp=False. "
                           "This might indicate a setup issue or non-GNM model. Falling back to PDB data ADP.")
                 if hasattr(self.model, 'adp') and self.model.adp is not None and len(self.model.adp) > 0:
-                    ADP_source = torch.tensor(self.model.adp[0], dtype=self.real_dtype, device=self.device)
+                    ADP_source = torch.as_tensor(self.model.adp[0], dtype=self.real_dtype, device=self.device)
                     ADP = ADP_source / (8 * torch.pi * torch.pi)
                 else:
                     logging.warning("[apply_disorder] PDB data ADP also not found. Falling back to ones.")
                     num_atoms = self.n_atoms_per_asu
                     ADP = torch.ones(num_atoms, device=self.device, dtype=self.real_dtype)
-
-        # Ensure ADP tensor requires grad if it's float (should be handled by its source)
-        # Add a check and potentially connect the graph if needed, especially for self.ADP
-        if ADP.is_floating_point() and not ADP.requires_grad:
-            # Check if the source (self.ADP if use_data_adp=False) required grad
-            source_requires_grad = False
-            if not use_data_adp and hasattr(self, 'ADP') and self.ADP is not None:
-                source_requires_grad = self.ADP.requires_grad # Check the source tensor directly
-            # Only set requires_grad if the source needed it
-            if source_requires_grad:
-                ADP = ADP.clone().detach().requires_grad_(True) # Recreate to ensure leaf status if needed
 
         logging.debug(f"[apply_disorder] Using ADP with shape: {ADP.shape}, requires_grad={ADP.requires_grad}")
         
@@ -1435,7 +1433,7 @@ class OnePhonon:
         valid_indices = torch.where(self.res_mask)[0]
         invalid_modes = torch.isnan(self.Winv.real)
         # Keep excluded modes finite during arithmetic, then restore the output NaN mask.
-        mode_weights = self.Winv.real.masked_fill(invalid_modes, 0)
+        mode_covariance = self._mode_covariance(rank)
 
         if getattr(self, 'use_arbitrary_q', False):
             logging.debug(f"[apply_disorder] ARBITRARY-Q MODE (using direct indexing)")
@@ -1493,18 +1491,11 @@ class OnePhonon:
                 F[:, i_asu, :] = sf_result.to(self.complex_dtype)
             F = F.reshape((valid_indices.numel(), self.n_asu * self.n_dof_per_asu))
 
-            # Apply disorder model
-            V_valid = self.V[valid_indices].to(self.complex_dtype) # V is expanded in arbitrary mode
-            Winv_valid = mode_weights[valid_indices]
-
-            if rank == -1:
-                FV = torch.bmm(F.unsqueeze(1), V_valid).squeeze(1)
-                intensity = (FV.abs().square() * Winv_valid).sum(dim=-1)
-                intensity = intensity.masked_fill(invalid_modes[valid_indices].any(dim=-1), float('nan'))
-            else:
-                FV = (F * V_valid[:, :, rank]).sum(dim=-1)
-                intensity = FV.abs().square() * Winv_valid[:, rank]
-                intensity = intensity.masked_fill(invalid_modes[valid_indices, rank], float('nan'))
+            # Contract the spectral matrix rather than differentiating individual eigenvectors.
+            covariance = mode_covariance[valid_indices]
+            intensity = (torch.bmm(F.unsqueeze(1), covariance).squeeze(1) * F.conj()).sum(dim=-1).real
+            invalid = invalid_modes[valid_indices].any(dim=-1) if rank == -1 else invalid_modes[valid_indices, rank]
+            intensity = intensity.masked_fill(invalid, float('nan'))
 
             # Build full result array
             Id = torch.full((n_points,), float('nan'), dtype=self.real_dtype, device=self.device)
@@ -1537,8 +1528,7 @@ class OnePhonon:
                         ).item()
 
                         # Retrieve phonon data for this BZ index (V/Winv have size n_bz_points)
-                        V_k = self.V[idx].to(self.complex_dtype)
-                        Winv_k = mode_weights[idx]
+                        covariance = mode_covariance[idx]
 
                         # Find corresponding q points
                         q_indices = self._at_kvec_from_miller_points((dh, dk, dl))
@@ -1568,24 +1558,9 @@ class OnePhonon:
                             F[:, i_asu, :] = sf_result.to(self.complex_dtype)
                         F = F.reshape((valid_indices_for_this_bz.numel(), self.n_asu * self.n_dof_per_asu))
 
-                        # Perform calculation using the single V_k, Winv_k for this BZ point
-                        F = F.to(self.complex_dtype)
-                        V_k = V_k.to(self.complex_dtype) # Ensure complex
-
-                        if rank == -1:
-                            FV = torch.matmul(F, V_k)
-                            FV_abs_squared = torch.abs(FV)**2
-                            real_winv = Winv_k.real.to(dtype=self.real_dtype)
-                            intensity_contribution = torch.sum(FV_abs_squared * real_winv, dim=1)
-                            intensity_contribution = intensity_contribution.masked_fill(invalid_modes[idx].any(), float('nan'))
-                        else:
-                            V_k_rank = V_k[:, rank]
-                            Winv_k_rank = Winv_k[rank]
-                            FV = torch.matmul(F, V_k_rank)
-                            FV_abs_squared = torch.abs(FV)**2
-                            real_winv = Winv_k_rank.real.to(dtype=self.real_dtype)
-                            intensity_contribution = FV_abs_squared * real_winv
-                            intensity_contribution = intensity_contribution.masked_fill(invalid_modes[idx, rank], float('nan'))
+                        intensity_contribution = ((F @ covariance) * F.conj()).sum(dim=-1).real
+                        invalid = invalid_modes[idx].any() if rank == -1 else invalid_modes[idx, rank]
+                        intensity_contribution = intensity_contribution.masked_fill(invalid, float('nan'))
 
                         # Accumulate results into the full Id tensor
                         Id.index_add_(0, valid_indices_for_this_bz, intensity_contribution.to(dtype=self.real_dtype))
@@ -1883,7 +1858,7 @@ class OnePhonon:
         3. Converts frequency from THz to rad/s using: ω[rad/s] = ω[THz] × 2π × 10¹²
         4. Creates PyTorch tensors with proper device placement and dtype
         5. Enables gradient tracking for density values (frequencies remain fixed)
-        6. For thermal mode: normalizes density by Boltzmann factor exp(-ℏω/kBT)
+        Thermal normalization is rebuilt during interpolation, keeping density a leaf.
         
         File Format:
             Column 1: Frequency in THz
@@ -1940,18 +1915,6 @@ class OnePhonon:
         # Enable gradient tracking for the density values (frequencies are fixed)
         self.pdos_density.requires_grad_(True)
         
-        # Apply normalization for thermal mode
-        if self.pdos_mode == 'thermal':
-            # Physical constants
-            hbar = 1.054571817e-34  # J⋅s
-            kB = 1.380649e-23       # J/K
-            
-            # Compute Boltzmann factor: exp(-ħω / kBT)
-            boltzmann_factor = torch.exp(-self.pdos_omega * hbar / (kB * self.temperature_k))
-            
-            # Normalize density by Boltzmann factor to get population
-            self.pdos_density = self.pdos_density / boltzmann_factor
-
     def _differentiable_interp(self, query_omega: torch.Tensor) -> torch.Tensor:
         """
         Differentiable linear interpolation of PDOS density at query frequencies.
@@ -2002,8 +1965,12 @@ class OnePhonon:
         # Compute interpolation weights
         x0 = self.pdos_omega[indices - 1]
         x1 = self.pdos_omega[indices]
-        y0 = self.pdos_density[indices - 1]
-        y1 = self.pdos_density[indices]
+        density = self.pdos_density
+        if getattr(self, 'pdos_mode', None) == 'thermal':
+            # Rebuild normalization so samples remain leaves and temperature updates take effect.
+            density = density / torch.exp(-self.pdos_omega * 1.054571817e-34 / (1.380649e-23 * self.temperature_k))
+        y0 = density[indices - 1]
+        y1 = density[indices]
         
         # Linear interpolation using tensor arithmetic
         weights = (query_omega - x0) / (x1 - x0)

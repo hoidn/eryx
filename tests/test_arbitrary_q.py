@@ -455,7 +455,7 @@ class TestArbitraryQVectors(TestBase):
         # Verify model attributes
         self.assertTrue(model.use_arbitrary_q)
         self.assertEqual(model.q_grid.shape, (1, 3))
-        self.assertTrue(model.q_grid.requires_grad)
+        self.assertFalse(model.q_grid.requires_grad)
     
     def test_grid_equivalence(self):
         """
@@ -585,19 +585,19 @@ class TestArbitraryQVectors(TestBase):
         # Verify model attributes
         self.assertTrue(model.use_arbitrary_q)
         self.assertEqual(model.q_grid.shape, (3, 3))
-        self.assertTrue(model.q_grid.requires_grad)
+        self.assertEqual(model.q_grid.requires_grad, q_vectors.requires_grad)
         
         # Verify tensors have correct shapes
         self.assertEqual(model.kvec.shape, (3, 3))
         self.assertEqual(model.kvec_norm.shape, (3, 1))
-        self.assertTrue(model.kvec.requires_grad)
-        self.assertTrue(model.kvec_norm.requires_grad)
+        self.assertEqual(model.kvec.requires_grad, q_vectors.requires_grad)
+        self.assertEqual(model.kvec_norm.requires_grad, q_vectors.requires_grad)
         
         # Verify V and Winv tensors exist and have requires_grad
         self.assertTrue(hasattr(model, 'V'))
         self.assertTrue(hasattr(model, 'Winv'))
-        # V should NOT require grad after fix for Issue #4
-        self.assertFalse(model.V.requires_grad, "V should be detached and not require grad")
+        # Diagnostic eigenvectors retain native autograd; intensities combine modes safely.
+        self.assertTrue(model.V.requires_grad)
         # Winv SHOULD require grad if inputs did (which they do by default in GNM)
         self.assertTrue(model.Winv.requires_grad, "Winv should require grad")
 

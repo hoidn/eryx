@@ -107,5 +107,61 @@ instead adds interpolation error. These outputs differ from the small script's.
 - **Legacy comparisons:** `run_torch.py` defaults to grid mode; `--arb-q` selects
   its grid-derived arbitrary-q comparison. These larger runs write fixed filenames.
 
-PyTorch support does not imply complete derivatives: the current model detaches
-phonon eigenvectors. Check gradients for the parameters you intend to fit.
+## Optimization
+
+First-order intensity derivatives support spring constants (`gamma_intra` and
+`gamma_inter`), arbitrary `q_vectors`, PDOS density samples, and thermal
+`temperature_k`. Pass leaf tensors with `requires_grad=True` for the parameters
+you intend to fit. The model retains supplied tensors, including when converting
+their dtype or device for a calculation. Loaded `model.pdos_density` is also a
+leaf and can be passed to an optimizer.
+
+Rebuild phonons and covariance after parameter updates. `apply_disorder()` uses
+the stored populations so deliberate pump-probe edits to `Winv` remain effective.
+For example, run from the repository root:
+
+```python
+import torch
+from eryx.models_torch import OnePhonon
+
+gamma = torch.tensor(1.3, dtype=torch.float64, requires_grad=True)
+q = torch.tensor([[0.11, 0.07, -0.09]], dtype=torch.float64, requires_grad=True)
+model = OnePhonon(
+    "tests/pdbs/5zck_p1.pdb", [-1, 1, 2], [-1, 1, 2], [-1, 1, 2],
+    gamma_intra=gamma, gamma_inter=0.7, q_vectors=q, device=torch.device("cpu"),
+)
+optimizer = torch.optim.SGD([gamma, q], lr=1e-8)
+for _ in range(2):
+    optimizer.zero_grad()
+    model.compute_gnm_phonons()
+    model.compute_covariance_matrix()
+    intensity = model.apply_disorder()
+    loss = intensity[torch.isfinite(intensity)].sum()  # Replace with your fit loss.
+    loss.backward()
+    optimizer.step()
+```
+
+[Numerical derivative tests](../tests/test_differentiability.py) compare autograd
+with finite differences, including complex mode rotation, repeated eigenvalues,
+independent duplicate q points, and successive optimizer steps. Standalone
+`scatter_torch.structure_factors` also supports derivatives of coordinates,
+form factors, ADPs, and projections.
+
+Limits:
+
+- The combined mode covariance supports first-order backward only. Higher-order
+  requests (`create_graph=True`) raise explicitly; `torch.func` transforms are
+  not supported by its custom operation.
+- PDB parsing, contact topology, grid dimensions, and masks are fixed/discrete.
+  BZ boundaries, mode cutoffs, and interpolation knots can be nonsmooth. End-to-end
+  structure or unit-cell refinement is outside this tested path.
+- Summed intensities handle repeated modes for smooth, symmetric populations.
+  Selecting one rank or assigning unequal weights inside a degenerate eigenspace
+  has no unique derivative and raises during backward. Manual population edits
+  must preserve the symmetry of degenerate modes; uniform scaling and symmetric
+  normalization are supported. Diagnostic `model.V` has native eigenvector
+  gradient restrictions at degeneracy.
+- Recompute any parameter-derived tensors yourself between iterations if you
+  supply non-leaf inputs. Histogram/frequency exports are detached diagnostics.
+  Mathematical gradients do not validate the physical thermal model or its
+  empirical frequency calibration; see [PDOS interpretation](PDOS.md).

@@ -186,12 +186,6 @@ def structure_factors_batch(q_grid: torch.Tensor, xyz: torch.Tensor,
     final_complex = torch.complex(A_real, A_imag)
     assert final_complex.dtype == complex_dtype, f"Final structure factor dtype is {final_complex.dtype}, expected {complex_dtype}"
 
-    # Ensure requires_grad is set if any input required grad
-    if (q_grid.requires_grad or xyz.requires_grad or
-        (U is not None and U.requires_grad) or
-        (project_on_components is not None and project_on_components.requires_grad)):
-        final_complex.requires_grad_(True)
-
     return final_complex
 
 def structure_factors(q_grid: torch.Tensor, xyz: torch.Tensor,

@@ -131,7 +131,7 @@ class TestMatricesAndScatter(unittest.TestCase):
         # Verify torch_Amat properties
         self.assertIsInstance(torch_Amat, torch.Tensor)
         self.assertEqual(torch_Amat.dtype, torch.float64)
-        self.assertTrue(torch_Amat.requires_grad)
+        self.assertFalse(torch_Amat.requires_grad)  # Fixed PDB geometry is not a parameter.
         
         # Convert PyTorch tensor to NumPy array for comparison
         torch_Amat_np = torch_Amat.detach().cpu().numpy()
@@ -158,7 +158,7 @@ class TestMatricesAndScatter(unittest.TestCase):
         # Verify torch_M0 properties
         self.assertIsInstance(torch_M0, torch.Tensor)
         self.assertEqual(torch_M0.dtype, torch.float64)
-        self.assertTrue(torch_M0.requires_grad)
+        self.assertFalse(torch_M0.requires_grad)
         
         # Convert PyTorch tensor to NumPy array for comparison
         torch_M0_np = torch_M0.detach().cpu().numpy()
@@ -232,7 +232,7 @@ class TestMatricesAndScatter(unittest.TestCase):
         
         # Verify torch_Linv properties
         self.assertIsInstance(torch_Linv, torch.Tensor)
-        self.assertTrue(torch_Linv.requires_grad)
+        self.assertFalse(torch_Linv.requires_grad)
         
         # Check dtype - could be float64 or complex128 depending on the code path
         self.assertTrue(

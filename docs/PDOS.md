@@ -11,7 +11,7 @@ and exported histogram. Always import the model from `eryx.models_torch`.
 | First column | Frequency in THz; finite and strictly increasing |
 | Second column | Finite density/population values; use nonnegative values for physical weights |
 | `pdos_mode="direct"` | Interpolate supplied weights and use them as `Winv` |
-| `pdos_mode="thermal"` | Divide input weights by a Boltzmann factor during loading, then apply a Boltzmann factor at interpolation queries |
+| `pdos_mode="thermal"` | Normalize input weights by a Boltzmann factor on each evaluation, then apply a Boltzmann factor at interpolation queries |
 | `temperature_k` | Defaults to None; a positive value is required with a thermal input file |
 | `generate_pdos(bins=100, density=True)` | Histogram mode frequencies from saved eigenvalues; returns two NumPy columns |
 | `get_frequencies_thz()` | Flatten inferred frequencies and remove NaN/inf |
@@ -39,8 +39,10 @@ a calibrated thermal spectrum or an identity-preserving PDOS export/import cycle
   not implement the Bose–Einstein occupation formula previously stated here.
 - Interpolation clamps out-of-range queries to the nearest endpoint. Check
   frequency coverage; endpoint weights are not evidence for an unmeasured band.
-- Eigenvectors are detached in the phonon calculation. Autograd availability
-  is not a guarantee of full structural or force-constant derivatives.
+- Intensity derivatives include eigenvalue and mode-rotation terms. Thermal
+  `pdos_density` remains a leaf tensor; normalization is rebuilt for each
+  evaluation so density and temperature can be optimized repeatedly. See the
+  [optimization workflow and derivative limits](PYTORCH_QUICKSTART.md#optimization).
 
 ## Pump-probe demonstration
 

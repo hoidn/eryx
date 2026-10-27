@@ -1,5 +1,8 @@
 # PyTorch audit implementation plan
 
+The later [differentiability audit](differentiability-audit.md) supersedes this
+audit's detached-eigenvector and q-gradient limitations; the record below is historical.
+
 **Goal:** Audit the PyTorch simulation paths and fix reproducible, substantial performance and correctness defects on `feat/pytorch-audit`.
 
 **Approach:** Keep existing APIs and float64/complex128 precision. Trace callers and compare independent mathematical expectations, then add failing regressions before changing shared implementations. Preserve the existing detached-eigenvector convention and explicitly document its gradient limits.

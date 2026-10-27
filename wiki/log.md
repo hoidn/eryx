@@ -124,3 +124,22 @@ Navigation: [index](index.md), [sources](sources.md), [open questions](open-ques
   [README](../README.md), [visualization topic](visualization.md), and source catalog.
   Notebook schema, local links, and scoped whitespace checks passed. CUDA,
   large-protein runs, and physical frequency calibration were not tested.
+
+## [2026-10-26] audit | First-order differentiability
+
+- Corrected missing phonon mode-rotation and arbitrary-q derivatives, cached
+  parameter graphs, thermal density leaf handling, and tensor-adapter detachment.
+  The [audit record](../plans/differentiability-audit.md) gives the reproduced
+  defects, mathematical approach, and supported scope.
+- Updated the [optimization recipe](../docs/PYTORCH_QUICKSTART.md#optimization),
+  [PDOS reference](../docs/PDOS.md), population topic, and gradient open question.
+  Executed the documented two-step CPU optimization example.
+- All 38 new numerical gradient/edge-case tests pass, including CPU and CUDA
+  cases. Final full suite: 278 passed, 34 failed, 16 skipped. Comparison with
+  baseline (238 passed, 36 failed, 16 skipped) found no new failing test IDs.
+  Remaining failures include missing reference logs, stale fixtures, and state
+  serialization issues. Third-party warnings remain.
+- The combined covariance backward supports first-order derivatives and rejects
+  higher-order requests explicitly. End-to-end second derivatives, structural
+  refinement, large-simulation performance, and physical calibration were not
+  established. See the audit record for boundary and degeneracy limitations.

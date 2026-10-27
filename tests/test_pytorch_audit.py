@@ -295,9 +295,11 @@ def test_arbitrary_q_setup_recovers_skew_cell_miller_indices(tmp_path):
 @pytest.mark.parametrize("use_data_adp", [False, True])
 def test_protein_intensity_backward_is_finite(device, arbitrary, use_data_adp):
     pdb = Path(__file__).parent / "pdbs" / "5zck_p1.pdb"
-    q = torch.tensor([[0.1, 0.2, 0.3], [0.15, 0.35, -0.4], [0, 0, 0]], dtype=torch.float64, device=device) if arbitrary else None
+    q = torch.tensor([[0.1, 0.2, 0.3], [0.15, 0.35, -0.4], [0, 0, 0]], dtype=torch.float64, device=device, requires_grad=True) if arbitrary else None
     model = OnePhonon(str(pdb), [-1, 1, 2], [-1, 1, 2], [-1, 1, 2],
                       q_vectors=q, device=torch.device(device))
+    if not arbitrary:
+        model.q_grid.requires_grad_()
     intensity = model.apply_disorder(use_data_adp=use_data_adp)
     finite = intensity[torch.isfinite(intensity)]
     assert finite.numel() > 0

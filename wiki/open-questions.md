@@ -6,7 +6,7 @@ Last reviewed: 2026-10-26
 
 The former [PDOS guide](../docs/PDOS.md) described
 `rho(omega) / (exp(hbar * omega / (kB * T)) - 1)`.
-[OnePhonon._load_and_prepare_pdos](../eryx/models_torch.py) instead divides the
+[OnePhonon._differentiable_interp](../eryx/models_torch.py) instead divides the
 input density by `exp(-hbar * omega / (kB * T))`, and `compute_gnm_phonons`
 multiplies the interpolated value by that factor at each evaluated frequency.
 The guide now describes those operations without asserting their physical validity.
@@ -19,15 +19,17 @@ documentation. See [phonon populations](phonon-populations.md).
 
 ## Scope of gradient support
 
-Earlier documentation promised full gradient preservation.
-[compute_gnm_phonons](../eryx/models_torch.py) explicitly detaches eigenvectors,
-and thermal preprocessing replaces `pdos_density` with a non-leaf tensor.
-These observations limit blanket optimization claims.
+The [differentiability audit](../plans/differentiability-audit.md) corrected missing
+mode-rotation and q derivatives and kept thermal density samples as leaves.
+[Finite-difference tests](../tests/test_differentiability.py) now cover spring
+constants, arbitrary q, populations, temperature, repeated eigenvalues, and
+multiple optimizer steps. The [optimization recipe](../docs/PYTORCH_QUICKSTART.md#optimization)
+describes the supported first-order path and required refreshes.
 
-**Needed:** identify required optimizable parameters and verify each relevant
-loss derivative, including graph reuse across iterations. The existing
-[gradient tests](../tests/test_gradient_flow.py) are a starting point, not proof
-of every optimization use case. See [validation](validation.md).
+**Remaining scope:** full structural/unit-cell refinement and higher-order
+derivatives have not been established. Discrete topology, masking boundaries,
+and a selected member of a degenerate eigenspace cannot support blanket smoothness
+claims. Verify any new fitting path numerically; see [validation](validation.md).
 
 ## Missing grid reference logs
 
