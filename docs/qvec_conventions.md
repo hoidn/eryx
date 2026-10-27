@@ -1,5 +1,9 @@
 # OnePhonon Implementation Conventions and Data Flow
 
+> Historical design/debugging notes, including proposed fixes and illustrative
+> implementations. For current grid dimensions and GNM constructor requirements,
+> start with [sampling](../wiki/sampling.md); the body below is preserved as history.
+
 This document establishes clear conventions for the OnePhonon implementation, focusing on arbitrary q-vector support and grid-based calculations.
 
 ## 1. Key Data Structures and Their Relationships

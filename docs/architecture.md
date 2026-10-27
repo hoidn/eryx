@@ -1,5 +1,9 @@
 # PyTorch Port Architecture Overview
 
+> Historical port design: phase tables and illustrative code below are retained
+> as design evidence. Use the [maintained architecture summary](../wiki/architecture.md)
+> and linked implementation for current behavior.
+
 ## Component-to-Function Mapping
 
 This table explicitly maps architectural components to functions specified in `to_convert.json` with their execution paths documented in `call_chains.json`:

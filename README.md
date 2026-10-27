@@ -29,9 +29,11 @@ PyTorch; `from eryx import OnePhonon` selects NumPy. The package also exports
 
 ## Further reading
 
+- [Project wiki](wiki/index.md) — architecture, concepts, evidence, and open questions
+- [Documentation index](docs/README.md) — detailed guides and historical records
 - [PDOS inputs and interpretation limits](docs/PDOS.md)
 - [Visualization](docs/visualization/README.md), including optional K3D HTML export
-- [Sampling and reciprocal-space coordinates](docs/PYTORCH_QUICKSTART.md#change-the-inputs)
+- [Sampling and reciprocal-space coordinates](wiki/sampling.md)
 
 The default model uses an elastic network projected onto rigid-body motion of
 each asymmetric unit. This is not a molecular-dynamics simulation. Frequency

@@ -1,6 +1,6 @@
 # Visualization documentation
 
-Start with the [visualization API](../../eryx/visualization/README.md) for data
+Start with the [wiki visualization topic](../../wiki/visualization.md) for data
 contracts, dependencies, and evidence limits, or the
 [PyTorch quickstart](../PYTORCH_QUICKSTART.md) to produce a small result.
 
@@ -22,5 +22,6 @@ contracts, dependencies, and evidence limits, or the
 
 Phase labels and earlier production-readiness claims belong to those records;
 this index does not certify current browser compatibility or test results.
+See [validation](../../wiki/validation.md) for how to record fresh evidence.
 
-[Implementation](../../eryx/visualization/) · [PyTorch workflow](../PYTORCH_QUICKSTART.md)
+[Implementation](../../eryx/visualization/) · [Documentation index](../README.md)
