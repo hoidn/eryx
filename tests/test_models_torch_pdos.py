@@ -600,11 +600,8 @@ class TestGetFrequenciesTHz:
         model = type('MockModel', (), {})()
         
         # Set up a known Winv tensor where we know the expected frequency
-        # If Winv = 1/(ω²) and we want freq = 1.0 THz, then:
-        # ω = 2π × 10¹² rad/s (for 1 THz)
-        # ω² = (2π × 10¹²)²
-        # Winv = 1/ω² = 1/(2π × 10¹²)²
-        omega_for_1thz = 2 * np.pi * 1e12  # rad/s for 1 THz
+        # The model's established calibration is f_THz = 100 * omega_internal / (2π).
+        omega_for_1thz = 2 * np.pi / 100
         winv_for_1thz = 1.0 / (omega_for_1thz ** 2)
         
         # Create a tensor with multiple known values
@@ -721,8 +718,8 @@ END
         # ax.hist(np.sqrt(1. / np.real(self.phonon.Winv).flatten()), bins=50, orientation='horizontal')
         freq_ref = np.sqrt(1. / np.real(model.Winv.detach().cpu().numpy()).flatten())
         freq_clean_ref = freq_ref[np.isfinite(freq_ref)]
-        # Note: reference used rad/s, but we want THz for the method
-        freq_thz_ref = freq_clean_ref / (2 * np.pi * 1e12)
+        # Preserve the established empirical conversion from model units to THz.
+        freq_thz_ref = freq_clean_ref * 100 / (2 * np.pi)
         hist_ref, edges_ref = np.histogram(freq_thz_ref, bins=100, density=True)
         centers_ref = 0.5 * (edges_ref[1:] + edges_ref[:-1])
         pdos_ref = np.column_stack([centers_ref, hist_ref])

@@ -210,7 +210,7 @@ class EigenOps:
             # Use torch.linalg.svd which supports backward() for gradients
             U, S, Vh = torch.linalg.svd(matrix, full_matrices=False)
             # Convert Vh to V to match the expected output format
-            V = Vh.transpose(-2, -1)
+            V = Vh.mH
             
             # Handle zero-valued singular values for numerical stability
             S = torch.clamp(S, min=eps)
@@ -256,7 +256,7 @@ class EigenOps:
         if symmetric:
             # For symmetric matrices, use torch.linalg.eigh which has better gradient support
             # Ensure matrix is symmetric (for numerical stability)
-            matrix_sym = 0.5 * (matrix + matrix.transpose(-2, -1))
+            matrix_sym = 0.5 * (matrix + matrix.mH)
             eigenvalues, eigenvectors = torch.linalg.eigh(matrix_sym)
             
             # Sort eigenvalues in descending order (by magnitude) and reorder eigenvectors
@@ -385,96 +385,6 @@ class BrillouinZoneUtils:
     """
     
     @staticmethod
-    def map_q_to_k_bz(q_vector: torch.Tensor, A_inv_tensor: torch.Tensor) -> torch.Tensor:
-        """
-        Maps a q vector to its equivalent k-vector in the first Brillouin zone.
-        
-        This function implements the standard crystallographic mapping from an arbitrary
-        q-vector in reciprocal space to its equivalent k-vector within the first
-        Brillouin zone. This mapping is essential for correctly calculating phonon
-        properties which are periodic in reciprocal space.
-        
-        The mapping follows these steps:
-        1. Convert q to k = q/(2π)
-        2. Convert k to fractional coordinates hkl using the reciprocal lattice vectors
-        3. Map each fractional coordinate to the range [-0.5, 0.5) using modular arithmetic
-        4. Convert the mapped fractional coordinates back to Cartesian k-vector
-        
-        Args:
-            q_vector: Q-vector in reciprocal space (Å⁻¹) of shape (3,) or (batch_size, 3)
-            A_inv_tensor: Inverse of the real-space unit cell matrix, shape (3,3)
-            
-        Returns:
-            Equivalent k-vector in the first Brillouin zone, same shape as input q_vector
-        """
-        # Ensure high precision
-        real_dtype = torch.float64
-        
-        # --- Debug Prints Start ---
-        print(f"\nDEBUG map_q_to_k_bz:")
-        # Print input q, handling batch vs single vector
-        if q_vector.dim() > 1:
-            print(f"  Input q (batch shape {q_vector.shape}):\n{q_vector.cpu().numpy()}")
-        else:
-            print(f"  Input q: {q_vector.cpu().numpy()}")
-        print(f"  Input A_inv:\n{A_inv_tensor.cpu().numpy()}")
-        # --- Debug Prints End ---
-        
-        # Handle both single vectors and batches
-        is_batch = q_vector.dim() > 1
-        if not is_batch:
-            q_vector = q_vector.unsqueeze(0)  # Add batch dimension
-            
-        q_vector = q_vector.to(dtype=real_dtype)
-        A_inv_tensor = A_inv_tensor.to(dtype=real_dtype)
-
-        # 1. Calculate direct k = q / (2*pi)
-        two_pi = torch.tensor(2.0 * torch.pi, dtype=real_dtype, device=q_vector.device)
-        k_direct = q_vector / two_pi
-        # --- Debug Prints Start ---
-        print(f"  k_direct (q/2pi): {k_direct.cpu().numpy()}")
-        # --- Debug Prints End ---
-
-        # 2. Calculate direct fractional coordinates hkl = k @ A_inv^(-T) = k @ A
-        # We need A = (A_inv)^-1
-        try:
-            # Use pseudo-inverse for potentially non-invertible A_inv
-            A_tensor = torch.linalg.pinv(A_inv_tensor)
-            # --- Debug Prints Start ---
-            print(f"  A (pinv(A_inv)):\n{A_tensor.cpu().numpy()}")
-            # --- Debug Prints End ---
-        except Exception as e:
-            # --- Debug Prints Start ---
-            print(f"  ERROR calculating A: {e}")
-            # --- Debug Prints End ---
-            raise
-
-        # Ensure correct dimensions for matmul
-        hkl_direct = torch.matmul(k_direct, A_tensor)
-        # --- Debug Prints Start ---
-        print(f"  hkl_direct (k @ A): {hkl_direct.cpu().numpy()}")
-        # --- Debug Prints End ---
-
-        # 3. Map fractional coordinates to [-0.5, 0.5)
-        # More robust mapping: (x + 0.5) % 1.0 - 0.5
-        hkl_bz = torch.remainder(hkl_direct + 0.5, 1.0) - 0.5
-        # --- Debug Prints Start ---
-        print(f"  hkl_bz (mapped): {hkl_bz.cpu().numpy()}")
-        # --- Debug Prints End ---
-
-        # 4. Calculate k_bz = hkl_bz @ A_inv^T
-        k_bz = torch.matmul(hkl_bz, A_inv_tensor.T)
-        # --- Debug Prints Start ---
-        print(f"  Output k_bz (hkl_bz @ A_inv.T): {k_bz.cpu().numpy()}")
-        # --- Debug Prints End ---
-
-        # Return k_bz with high precision, removing batch dimension if input was a single vector
-        if not is_batch:
-            k_bz = k_bz.squeeze(0)
-            
-        return k_bz.to(dtype=real_dtype)
-    
-    @staticmethod
     def find_unique_k_vectors(k_vectors: torch.Tensor, tolerance: float = 1e-10) -> tuple:
         """
         Find unique k-vectors within a given tolerance.
@@ -537,7 +447,7 @@ class BrillouinZoneUtils:
         two_pi = torch.tensor(2.0 * torch.pi, dtype=real_dtype, device=q_vector.device)
         k_direct = q_vector / two_pi
 
-        # 2. Calculate direct fractional coordinates hkl = k @ A_inv^(-T) = k @ A
+        # 2. Calculate direct fractional coordinates hkl = k @ A_inv^(-1) = k @ A
         # We need A = (A_inv)^-1
         try:
             # Use pseudo-inverse for potentially non-invertible A_inv
@@ -552,9 +462,11 @@ class BrillouinZoneUtils:
         # 3. Map fractional coordinates to [-0.5, 0.5)
         # More robust mapping: (x + 0.5) % 1.0 - 0.5
         hkl_bz = torch.remainder(hkl_direct + 0.5, 1.0) - 0.5
+        # Round trips through Cartesian space can put a boundary just below +0.5.
+        hkl_bz = torch.where(torch.isclose(hkl_bz, hkl_bz.new_tensor(0.5), rtol=0, atol=1e-12), -0.5, hkl_bz)
 
-        # 4. Calculate k_bz = hkl_bz @ A_inv^T
-        k_bz = torch.matmul(hkl_bz, A_inv_tensor.T)
+        # Match the row-vector convention q = 2π * hkl @ A_inv used by generate_grid.
+        k_bz = torch.matmul(hkl_bz, A_inv_tensor)
 
         # Return k_bz with high precision, removing batch dimension if input was a single vector
         if not is_batch:

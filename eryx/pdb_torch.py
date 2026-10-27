@@ -147,47 +147,7 @@ class GaussianNetworkModel:
         Returns:
             Tensor of shape [batch_size, m, n] containing pseudo-inverses
         """
-        # Ensure high precision
-        batch_matrices = batch_matrices.to(dtype=self.complex_dtype)
-        # Get batch dimensions and matrix shape
-        batch_size, n, m = batch_matrices.shape
-        
-        # Compute batched SVD
-        U, S, Vh = torch.linalg.svd(batch_matrices, full_matrices=False)
-        
-        # Apply rcond cutoff relative to largest singular value in each matrix
-        S_max, _ = torch.max(S, dim=1, keepdim=True)
-        S_cutoff = rcond * S_max
-        S_valid = S > S_cutoff.expand_as(S)
-        
-        # Create batched reciprocal of singular values with zeros for invalid entries
-        S_pinv = torch.zeros_like(S)
-        S_pinv[S_valid] = 1.0 / S[S_valid]
-        
-        # Create diagonal matrices from singular values for matrix multiplication
-        min_dim = min(m, n)
-        
-        # Process entire batch at once using vectorized operations
-        # Create a batch of diagonal matrices using the reciprocal singular values
-        S_pinv_values = S_pinv[:, :min_dim].to(dtype=batch_matrices.dtype)
-        
-        # Create empty matrices for the batch
-        S_pinv_matrix = torch.zeros(batch_size, m, n, device=self.device, dtype=self.complex_dtype)
-        
-        # Create indices for batch diagonal assignment
-        batch_indices = torch.arange(batch_size, device=self.device).repeat_interleave(min_dim)
-        row_indices = torch.arange(min_dim, device=self.device).repeat(batch_size)
-        col_indices = row_indices.clone()
-        
-        # Flatten S_pinv_values for assignment
-        flat_values = S_pinv_values.reshape(-1)
-        
-        # Set all diagonal elements at once
-        S_pinv_matrix[batch_indices, row_indices, col_indices] = flat_values
-        
-        # Compute the pseudo-inverse using U, S_pinv, and Vh
-        # pinv(A) = V * S_pinv * U^H
-        return torch.bmm(Vh.transpose(1, 2).conj(), torch.bmm(S_pinv_matrix, U.transpose(1, 2).conj()))
+        return torch.linalg.pinv(batch_matrices.to(dtype=self.complex_dtype), rtol=rcond)
     
     def compute_Kinv(self, hessian: torch.Tensor, kvec_batch: torch.Tensor, 
                     reshape: bool = True) -> torch.Tensor:
@@ -233,31 +193,8 @@ class GaussianNetworkModel:
         
         Kmat_batch_2d_reg = Kmat_batch_2d + eps * identity
         
-        # Compute pseudo-inverse using batched operation
-        try:
-            Kinv_batch = self._batched_pinv(Kmat_batch_2d_reg, rcond=eps)
-        except RuntimeError as e:
-            # Fallback to direct pinv if batched version fails
-            print(f"WARNING: Batched pseudo-inverse failed with error: {e}")
-            print(f"Falling back to direct pinv for all matrices at once.")
-            
-            # Log more diagnostic information
-            print(f"Matrix shape: {Kmat_batch_2d_reg.shape}, dtype: {Kmat_batch_2d_reg.dtype}")
-            
-            # Process all matrices at once using direct pinv
-            try:
-                # Process all matrices at once with direct pinv
-                Kinv_batch = torch.linalg.pinv(Kmat_batch_2d_reg, rcond=eps)
-            except Exception as direct_e:
-                print(f"WARNING: Direct pinv failed: {direct_e}")
-                print("Using identity matrices as last resort")
-                # Last resort fallback - use identity matrices
-                Kinv_batch = torch.eye(
-                    Kmat_batch_2d_reg.shape[1],
-                    device=Kmat_batch_2d_reg.device,
-                    dtype=Kmat_batch_2d_reg.dtype
-                ).unsqueeze(0).expand(batch_size, -1, -1)
-        
+        Kinv_batch = self._batched_pinv(Kmat_batch_2d_reg, rcond=eps)
+
         # Reshape if requested
         if reshape:
             # From [batch_size, n_asu*n_atoms, n_asu*n_atoms] 
