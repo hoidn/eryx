@@ -1,49 +1,26 @@
-# Visualization Documentation
+# Visualization documentation
 
-This directory contains all documentation for the eryx visualization module, organized by technology.
+Start with the [visualization API](../../eryx/visualization/README.md) for data
+contracts, dependencies, and evidence limits, or the
+[PyTorch quickstart](../PYTORCH_QUICKSTART.md) to produce a small result.
 
-## 📦 Documentation Structure
+## K3D
 
-```
-visualization/
-├── k3d/                   # K3D 3D visualization documentation
-│   ├── README.md          # K3D documentation map & navigation
-│   ├── getting-started/   # Quick start guides
-│   ├── api/              # API references and patterns
-│   ├── guides/           # Advanced guides
-│   └── troubleshooting/  # Debugging help
-│
-├── matplotlib/           # Matplotlib animation documentation
-│   ├── IMPLEMENTATION_PLAN.md
-│   ├── ANIMATION_FORMAT.md
-│   └── completion-reports/
-│
-└── ARCHITECTURE.md       # Overall visualization architecture
-```
+- [Documentation map](k3d/README.md) — browser examples and API references.
+- [Interactive volume quickstart](k3d/getting-started/QUICK_START.md) — export the
+  bundled simulation with explicit voxel-index bounds.
+- [HTML JavaScript API](k3d/api/HTML_JAVASCRIPT_API.md) — export integration notes.
 
-## 🚀 Quick Start
+## Matplotlib
 
-### For K3D Visualization
-- **New users**: Start with [`k3d/getting-started/QUICK_START.md`](./k3d/getting-started/QUICK_START.md)
-- **Debugging**: See [`k3d/api/HTML_JAVASCRIPT_API.md`](./k3d/api/HTML_JAVASCRIPT_API.md)
-- **Navigation**: Use [`k3d/README.md`](./k3d/README.md) for complete K3D documentation map
+- [Slicing example](../../examples/create_slicing_animation.py) — existing GIF workflow.
+- [Architecture](ARCHITECTURE.md) — visualization design.
+- [Implementation plan](matplotlib/IMPLEMENTATION_PLAN.md) and
+  [format decision](matplotlib/ANIMATION_FORMAT.md) — design history.
+- [Phase 1](matplotlib/completion-reports/PHASE1.md) and
+  [Phase 2](matplotlib/completion-reports/PHASE2.md) — historical completion reports.
 
-### For Matplotlib Animation
-- **Planning**: [`matplotlib/IMPLEMENTATION_PLAN.md`](./matplotlib/IMPLEMENTATION_PLAN.md)
-- **Status**: See completion reports in [`matplotlib/completion-reports/`](./matplotlib/completion-reports/)
+Phase labels and earlier production-readiness claims belong to those records;
+this index does not certify current browser compatibility or test results.
 
-## 📊 Status
-
-### K3D System
-✅ **Production Ready** - Complete documentation, working examples, tested patterns
-
-### Matplotlib Animation
-✅ **Phase 1**: Foundation components (Complete)
-✅ **Phase 2**: Slicing animation (Complete)
-🔧 **Phase 3**: Testing and optimization (In Progress)
-
-## 🔗 Links
-
-- [Implementation Code](../../eryx/visualization/) - The actual implementation
-- [Main Project](../../README.md) - Project overview
-- [Integration Guide](../../CLAUDE.md) - Project-specific patterns
+[Implementation](../../eryx/visualization/) · [PyTorch workflow](../PYTORCH_QUICKSTART.md)

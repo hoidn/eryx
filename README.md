@@ -1,43 +1,39 @@
 # eryx
-A collection of scripts for simulating diffuse scattering from protein crystals.
 
-## Features
+Diffuse scattering simulations for protein crystals, with NumPy and PyTorch
+implementations of a one-phonon model. The PyTorch path supports CPU/CUDA,
+reciprocal-space grids, and evaluation at supplied q vectors.
 
-- **Dual Implementation**: Both NumPy and PyTorch versions for traditional scientific computing and gradient-enabled optimization
-- **Phonon Models**: Gaussian Network Model (GNM) and rigid body approximations for protein flexibility
-- **Custom PDOS Support**: User-specified Phonon Density of States integration with full gradient flow preservation
-- **Flexible Sampling**: Grid-based and arbitrary q-vector modes for targeted evaluation
-- **GPU Acceleration**: CUDA support for large-scale computations
+## Getting started
 
-## Installation
+From the repository root, create an environment and run the small bundled example:
 
-To create the `silicx` conda environment:
-> conda create --name sicilx python=3.10
-> 
-> conda activate sicilx
-> 
-> pip install -r requirements.txt
-
-## Custom Phonon Density of States (PDOS)
-
-The PyTorch implementation supports user-specified phonon population modeling through external PDOS data:
-
-```python
-from eryx import OnePhonon
-
-# Use experimental or theoretical PDOS data
-model = OnePhonon(
-    "protein.pdb",
-    hsampling=[-4, 4, 32],
-    ksampling=[-4, 4, 32], 
-    lsampling=[-4, 4, 32],
-    pdos_path="experimental_pdos.dat",  # 2-column file: frequency(THz), density
-    pdos_mode="thermal",                # 'thermal' or 'direct'
-    temperature_k=300.0,               # Required for thermal mode
-)
-
-# Full gradient flow preserved for optimization
-intensity = model.apply_disorder()
+```bash
+conda create --name eryx python=3.10
+conda activate eryx
+python -m pip install -r requirements.txt
+python -m examples.pytorch_diffuse
 ```
 
-For detailed PDOS usage instructions, see [`docs/PDOS_USER_GUIDE.md`](docs/PDOS_USER_GUIDE.md).
+This CPU example uses the bundled histidine crystal on a 13×13×13 grid. It writes
+intensity and coordinates, central slice images, a radial intensity profile, and
+a mode-density histogram under `tmp/pytorch-quickstart/`. Re-running replaces
+those example outputs.
+
+Follow the [PyTorch workflow](docs/PYTORCH_QUICKSTART.md) to use a protein PDB,
+adjust sampling, interpret outputs, and compare with experiment.
+
+**Import selection matters:** `from eryx.models_torch import OnePhonon` selects
+PyTorch; `from eryx import OnePhonon` selects NumPy. The package also exports
+`OnePhonon_torch` as an explicit PyTorch alias.
+
+## Further reading
+
+- [PDOS inputs and interpretation limits](docs/PDOS.md)
+- [Visualization](docs/visualization/README.md), including optional K3D HTML export
+- [Sampling and reciprocal-space coordinates](docs/PYTORCH_QUICKSTART.md#change-the-inputs)
+
+The default model uses an elastic network projected onto rigid-body motion of
+each asymmetric unit. This is not a molecular-dynamics simulation. Frequency
+helpers use an empirical conversion; eigenvectors are detached from autograd.
+Validate physical units and parameter gradients before quantitative fitting.

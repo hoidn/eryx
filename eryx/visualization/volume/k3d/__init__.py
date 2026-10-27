@@ -1,41 +1,9 @@
-"""
-K3D visualization module for advanced 3D clipping and interactive rendering.
+"""Optional K3D rendering.
 
-This module provides production-ready 3D visualization capabilities using K3D's
-WebGL-based rendering engine with full clipping plane support.
-
-Key Features:
-- Interactive 3D volume rendering with real-time clipping planes
-- Spherical and planar clipping modes for anisotropy analysis
-- Browser-based animation and interactive controls
-- Production-quality visualizations for diffuse intensity data
-
-Quick Start:
------------
-import numpy as np
-from eryx.visualization.volume.k3d import create_clipped_visualization
-
-# Load your diffuse intensity data
-data = np.load('torch_diffuse_intensity.npy')
-volume_3d = data.reshape(41, 41, 41)  # Assuming cubic data
-
-# Create interactive visualization with clipping
-plot = create_clipped_visualization(
-    volume_3d,
-    bounds=[-2, 2, -2, 2, -2, 2],  # q-space bounds
-    clipping_planes=[[1, 0, 0, 0]]  # qx > 0 half-space
-)
-
-# Export to HTML
-with open('diffuse_intensity_clipped.html', 'w') as f:
-    f.write(plot.get_snapshot())
-
-Available Examples:
-------------------
-- k3d_spherical_clipping.py/.ipynb: Spherical clipping for isotropic analysis
-- k3d_interactive_clipping.py/.ipynb: Interactive planar clipping controls  
-- final_k3d_clipping_solution.py: Production-ready implementation
-- FINAL_WORKING_SOLUTION.md: Complete documentation and examples
+create_clipped_visualization(volume_data) returns (plot, volume).
+Configure properties on those objects after construction. See
+docs/visualization/k3d/getting-started/QUICK_START.md for an executable example
+with recorded map shape, axis order, and explicit display bounds.
 """
 
 try:

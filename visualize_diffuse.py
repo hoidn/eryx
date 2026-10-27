@@ -36,7 +36,7 @@ def get_map_shape_from_reference(ref_files=["torch_grid_results.npz", "np_result
                     if 'map_shape' in data:
                         shape = tuple(data['map_shape'])
                         # Basic validation of shape tuple
-                        if isinstance(shape, tuple) and len(shape) == 3 and all(isinstance(dim, int) for dim in shape):
+                        if len(shape) == 3 and all(isinstance(dim, (int, np.integer)) and dim > 0 for dim in shape):
                              logging.info(f"Inferred map shape {shape} from reference file: {ref_file}")
                              return shape
                         else:

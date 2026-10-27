@@ -59,8 +59,7 @@ def run_torch(device: Optional[torch.device] = None):
     Returns:
         torch.Tensor: Diffuse intensity tensor
     """
-    if device is None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device(device or ('cuda' if torch.cuda.is_available() else 'cpu'))
     
     try:
         logging.info(f"Starting PyTorch branch computation on {device}")
@@ -93,8 +92,12 @@ def run_torch(device: Optional[torch.device] = None):
         logging.debug(f"  Dimension 1: min = {onephonon_torch.hkl_grid[:,1].min().item()}, max = {onephonon_torch.hkl_grid[:,1].max().item()}")
         logging.debug(f"  Dimension 2: min = {onephonon_torch.hkl_grid[:,2].min().item()}, max = {onephonon_torch.hkl_grid[:,2].max().item()}")
         logging.debug(f"PyTorch: q_grid range: min = {onephonon_torch.q_grid.min().item()}, max = {onephonon_torch.q_grid.max().item()}")
-        logging.info("PyTorch branch diffuse intensity stats: min=%s, max=%s", 
-                    torch.nanmin(Id_torch).item(), torch.nanmax(Id_torch).item())
+        valid = Id_torch[torch.isfinite(Id_torch)]
+        if valid.numel():
+            logging.info("PyTorch branch diffuse intensity stats: min=%s, max=%s",
+                         valid.min().item(), valid.max().item())
+        else:
+            logging.warning("PyTorch computation produced no finite intensities")
         
         # Save results for comparison
         torch.save(Id_torch, "torch_diffuse_intensity.pt")

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import os
 import logging
 import numpy as np
 import torch
@@ -36,11 +35,10 @@ def run_torch(device=None):
         logging.info(f"Starting PyTorch branch computation on {device}")
         
         # Use the same parameters as in run_np
-        #pdb_path = "tests/pdbs/5zck_p1.pdb"
-        pdb_path = "tests/pdbs/6o2h_clean.pdb"
+        pdb_path = "tests/pdbs/5zck_p1.pdb"
         onephonon_torch = OnePhonon(
             pdb_path,
-            [-5, 5, 8], [-5, 5, 8], [-5, 5, 8],
+            [-4, 4, 3], [-17, 17, 3], [-29, 29, 3],
             expand_p1=True,
             res_limit=0.0,
             gnm_cutoff=4.0,
@@ -75,6 +73,7 @@ def run_torch(device=None):
                          np.nanmin(intensity_torch_np), np.nanmax(intensity_torch_np))
         except Exception as e:
             logging.error(f"PyTorch Grid: Failed to save results to {output_filename}: {e}")
+            raise
         
         # Also save original files for backward compatibility
         torch.save(Id_torch, "torch_diffuse_intensity.pt")
@@ -84,16 +83,15 @@ def run_torch(device=None):
         
     except RuntimeError as e:
         # Handle CUDA errors by falling back to CPU
-        if 'CUDA' in str(e):
+        if device.type == 'cuda' and 'CUDA' in str(e):
             logging.error(f"CUDA error: {e}. Attempting to run on CPU instead.")
-            # Modify the environment to force CPU usage and retry
-            os.environ["CUDA_VISIBLE_DEVICES"] = ""
-            return run_torch()  # Recursive call will use CPU now
+            return run_torch(device='cpu')
         else:
             logging.error(f"Error in PyTorch computation: {e}")
             raise
     except Exception as e:
         logging.error(f"Unexpected error in PyTorch computation: {e}")
+        raise
 
 def run_torch_arb_q(device=None):
     """Run PyTorch version in arbitrary q-vector mode."""
@@ -201,6 +199,7 @@ def run_torch_arb_q(device=None):
                 logging.warning("Arb-Q: All flat intensity values are NaN!")
         except Exception as e:
             logging.error(f"Arb-Q: Failed to save results to {output_filename}: {e}")
+            raise
         
         # Also save original files for backward compatibility
         torch.save(Id_arb_q, "arb_q_diffuse_intensity.pt")

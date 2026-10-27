@@ -8,10 +8,8 @@ Quick Start:
 -----------
 # K3D Interactive Visualization (Recommended)
 from eryx.visualization import create_clipped_visualization
-plot = create_clipped_visualization(
-    volume_data,
-    clipping_planes=[[1, 0, 0, 0]]  # qx > 0
-)
+plot, volume = create_clipped_visualization(volume_data)
+plot.clipping_planes = [[1, 0, 0, 0]]
 
 # Matplotlib Animation (Alternative)  
 from eryx.visualization import create_slicing_animation
@@ -78,17 +76,18 @@ def visualize_diffuse_3d(data, method='k3d', **kwargs):
     method : str
         'k3d' (recommended) or 'matplotlib'
     **kwargs
-        Method-specific options
+        Animation options for method='matplotlib'. K3D takes no keyword options;
+        configure the returned plot and volume objects instead.
         
     Returns
     -------
-    Visualization object (type depends on method)
+    (plot, volume) for K3D, or the output filename for Matplotlib animation.
     
     Examples
     --------
     # K3D with clipping (recommended)
-    plot = visualize_diffuse_3d(volume, method='k3d', 
-                               clipping_planes=[[1,0,0,0]])
+    plot, rendered_volume = visualize_diffuse_3d(volume, method='k3d')
+    plot.clipping_planes = [[1, 0, 0, 0]]
                                
     # Matplotlib animation  
     anim = visualize_diffuse_3d('data.npz', method='matplotlib',
@@ -99,16 +98,17 @@ def visualize_diffuse_3d(data, method='k3d', **kwargs):
     # Handle data loading
     if isinstance(data, str):
         handler = IntensityDataHandler(data)
-        volume, coords, shape = handler.load_data()
-        if volume.ndim == 1:
-            # Try to reshape to cube
-            cube_size = round(len(volume) ** (1/3))
-            if cube_size ** 3 == len(volume):
-                volume = volume.reshape(cube_size, cube_size, cube_size)
+        coords, volume, shape = handler.load_data()
+        if volume is None:
+            raise ValueError(f"Could not load intensity from {data}")
+        if volume.ndim == 1 and shape is not None:
+            volume = volume.reshape(shape)
     else:
         volume = np.asarray(data)
     
     if method.lower() == 'k3d':
+        if volume.ndim != 3:
+            raise ValueError("K3D requires a 3D array or an NPZ with map_shape")
         if not _has_k3d:
             raise ImportError("K3D not available. Install with: pip install k3d")
         return create_clipped_visualization(volume, **kwargs)
